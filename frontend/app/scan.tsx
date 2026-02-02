@@ -146,6 +146,53 @@ export default function Scan() {
     }
   };
 
+  // Manual input UI
+  if (showManualInput) {
+    const [manualBarcode, setManualBarcode] = useState(scannedBarcode);
+    const { TextInput } = require('react-native');
+    
+    return (
+      <View style={styles.container}>
+        <Ionicons name="create-outline" size={80} color="#4CAF50" />
+        <Text style={styles.text}>Manual Barcode Entry</Text>
+        <Text style={[styles.text, { fontSize: 14, marginTop: 8, color: '#888' }]}>
+          Scanned: {scannedBarcode}
+        </Text>
+        <Text style={[styles.text, { fontSize: 14, marginTop: 16 }]}>
+          Correct the barcode if needed:
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter barcode"
+          placeholderTextColor="#666"
+          value={manualBarcode}
+          onChangeText={setManualBarcode}
+          keyboardType="numeric"
+          autoFocus
+        />
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={() => handleManualEntry(manualBarcode)}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Searching...' : 'Search Product'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#333', marginTop: 16 }]} 
+          onPress={() => {
+            setShowManualInput(false);
+            setScanned(false);
+            setScannedBarcode('');
+          }}
+        >
+          <Text style={styles.buttonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // Web fallback - camera not available in web preview
   if (Platform.OS === 'web') {
     const [manualBarcode, setManualBarcode] = useState('');
