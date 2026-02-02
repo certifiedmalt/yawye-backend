@@ -156,7 +156,35 @@ IMPORTANT:
 - Products with mostly UPF ingredients should score 1-3
 - Focus on ADDITIVES and PROCESSING, not natural sugars or fats from whole foods
 - Be specific about why industrial processing is harmful
-- Cite research on ultra-processed foods, not general nutrition advice
+- Cite research on ultra-processed foods, not general nutrition advice"""
+        
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON from response
+        import json
+        # Clean response to extract JSON
+        response_text = response.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        
+        analysis = json.loads(response_text)
+        return analysis
+    except Exception as e:
+        print(f"AI Analysis error: {e}")
+        return {
+            "harmful_ingredients": [],
+            "beneficial_ingredients": [],
+            "overall_score": 5,
+            "upf_score": "0%",
+            "processing_category": "Unknown",
+            "recommendation": "Unable to analyze ingredients at this time."
+        }
 
 # Routes
 @app.get("/api/health")
