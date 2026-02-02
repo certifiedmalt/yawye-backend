@@ -131,6 +131,9 @@ export default function Result() {
                     </Text>
                   </View>
                 </View>
+                {ingredient.processing_level && (
+                  <Text style={styles.processingLevel}>{ingredient.processing_level}</Text>
+                )}
                 <Text style={styles.ingredientDescription}>
                   {ingredient.health_risk}
                 </Text>
