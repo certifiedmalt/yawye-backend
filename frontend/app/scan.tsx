@@ -352,6 +352,29 @@ const styles = StyleSheet.create({
   topOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    alignItems: 'flex-end',
+  },
+  manualButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  manualButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 6,
+  },
+  scannedCode: {
+    color: '#4CAF50',
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '600',
   },
   middleRow: {
     flexDirection: 'row',
