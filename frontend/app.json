@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "You Are What You Eat",
+    "slug": "you-are-what-you-eat",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,13 +9,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.youarewhatyoueat.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan product barcodes to analyze ingredients"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
       },
+      "package": "com.youarewhatyoueat.app",
+      "permissions": ["CAMERA"],
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -25,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan product barcodes to analyze ingredients"
+        }
+      ],
       [
         "expo-splash-screen",
         {
