@@ -229,6 +229,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
+  processingBadge: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginVertical: 8,
+  },
+  processingText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  upfScore: {
+    fontSize: 14,
+    color: '#FFA726',
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  processingLevel: {
+    fontSize: 13,
+    color: '#2196F3',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   section: {
     marginBottom: 24,
   },
