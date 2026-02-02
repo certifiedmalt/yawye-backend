@@ -21,6 +21,8 @@ export default function Scan() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState<string>('');
+  const [showManualInput, setShowManualInput] = useState(false);
   const { token } = useAuth();
   const router = useRouter();
 
