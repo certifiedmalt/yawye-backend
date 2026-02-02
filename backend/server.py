@@ -97,66 +97,66 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using AI and return health analysis"""
+    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
-            system_message="You are a nutritionist and food safety expert. Analyze ingredients and provide health impact information."
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers."
         ).with_model("openai", "gpt-5.2")
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
+FOCUS: Identify ultra-processed food (UPF) ingredients and markers of industrial processing.
+
+PRIORITIZE AS HIGH SEVERITY:
+- Emulsifiers (E471, mono/diglycerides, lecithins, polysorbates)
+- Artificial sweeteners (aspartame, sucralose, acesulfame K)
+- Preservatives (sodium benzoate, potassium sorbate, BHA, BHT)
+- Artificial colors (tartrazine, sunset yellow, etc.)
+- Modified starches, maltodextrin, dextrose
+- Hydrogenated oils, palm oil, interesterified fats
+- Flavor enhancers (MSG, hydrolyzed proteins, yeast extract)
+- Added sugars (high fructose corn syrup, glucose syrup, invert sugar)
+
+PROCESSING SCORE SYSTEM:
+- Score 8-10: Whole/minimally processed ingredients (real fruits, nuts, whole grains, simple ingredients)
+- Score 5-7: Moderately processed (refined flour, sugar, salt, some processing)
+- Score 1-4: Ultra-processed (multiple additives, emulsifiers, artificial ingredients, heavily processed)
+
 Provide a JSON response with this exact structure:
 {{
   "harmful_ingredients": [
     {{
       "name": "ingredient name",
-      "health_risk": "brief description of health risk",
+      "health_risk": "explain why this UPF ingredient is harmful (focus on processing, not natural content)",
       "severity": "high/medium/low",
-      "study_reference": "Brief mention of relevant studies or research (e.g., 'WHO studies link high sodium to hypertension')"
+      "processing_level": "NOVA 4 - ultra-processed" or "NOVA 3 - processed" or "NOVA 2 - processed culinary ingredient",
+      "study_reference": "Brief mention of research on ultra-processed foods and health outcomes (e.g., 'Studies link emulsifiers to gut inflammation and metabolic syndrome' or 'Research shows artificial sweeteners disrupt gut microbiome')"
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "brief description of health benefit",
-      "study_reference": "Brief mention of relevant studies or research (e.g., 'Multiple RCTs show fiber reduces cardiovascular disease risk')"
+      "health_benefit": "explain health benefit",
+      "processing_level": "NOVA 1 - whole/minimally processed" or "natural ingredient",
+      "study_reference": "Research on health benefits (e.g., 'Studies show whole grains reduce cardiovascular disease risk by 30%')"
     }}
   ],
   "overall_score": 1-10,
-  "recommendation": "brief overall recommendation"
+  "upf_score": "percentage of ingredients that are ultra-processed (0-100%)",
+  "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
+  "recommendation": "Clear recommendation based on processing level and UPF content"
 }}
 
-Be specific and cite real research areas. Keep it concise but informative."""
-        
-        user_message = UserMessage(text=prompt)
-        response = await chat.send_message(user_message)
-        
-        # Parse JSON from response
-        import json
-        # Clean response to extract JSON
-        response_text = response.strip()
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
-        
-        analysis = json.loads(response_text)
-        return analysis
-    except Exception as e:
-        print(f"AI Analysis error: {e}")
-        return {
-            "harmful_ingredients": [],
-            "beneficial_ingredients": [],
-            "overall_score": 5,
-            "recommendation": "Unable to analyze ingredients at this time."
-        }
+IMPORTANT: 
+- The more processed and artificial the ingredients, the LOWER the score
+- Products with mostly UPF ingredients should score 1-3
+- Focus on ADDITIVES and PROCESSING, not natural sugars or fats from whole foods
+- Be specific about why industrial processing is harmful
+- Cite research on ultra-processed foods, not general nutrition advice
 
 # Routes
 @app.get("/api/health")
