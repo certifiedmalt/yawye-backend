@@ -92,6 +92,14 @@ export default function Result() {
           <Text style={[styles.scoreValue, { color: scoreColor }]}>
             {analysis.overall_score}/10
           </Text>
+          {analysis.processing_category && (
+            <View style={styles.processingBadge}>
+              <Text style={styles.processingText}>{analysis.processing_category}</Text>
+            </View>
+          )}
+          {analysis.upf_score && (
+            <Text style={styles.upfScore}>UPF Content: {analysis.upf_score}</Text>
+          )}
           <Text style={styles.recommendation}>{analysis.recommendation}</Text>
         </View>
 
