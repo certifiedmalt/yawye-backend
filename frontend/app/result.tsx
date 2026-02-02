@@ -15,12 +15,14 @@ interface HarmfulIngredient {
   name: string;
   health_risk: string;
   severity: string;
+  processing_level?: string;
   study_reference: string;
 }
 
 interface BeneficialIngredient {
   name: string;
   health_benefit: string;
+  processing_level?: string;
   study_reference: string;
 }
 
@@ -28,6 +30,8 @@ interface Analysis {
   harmful_ingredients: HarmfulIngredient[];
   beneficial_ingredients: BeneficialIngredient[];
   overall_score: number;
+  upf_score?: string;
+  processing_category?: string;
   recommendation: string;
 }
 
