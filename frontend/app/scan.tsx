@@ -57,9 +57,11 @@ export default function Scan() {
     if (scanned || loading) return;
     
     setScanned(true);
+    setScannedBarcode(data);
     setLoading(true);
 
     try {
+      console.log('Scanned barcode:', data);
       const response = await axios.post(
         `${BACKEND_URL}/api/scan`,
         { barcode: data },
@@ -72,23 +74,75 @@ export default function Scan() {
         params: { productData: JSON.stringify(response.data) },
       });
     } catch (error: any) {
+      console.error('Scan error:', error.response?.data);
+      const errorMessage = error.response?.data?.detail || 'Failed to scan product';
+      
       Alert.alert(
-        'Error',
-        error.response?.data?.detail || 'Failed to scan product',
+        'Scan Error',
+        `Barcode: ${data}\n\n${errorMessage}\n\nWould you like to try entering it manually?`,
         [
           {
             text: 'Try Again',
             onPress: () => {
               setScanned(false);
+              setScannedBarcode('');
+              setLoading(false);
+            },
+          },
+          {
+            text: 'Manual Entry',
+            onPress: () => {
+              setShowManualInput(true);
               setLoading(false);
             },
           },
           {
             text: 'Go Back',
+            style: 'cancel',
             onPress: () => router.back(),
           },
         ]
       );
+    }
+  };
+
+  const handleManualEntry = async (manualCode: string) => {
+    if (!manualCode.trim()) {
+      Alert.alert('Error', 'Please enter a barcode');
+      return;
+    }
+    
+    setLoading(true);
+    setScannedBarcode(manualCode);
+
+    try {
+      const response = await axios.post(
+        `${BACKEND_URL}/api/scan`,
+        { barcode: manualCode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      router.push({
+        pathname: '/result',
+        params: { productData: JSON.stringify(response.data) },
+      });
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail || 'Product not found',
+        [
+          {
+            text: 'Try Again',
+            onPress: () => {
+              setShowManualInput(false);
+              setScanned(false);
+              setScannedBarcode('');
+              setLoading(false);
+            },
+          },
+        ]
+      );
+      setLoading(false);
     }
   };
 
