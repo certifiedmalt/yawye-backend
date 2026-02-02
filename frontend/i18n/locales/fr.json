@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "Tu Es Ce Que Tu Manges",
+    "tagline": "Scanner. Analyser. Mieux Manger."
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "name": "Nom",
+    "loggingIn": "Connexion en cours...",
+    "signingUp": "Création du compte...",
+    "dontHaveAccount": "Pas de compte ? Inscrivez-vous",
+    "alreadyHaveAccount": "Déjà un compte ? Connectez-vous",
+    "createAccount": "Créer un Compte",
+    "joinRevolution": "Rejoignez la révolution de l'alimentation saine"
+  },
+  "main": {
+    "hello": "Bonjour, {{name}} !",
+    "whatEating": "Que mangez-vous aujourd'hui ?",
+    "scansRemaining": "Scans Restants Aujourd'hui",
+    "subscription": "Abonnement",
+    "scanProduct": "Scanner un Produit",
+    "whatWeAnalyze": "Ce Que Nous Analysons",
+    "harmfulIngredients": "Ingrédients Nocifs",
+    "harmfulDesc": "Identifier les ingrédients pouvant présenter des risques pour la santé avec des références scientifiques",
+    "beneficialIngredients": "Ingrédients Bénéfiques",
+    "beneficialDesc": "Découvrez des ingrédients sains soutenus par des études de recherche",
+    "healthScore": "Score de Santé Global",
+    "healthScoreDesc": "Obtenez une évaluation de santé complète de 1 à 10",
+    "upgradeToPremium": "Passer à Premium",
+    "unlimitedScans": "Scans illimités par jour",
+    "detailedAnalysis": "Analyse détaillée des ingrédients",
+    "saveFavorites": "Sauvegarder les favoris",
+    "scanHistory": "Historique des scans",
+    "upgradeNow": "Passer à Premium Maintenant"
+  },
+  "scan": {
+    "scanProduct": "Scanner le Produit",
+    "alignBarcode": "Alignez le code-barres dans le cadre",
+    "analyzingProduct": "Analyse du produit...",
+    "manualEntry": "Saisie Manuelle",
+    "cameraNotAvailable": "Caméra non disponible sur le web",
+    "useExpoGo": "Utilisez l'application Expo Go sur votre téléphone pour scanner les codes-barres",
+    "enterManually": "Ou entrez un code-barres manuellement pour tester :",
+    "enterBarcode": "Entrer le code-barres",
+    "scanManually": "Scanner Manuellement",
+    "scanning": "Scan en cours...",
+    "cameraPermissionDenied": "Permission de la caméra refusée",
+    "enableCamera": "Veuillez activer l'accès à la caméra dans les paramètres de votre appareil",
+    "grantPermission": "Accorder la Permission",
+    "goBack": "Retour",
+    "lastScanned": "Dernier scanné : {{barcode}}",
+    "correctBarcode": "Corrigez le code-barres si nécessaire :",
+    "searchProduct": "Rechercher le Produit",
+    "searching": "Recherche...",
+    "cancel": "Annuler"
+  },
+  "result": {
+    "productAnalysis": "Analyse du Produit",
+    "healthScore": "Score de Santé",
+    "upfContent": "Contenu UPF : {{score}}",
+    "harmfulIngredients": "Ingrédients Nocifs",
+    "beneficialIngredients": "Ingrédients Bénéfiques",
+    "scanAnother": "Scanner un Autre Produit"
+  },
+  "subscription": {
+    "free": "Gratuit",
+    "premium": "Premium",
+    "monthly": "Mensuel",
+    "yearly": "Annuel",
+    "perMonth": "/mois",
+    "perYear": "/an",
+    "save": "Économisez {{percent}}%",
+    "startFreeTrial": "Démarrer l'Essai Gratuit de 7 Jours",
+    "subscribe": "S'abonner",
+    "restore": "Restaurer les Achats",
+    "termsAndPrivacy": "Conditions et Politique de Confidentialité"
+  },
+  "errors": {
+    "fillAllFields": "Veuillez remplir tous les champs",
+    "passwordLength": "Le mot de passe doit contenir au moins 6 caractères",
+    "loginFailed": "Échec de la connexion",
+    "registrationFailed": "Échec de l'inscription",
+    "scanError": "Erreur de Scan",
+    "productNotFound": "Produit non trouvé",
+    "tryAgain": "Réessayer",
+    "error": "Erreur"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "logout": "Déconnexion",
+    "confirm": "Confirmer",
+    "cancel": "Annuler"
+  }
+}

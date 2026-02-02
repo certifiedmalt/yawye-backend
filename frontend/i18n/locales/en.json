@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "You Are What You Eat",
+    "tagline": "Scan. Analyze. Eat Better."
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "loggingIn": "Logging in...",
+    "signingUp": "Creating Account...",
+    "dontHaveAccount": "Don't have an account? Sign up",
+    "alreadyHaveAccount": "Already have an account? Login",
+    "createAccount": "Create Account",
+    "joinRevolution": "Join the healthy eating revolution"
+  },
+  "main": {
+    "hello": "Hello, {{name}}!",
+    "whatEating": "What are you eating today?",
+    "scansRemaining": "Scans Remaining Today",
+    "subscription": "Subscription",
+    "scanProduct": "Scan a Product",
+    "whatWeAnalyze": "What We Analyze",
+    "harmfulIngredients": "Harmful Ingredients",
+    "harmfulDesc": "Identify ingredients that may pose health risks with scientific references",
+    "beneficialIngredients": "Beneficial Ingredients",
+    "beneficialDesc": "Discover healthy ingredients backed by research studies",
+    "healthScore": "Overall Health Score",
+    "healthScoreDesc": "Get a comprehensive health rating from 1-10",
+    "upgradeToPremium": "Upgrade to Premium",
+    "unlimitedScans": "Unlimited scans per day",
+    "detailedAnalysis": "Detailed ingredient analysis",
+    "saveFavorites": "Save favorites",
+    "scanHistory": "Scan history",
+    "upgradeNow": "Upgrade Now"
+  },
+  "scan": {
+    "scanProduct": "Scan Product",
+    "alignBarcode": "Align barcode within the frame",
+    "analyzingProduct": "Analyzing product...",
+    "manualEntry": "Manual Entry",
+    "cameraNotAvailable": "Camera not available on web",
+    "useExpoGo": "Use Expo Go app on your phone to scan barcodes",
+    "enterManually": "Or enter a barcode manually for testing:",
+    "enterBarcode": "Enter barcode",
+    "scanManually": "Scan Manually",
+    "scanning": "Scanning...",
+    "cameraPermissionDenied": "Camera permission denied",
+    "enableCamera": "Please enable camera access in your device settings",
+    "grantPermission": "Grant Permission",
+    "goBack": "Go Back",
+    "lastScanned": "Last scanned: {{barcode}}",
+    "correctBarcode": "Correct the barcode if needed:",
+    "searchProduct": "Search Product",
+    "searching": "Searching...",
+    "cancel": "Cancel"
+  },
+  "result": {
+    "productAnalysis": "Product Analysis",
+    "healthScore": "Health Score",
+    "upfContent": "UPF Content: {{score}}",
+    "harmfulIngredients": "Harmful Ingredients",
+    "beneficialIngredients": "Beneficial Ingredients",
+    "scanAnother": "Scan Another Product"
+  },
+  "subscription": {
+    "free": "Free",
+    "premium": "Premium",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "perMonth": "/month",
+    "perYear": "/year",
+    "save": "Save {{percent}}%",
+    "startFreeTrial": "Start 7-Day Free Trial",
+    "subscribe": "Subscribe",
+    "restore": "Restore Purchases",
+    "termsAndPrivacy": "Terms & Privacy Policy"
+  },
+  "errors": {
+    "fillAllFields": "Please fill in all fields",
+    "passwordLength": "Password must be at least 6 characters",
+    "loginFailed": "Login failed",
+    "registrationFailed": "Registration failed",
+    "scanError": "Scan Error",
+    "productNotFound": "Product not found",
+    "tryAgain": "Try Again",
+    "error": "Error"
+  },
+  "common": {
+    "loading": "Loading...",
+    "logout": "Logout",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  }
+}
