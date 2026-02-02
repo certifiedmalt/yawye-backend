@@ -299,6 +299,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 24,
   },
+  input: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+    width: '80%',
+  },
   button: {
     backgroundColor: '#4CAF50',
     borderRadius: 12,
