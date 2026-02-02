@@ -301,7 +301,15 @@ export default function Scan() {
         }}
       >
         <View style={styles.overlay}>
-          <View style={styles.topOverlay} />
+          <View style={styles.topOverlay}>
+            <TouchableOpacity 
+              style={styles.manualButton}
+              onPress={() => setShowManualInput(true)}
+            >
+              <Ionicons name="create-outline" size={20} color="#fff" />
+              <Text style={styles.manualButtonText}>Manual Entry</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.middleRow}>
             <View style={styles.sideOverlay} />
             <View style={styles.scanArea}>
@@ -316,6 +324,9 @@ export default function Scan() {
             <Text style={styles.instructions}>
               {loading ? 'Analyzing product...' : 'Align barcode within the frame'}
             </Text>
+            {scannedBarcode && !loading && (
+              <Text style={styles.scannedCode}>Last scanned: {scannedBarcode}</Text>
+            )}
             {loading && <ActivityIndicator size="large" color="#4CAF50" />}
           </View>
         </View>
