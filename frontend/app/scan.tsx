@@ -90,6 +90,65 @@ export default function Scan() {
     }
   };
 
+  // Web fallback - camera not available in web preview
+  if (Platform.OS === 'web') {
+    const [manualBarcode, setManualBarcode] = useState('');
+    const { TextInput } = require('react-native');
+    
+    const handleManualScan = async () => {
+      if (!manualBarcode.trim()) {
+        Alert.alert('Error', 'Please enter a barcode');
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await axios.post(
+          `${BACKEND_URL}/api/scan`,
+          { barcode: manualBarcode },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        router.push({
+          pathname: '/result',
+          params: { productData: JSON.stringify(response.data) },
+        });
+      } catch (error: any) {
+        Alert.alert('Error', error.response?.data?.detail || 'Failed to scan product');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    return (
+      <View style={styles.container}>
+        <Ionicons name="barcode-outline" size={80} color="#4CAF50" />
+        <Text style={styles.text}>Camera not available on web</Text>
+        <Text style={[styles.text, { fontSize: 14, marginTop: 8 }]}>
+          Use Expo Go app on your phone to scan barcodes
+        </Text>
+        <Text style={[styles.text, { fontSize: 14, marginTop: 16 }]}>
+          Or enter a barcode manually for testing:
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter barcode (e.g. 3017620422003)"
+          placeholderTextColor="#666"
+          value={manualBarcode}
+          onChangeText={setManualBarcode}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={handleManualScan}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Scanning...' : 'Scan Manually'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (hasPermission === null) {
     return (
       <View style={styles.container}>
@@ -104,8 +163,17 @@ export default function Scan() {
       <View style={styles.container}>
         <Ionicons name="camera-off" size={64} color="#888" />
         <Text style={styles.text}>Camera permission denied</Text>
+        <Text style={[styles.text, { fontSize: 14, marginTop: 8, color: '#888' }]}>
+          Please enable camera access in your device settings
+        </Text>
         <TouchableOpacity style={styles.button} onPress={requestCameraPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#333', marginTop: 16 }]} 
+          onPress={() => router.back()}
+        >
+          <Text style={styles.buttonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
