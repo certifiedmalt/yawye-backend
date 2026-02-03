@@ -396,11 +396,75 @@ async def get_favorites(current_user = Depends(get_current_user)):
 async def upgrade_subscription(current_user = Depends(get_current_user)):
     # Simple upgrade (in production, integrate with payment processor)
     await users_collection.update_one(
-        {"_id": current_user["_id"]},
+        {" _id": current_user["_id"]},
         {"$set": {"subscription_tier": "premium"}}
     )
     
     return {"message": "Upgraded to premium", "subscription_tier": "premium"}
+
+# AI Assistant endpoint
+class ChatRequest(BaseModel):
+    message: str
+    conversation_history: List[dict] = []
+
+@app.post("/api/assistant/chat")
+async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_current_user)):
+    """AI Health Assistant - Educational information only"""
+    try:
+        # Create system message with strong guardrails
+        system_message = """You are a health education assistant for "You Are What You Eat" app. 
+
+CRITICAL RULES:
+1. You provide EDUCATIONAL information only, NOT medical advice
+2. ALWAYS remind users to consult healthcare professionals for personal health decisions
+3. Focus on: general nutrition, food ingredients, UPFs, healthy eating principles
+4. NEVER: diagnose, prescribe, recommend treatments, or give personalized medical advice
+5. If asked medical questions, redirect to healthcare professionals
+6. Keep responses concise (2-3 paragraphs max)
+7. Be friendly and helpful but maintain boundaries
+
+SAFE TOPICS:
+- General nutrition education
+- Understanding food labels and ingredients
+- What are UPFs and why they matter
+- General healthy eating tips
+- How to use the app
+- Food science basics
+
+FORBIDDEN TOPICS:
+- Medical diagnosis or treatment
+- Personalized diet plans for medical conditions
+- Medication interactions
+- Specific health conditions
+- Weight loss advice beyond general principles
+
+If user asks forbidden topics, politely say: "I can't provide medical advice. Please consult a healthcare professional for personalized guidance. I can help with general nutrition education instead - what would you like to know?"
+"""
+
+        # Limit conversation history to last 10 messages
+        recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
+        
+        # Create chat with content filtering
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"assistant-{str(current_user['_id'])}-{datetime.utcnow().timestamp()}",
+            system_message=system_message
+        ).with_model("openai", "gpt-5.2")
+        
+        # Build conversation
+        for msg in recent_history:
+            if msg["role"] == "user":
+                chat.send_message(UserMessage(text=msg["content"]))
+        
+        # Send current message
+        user_message = UserMessage(text=chat_req.message)
+        response = await chat.send_message(user_message)
+        
+        return {"response": response}
+        
+    except Exception as e:
+        print(f"Assistant error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get response from assistant")
 
 if __name__ == "__main__":
     import uvicorn
