@@ -66,6 +66,10 @@ class ScanRequest(BaseModel):
 class FavoriteRequest(BaseModel):
     product_id: str
 
+class QuizAnswerRequest(BaseModel):
+    question_id: str
+    answer: str
+
 # Helper Functions
 def create_access_token(data: dict):
     to_encode = data.copy()
