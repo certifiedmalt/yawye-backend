@@ -27,6 +27,8 @@ export default function RootLayout() {
           <Stack.Screen name="scan" options={{ title: 'Scan Product' }} />
           <Stack.Screen name="result" options={{ title: 'Product Analysis' }} />
           <Stack.Screen name="assistant" options={{ title: 'Health Assistant' }} />
+          <Stack.Screen name="achievements" options={{ title: 'Achievements' }} />
+          <Stack.Screen name="quiz" options={{ title: 'Daily Quiz' }} />
         </Stack>
       </AuthProvider>
     </SubscriptionProvider>
