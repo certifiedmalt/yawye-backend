@@ -100,6 +100,15 @@ export default function Result() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* Confetti for healthy products */}
+      <ConfettiCannon
+        ref={confettiRef}
+        count={100}
+        origin={{ x: -10, y: 0 }}
+        autoStart={false}
+        fadeOut
+      />
+      
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {image_url && (
           <Image source={{ uri: image_url }} style={styles.productImage} />
