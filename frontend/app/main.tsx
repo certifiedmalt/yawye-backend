@@ -81,6 +81,12 @@ export default function Main() {
           <Text style={styles.scanButtonText}>Scan a Product</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.assistantButton} onPress={() => router.push('/assistant')}>
+          <Ionicons name="chatbubbles" size={36} color="#fff" />
+          <Text style={styles.assistantButtonText}>Health Assistant</Text>
+          <Text style={styles.assistantSubtext}>Ask nutrition questions</Text>
+        </TouchableOpacity>
+
         <View style={styles.features}>
           <Text style={styles.featuresTitle}>What We Analyze</Text>
           
