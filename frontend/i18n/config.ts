@@ -22,7 +22,7 @@ i18n
   .init({
     compatibilityJSON: 'v3',
     resources,
-    lng: Localization.locale.split('-')[0], // Use device locale
+    lng: Localization.locale ? Localization.locale.split('-')[0] : 'en', // Use device locale
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,
