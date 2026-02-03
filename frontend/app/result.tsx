@@ -116,7 +116,7 @@ export default function Result() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="warning" size={24} color="#FF5252" />
-              <Text style={styles.sectionTitle}>Harmful Ingredients</Text>
+              <Text style={styles.sectionTitle}>Ingredients to Avoid</Text>
             </View>
             {analysis.harmful_ingredients.map((ingredient, index) => (
               <View key={index} style={styles.ingredientCard}>
@@ -143,13 +143,29 @@ export default function Result() {
                 {ingredient.processing_level && (
                   <Text style={styles.processingLevel}>{ingredient.processing_level}</Text>
                 )}
-                <Text style={styles.ingredientDescription}>
-                  {ingredient.health_risk}
+                <Text style={styles.healthImpact}>
+                  {ingredient.health_impact}
                 </Text>
-                <View style={styles.studyReference}>
-                  <Ionicons name="document-text" size={16} color="#4CAF50" />
-                  <Text style={styles.studyText}>{ingredient.study_reference}</Text>
-                </View>
+                
+                {/* Collapsible Research Section */}
+                <TouchableOpacity 
+                  style={styles.researchToggle}
+                  onPress={() => toggleResearch(`harmful_${index}`)}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color="#4CAF50" />
+                  <Text style={styles.researchToggleText}>Research</Text>
+                  <Ionicons 
+                    name={expandedResearch[`harmful_${index}`] ? "chevron-up" : "chevron-down"} 
+                    size={16} 
+                    color="#4CAF50" 
+                  />
+                </TouchableOpacity>
+                
+                {expandedResearch[`harmful_${index}`] && (
+                  <View style={styles.researchContent}>
+                    <Text style={styles.researchText}>{ingredient.research_summary}</Text>
+                  </View>
+                )}
               </View>
             ))}
           </View>
