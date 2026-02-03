@@ -345,41 +345,6 @@ export default function Result() {
           </View>
         </View>
       )}
-  scoreRingContainer: {
-    width: 140,
-    height: 140,
-    marginBottom: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreRingBackground: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 70,
-    borderWidth: 8,
-    borderColor: '#333',
-  },
-  scoreRingFill: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 70,
-    borderWidth: 8,
-  },
-  scoreRingInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#0c0c0c',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreOutOf: {
-    fontSize: 16,
-    color: '#888',
-  },
-
     </SafeAreaView>
   );
 }
