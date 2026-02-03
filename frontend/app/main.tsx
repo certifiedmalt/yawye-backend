@@ -104,10 +104,6 @@ export default function Main() {
     fetchGamification();
   }, [token]);
 
-    await refreshUser();
-    setRefreshing(false);
-  };
-
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
