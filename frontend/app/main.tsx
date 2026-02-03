@@ -28,6 +28,27 @@ export default function Main() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+  useEffect(() => {
+    const fetchGamification = async () => {
+      if (!token) return;
+      try {
+        setGamificationLoading(true);
+        setGamificationError(null);
+        const response = await axios.get(`${BACKEND_URL}/api/gamification/stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setGamification(response.data);
+      } catch (error: any) {
+        console.error('Error loading gamification stats', error?.response?.data || error?.message);
+        setGamificationError('Unable to load streak and XP right now.');
+      } finally {
+        setGamificationLoading(false);
+      }
+    };
+
+    fetchGamification();
+  }, [token]);
+
     await refreshUser();
     setRefreshing(false);
   };
