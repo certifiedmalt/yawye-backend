@@ -23,6 +23,7 @@ export default function Scan() {
   const [loading, setLoading] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const [showManualInput, setShowManualInput] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState('');
   const { token } = useAuth();
   const router = useRouter();
 
