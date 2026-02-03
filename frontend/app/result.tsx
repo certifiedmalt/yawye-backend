@@ -52,6 +52,20 @@ export default function Result() {
   const params = useLocalSearchParams();
   const [productData, setProductData] = useState<ProductData | null>(null);
   const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
+  const scoreAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (productData) {
+      // Animate the score ring whenever productData changes
+      Animated.timing(scoreAnim, {
+        toValue: productData.analysis.overall_score,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [productData]);
+
   const [showResearchModal, setShowResearchModal] = useState(false);
   const confettiRef = useRef<any>(null);
 
