@@ -47,6 +47,8 @@ export default function Result() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [productData, setProductData] = useState<ProductData | null>(null);
+  const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
+  const [showResearchModal, setShowResearchModal] = useState(false);
 
   useEffect(() => {
     if (params.productData) {
