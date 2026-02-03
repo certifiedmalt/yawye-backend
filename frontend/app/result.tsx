@@ -93,10 +93,17 @@ export default function Result() {
   const { product_name, brands, image_url, analysis } = productData;
   const scoreColor =
     analysis.overall_score >= 7
-      ? '#4CAF50'
+      ? '#00E676' // Bright vibrant green for healthy!
       : analysis.overall_score >= 4
-      ? '#FFA726'
-      : '#FF5252';
+      ? '#FFD54F' // Bright yellow for mediocre
+      : '#FF5252'; // Red for unhealthy
+  
+  const scoreGradient = 
+    analysis.overall_score >= 7
+      ? ['#00E676', '#00C853'] // Green gradient for healthy
+      : analysis.overall_score >= 4
+      ? ['#FFD54F', '#FFA726'] // Yellow-orange gradient
+      : ['#FF5252', '#D32F2F']; // Red gradient for unhealthy
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
