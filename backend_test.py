@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://eatwise-scan.preview.emergentagent.com/api"
+BASE_URL = "https://upf-scanner.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "testuser@foodscan.com"
 TEST_USER_PASSWORD = "SecurePass123!"
 TEST_USER_NAME = "Food Scanner Test User"
