@@ -7,14 +7,19 @@ import {
   ScrollView,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
 
 export default function Main() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, token } = useAuth();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
