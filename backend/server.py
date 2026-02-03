@@ -406,6 +406,271 @@ async def upgrade_subscription(current_user = Depends(get_current_user)):
     
     return {"message": "Upgraded to premium", "subscription_tier": "premium"}
 
+# Gamification Endpoints
+
+@app.get("/api/gamification/stats")
+async def get_gamification_stats(current_user = Depends(get_current_user)):
+    """Get user's gamification stats (streaks, quests, badges, level)"""
+    user_id = str(current_user["_id"])
+    
+    # Get or create gamification data
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    
+    if not gamification:
+        # Initialize gamification data
+        gamification = {
+            "user_id": user_id,
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_scan_date": None,
+            "total_scans": 0,
+            "level": 1,
+            "xp": 0,
+            "badges": [],
+            "daily_quests": {
+                "scan_3_products": {"completed": False, "progress": 0, "xp": 10},
+                "find_healthy_product": {"completed": False, "progress": 0, "xp": 25},
+                "use_assistant": {"completed": False, "progress": 0, "xp": 20},
+            },
+            "last_quest_reset": datetime.utcnow(),
+            "quiz_streak": 0,
+            "quiz_correct_answers": 0,
+            "quiz_total_answers": 0,
+        }
+        await db["gamification"].insert_one(gamification)
+    
+    # Reset daily quests if needed
+    last_reset = gamification.get("last_quest_reset", datetime.utcnow())
+    if datetime.utcnow() - last_reset > timedelta(days=1):
+        gamification["daily_quests"] = {
+            "scan_3_products": {"completed": False, "progress": 0, "xp": 10},
+            "find_healthy_product": {"completed": False, "progress": 0, "xp": 25},
+            "use_assistant": {"completed": False, "progress": 0, "xp": 20},
+        }
+        gamification["last_quest_reset"] = datetime.utcnow()
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {"$set": {"daily_quests": gamification["daily_quests"], "last_quest_reset": datetime.utcnow()}}
+        )
+    
+    # Calculate level from XP
+    xp = gamification.get("xp", 0)
+    level = 1 + (xp // 100)  # Level up every 100 XP
+    
+    gamification["_id"] = str(gamification["_id"])
+    gamification["level"] = level
+    
+    return gamification
+
+@app.post("/api/gamification/update-streak")
+async def update_streak(current_user = Depends(get_current_user)):
+    """Update user's scan streak"""
+    user_id = str(current_user["_id"])
+    
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    
+    if not gamification:
+        return await get_gamification_stats(current_user)
+    
+    now = datetime.utcnow()
+    last_scan = gamification.get("last_scan_date")
+    current_streak = gamification.get("current_streak", 0)
+    
+    if last_scan:
+        last_scan_date = last_scan.date() if isinstance(last_scan, datetime) else datetime.fromisoformat(str(last_scan)).date()
+        today = now.date()
+        
+        if last_scan_date == today:
+            # Already scanned today
+            pass
+        elif last_scan_date == today - timedelta(days=1):
+            # Consecutive day
+            current_streak += 1
+        else:
+            # Streak broken
+            current_streak = 1
+    else:
+        current_streak = 1
+    
+    longest_streak = max(gamification.get("longest_streak", 0), current_streak)
+    total_scans = gamification.get("total_scans", 0) + 1
+    
+    # Update database
+    await db["gamification"].update_one(
+        {"user_id": user_id},
+        {
+            "$set": {
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "last_scan_date": now,
+                "total_scans": total_scans,
+            }
+        }
+    )
+    
+    # Check for streak badges
+    new_badges = []
+    badges = gamification.get("badges", [])
+    
+    if current_streak >= 3 and "streak_3" not in badges:
+        new_badges.append({"id": "streak_3", "name": "3-Day Warrior", "icon": "🔥"})
+    if current_streak >= 7 and "streak_7" not in badges:
+        new_badges.append({"id": "streak_7", "name": "Week Champion", "icon": "⭐"})
+    if current_streak >= 30 and "streak_30" not in badges:
+        new_badges.append({"id": "streak_30", "name": "Monthly Master", "icon": "💎"})
+    
+    if new_badges:
+        all_badges = badges + [b["id"] for b in new_badges]
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {"$set": {"badges": all_badges}}
+        )
+    
+    return {
+        "current_streak": current_streak,
+        "new_badges": new_badges,
+        "total_scans": total_scans,
+    }
+
+@app.post("/api/gamification/complete-quest")
+async def complete_quest(quest_id: str, current_user = Depends(get_current_user)):
+    """Mark a daily quest as completed"""
+    user_id = str(current_user["_id"])
+    
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    if not gamification:
+        return {"error": "Gamification data not found"}
+    
+    daily_quests = gamification.get("daily_quests", {})
+    
+    if quest_id in daily_quests and not daily_quests[quest_id]["completed"]:
+        daily_quests[quest_id]["completed"] = True
+        daily_quests[quest_id]["progress"] = 1
+        
+        # Award XP
+        xp_reward = daily_quests[quest_id]["xp"]
+        new_xp = gamification.get("xp", 0) + xp_reward
+        
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "daily_quests": daily_quests,
+                    "xp": new_xp,
+                }
+            }
+        )
+        
+        return {"success": True, "xp_earned": xp_reward, "total_xp": new_xp}
+    
+    return {"success": False, "message": "Quest already completed or not found"}
+
+# Quiz data
+QUIZ_QUESTIONS = [
+    {
+        "id": "q1",
+        "question": "Which additive is linked to gut inflammation?",
+        "options": ["Citric Acid", "Emulsifiers (E471)", "Vitamin C", "Salt"],
+        "correct": 1,
+        "explanation": "Emulsifiers like E471 can disrupt the gut microbiome and increase inflammation markers."
+    },
+    {
+        "id": "q2",
+        "question": "What does NOVA 4 classification mean?",
+        "options": ["Whole foods", "Processed ingredients", "Processed foods", "Ultra-processed foods"],
+        "correct": 3,
+        "explanation": "NOVA 4 represents ultra-processed foods with industrial formulations and additives."
+    },
+    {
+        "id": "q3",
+        "question": "Which is NOT an ultra-processed food marker?",
+        "options": ["Maltodextrin", "Whole wheat flour", "Modified starches", "Artificial sweeteners"],
+        "correct": 1,
+        "explanation": "Whole wheat flour is minimally processed (NOVA 1-2), while the others are UPF markers."
+    },
+    {
+        "id": "q4",
+        "question": "What health risk is associated with palm oil?",
+        "options": ["Increased vitamins", "Inflammation", "Better digestion", "Stronger bones"],
+        "correct": 1,
+        "explanation": "Palm oil consumption is linked to increased inflammation and metabolic dysfunction."
+    },
+    {
+        "id": "q5",
+        "question": "Which preservative is commonly found in soft drinks?",
+        "options": ["Vitamin E", "Sodium benzoate", "Calcium", "Iron"],
+        "correct": 1,
+        "explanation": "Sodium benzoate is a common preservative in sodas and can form benzene under certain conditions."
+    },
+]
+
+@app.get("/api/quiz/daily")
+async def get_daily_quiz(current_user = Depends(get_current_user)):
+    """Get today's quiz question"""
+    # Rotate question based on day of year
+    day_of_year = datetime.utcnow().timetuple().tm_yday
+    question_index = day_of_year % len(QUIZ_QUESTIONS)
+    question = QUIZ_QUESTIONS[question_index].copy()
+    
+    # Remove correct answer from response
+    correct_answer = question.pop("correct")
+    question.pop("explanation")
+    
+    return question
+
+@app.post("/api/quiz/answer")
+async def submit_quiz_answer(answer_req: QuizAnswerRequest, current_user = Depends(get_current_user)):
+    """Submit quiz answer and get result"""
+    user_id = str(current_user["_id"])
+    
+    # Find the question
+    question = next((q for q in QUIZ_QUESTIONS if q["id"] == answer_req.question_id), None)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    # Check answer
+    is_correct = int(answer_req.answer) == question["correct"]
+    
+    # Update gamification stats
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    if gamification:
+        quiz_correct = gamification.get("quiz_correct_answers", 0)
+        quiz_total = gamification.get("quiz_total_answers", 0)
+        quiz_streak = gamification.get("quiz_streak", 0)
+        
+        if is_correct:
+            quiz_correct += 1
+            quiz_streak += 1
+            xp_reward = 15
+        else:
+            quiz_streak = 0
+            xp_reward = 5  # Participation XP
+        
+        quiz_total += 1
+        new_xp = gamification.get("xp", 0) + xp_reward
+        
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "quiz_correct_answers": quiz_correct,
+                    "quiz_total_answers": quiz_total,
+                    "quiz_streak": quiz_streak,
+                    "xp": new_xp,
+                }
+            }
+        )
+        
+        return {
+            "correct": is_correct,
+            "explanation": question["explanation"],
+            "xp_earned": xp_reward,
+            "quiz_streak": quiz_streak,
+            "accuracy": round((quiz_correct / quiz_total) * 100, 1) if quiz_total > 0 else 0,
+        }
+    
+    return {"correct": is_correct, "explanation": question["explanation"]}
+
 # AI Assistant endpoint
 class ChatRequest(BaseModel):
     message: str
