@@ -13,17 +13,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface HarmfulIngredient {
   name: string;
-  health_risk: string;
+  health_impact: string;
   severity: string;
   processing_level?: string;
-  study_reference: string;
+  research_summary: string;
 }
 
 interface BeneficialIngredient {
   name: string;
   health_benefit: string;
   processing_level?: string;
-  study_reference: string;
+  research_summary: string;
 }
 
 interface Analysis {
