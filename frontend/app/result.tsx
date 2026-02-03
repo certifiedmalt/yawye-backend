@@ -61,6 +61,13 @@ export default function Result() {
     }
   }, [params]);
 
+  const toggleResearch = (ingredientName: string) => {
+    setExpandedResearch(prev => ({
+      ...prev,
+      [ingredientName]: !prev[ingredientName]
+    }));
+  };
+
   if (!productData) {
     return (
       <View style={styles.container}>
