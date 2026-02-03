@@ -70,6 +70,17 @@ export default function Scan() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      // Update gamification streak (non-blocking)
+      try {
+        await axios.post(
+          `${BACKEND_URL}/api/gamification/stats`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (e: any) {
+        console.log('Gamification streak update failed', e?.response?.data || e?.message);
+      }
+
       // Navigate to result page with product data
       router.push({
         pathname: '/result',
@@ -123,6 +134,17 @@ export default function Scan() {
         { barcode: manualCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Update gamification streak (non-blocking)
+      try {
+        await axios.post(
+          `${BACKEND_URL}/api/gamification/stats`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (e: any) {
+        console.log('Gamification streak update failed', e?.response?.data || e?.message);
+      }
 
       router.push({
         pathname: '/result',
