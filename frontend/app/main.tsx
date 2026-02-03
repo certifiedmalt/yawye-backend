@@ -22,6 +22,9 @@ export default function Main() {
   const { user, logout, refreshUser, token } = useAuth();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [gamificationLoading, setGamificationLoading] = useState(false);
+  const [gamificationError, setGamificationError] = useState<string | null>(null);
+  const [gamification, setGamification] = useState<any | null>(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
