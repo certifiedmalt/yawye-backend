@@ -3,6 +3,17 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../context/AuthContext';
 import { SubscriptionProvider } from '../context/SubscriptionContext';
 import '../i18n/config';
+import * as Notifications from 'expo-notifications';
+
+// Configure how notifications behave when received in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
 
 export default function RootLayout() {
   return (
