@@ -105,6 +105,57 @@ export default function Main() {
           </View>
         </View>
 
+        <View style={styles.gamificationCard}>
+          <View style={styles.gamificationHeader}>
+            <Text style={styles.gamificationTitle}>Your Health Streak</Text>
+            {gamificationLoading && <ActivityIndicator size="small" color="#4CAF50" />}
+          </View>
+          {gamificationError ? (
+            <Text style={styles.gamificationError}>{gamificationError}</Text>
+          ) : gamification ? (
+            <>
+              <View style={styles.gamificationRow}>
+                <View style={styles.gamificationStat}>
+                  <Ionicons name="flame" size={24} color="#FF5722" />
+                  <Text style={styles.gamificationStatValue}>
+                    {gamification.current_streak || 0} days
+                  </Text>
+                  <Text style={styles.gamificationStatLabel}>Current streak</Text>
+                </View>
+                <View style={styles.gamificationStat}>
+                  <Ionicons name="star" size={24} color="#FFD700" />
+                  <Text style={styles.gamificationStatValue}>
+                    L{gamification.level || 1}
+                  </Text>
+                  <Text style={styles.gamificationStatLabel}>
+                    {gamification.xp || 0} XP
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.gamificationActions}>
+                <TouchableOpacity
+                  style={styles.gamificationButton}
+                  onPress={() => router.push('/quiz')}
+                >
+                  <Ionicons name="school" size={18} color="#fff" />
+                  <Text style={styles.gamificationButtonText}>Daily Quiz</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.gamificationButton, { backgroundColor: '#2196F3' }]}
+                  onPress={() => router.push('/achievements')}
+                >
+                  <Ionicons name="trophy" size={18} color="#fff" />
+                  <Text style={styles.gamificationButtonText}>Achievements</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.gamificationError}>
+              Start scanning to build your streak and earn XP.
+            </Text>
+          )}
+        </View>
+
         <TouchableOpacity style={styles.scanButton} onPress={() => router.push('/scan')}>
           <Ionicons name="scan" size={48} color="#fff" />
           <Text style={styles.scanButtonText}>Scan a Product</Text>
@@ -311,5 +362,67 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  gamificationCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  gamificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  gamificationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  gamificationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  gamificationStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  gamificationStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 6,
+  },
+  gamificationStatLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  gamificationActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  gamificationButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    borderRadius: 999,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gamificationButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  gamificationError: {
+    fontSize: 13,
+    color: '#888',
   },
 });
