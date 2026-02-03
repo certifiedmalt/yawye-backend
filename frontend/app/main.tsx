@@ -29,6 +29,10 @@ export default function Main() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    await refreshUser();
+    setRefreshing(false);
+  };
+
   useEffect(() => {
     const fetchGamification = async () => {
       if (!token) return;
