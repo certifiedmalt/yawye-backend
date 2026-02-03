@@ -180,17 +180,45 @@ export default function Result() {
             {analysis.beneficial_ingredients.map((ingredient, index) => (
               <View key={index} style={styles.ingredientCard}>
                 <Text style={styles.ingredientName}>{ingredient.name}</Text>
-                <Text style={styles.ingredientDescription}>
+                {ingredient.processing_level && (
+                  <Text style={styles.processingLevel}>{ingredient.processing_level}</Text>
+                )}
+                <Text style={styles.healthImpact}>
                   {ingredient.health_benefit}
                 </Text>
-                <View style={styles.studyReference}>
-                  <Ionicons name="document-text" size={16} color="#4CAF50" />
-                  <Text style={styles.studyText}>{ingredient.study_reference}</Text>
-                </View>
+                
+                {/* Collapsible Research Section */}
+                <TouchableOpacity 
+                  style={styles.researchToggle}
+                  onPress={() => toggleResearch(`beneficial_${index}`)}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color="#4CAF50" />
+                  <Text style={styles.researchToggleText}>Research</Text>
+                  <Ionicons 
+                    name={expandedResearch[`beneficial_${index}`] ? "chevron-up" : "chevron-down"} 
+                    size={16} 
+                    color="#4CAF50" 
+                  />
+                </TouchableOpacity>
+                
+                {expandedResearch[`beneficial_${index}`] && (
+                  <View style={styles.researchContent}>
+                    <Text style={styles.researchText}>{ingredient.research_summary}</Text>
+                  </View>
+                )}
               </View>
             ))}
           </View>
         )}
+
+        {/* View All Research Button */}
+        <TouchableOpacity
+          style={styles.viewResearchButton}
+          onPress={() => setShowResearchModal(true)}
+        >
+          <Ionicons name="book-outline" size={20} color="#4CAF50" />
+          <Text style={styles.viewResearchText}>View All Research Studies</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.scanAgainButton}
@@ -198,6 +226,55 @@ export default function Result() {
         >
           <Ionicons name="scan" size={24} color="#fff" />
           <Text style={styles.scanAgainText}>Scan Another Product</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Research Modal */}
+      {showResearchModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Research Studies</Text>
+              <TouchableOpacity onPress={() => setShowResearchModal(false)}>
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScroll}>
+              {analysis.harmful_ingredients && analysis.harmful_ingredients.length > 0 && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>⚠️ Harmful Ingredients Research</Text>
+                  {analysis.harmful_ingredients.map((ingredient, index) => (
+                    <View key={index} style={styles.modalItem}>
+                      <Text style={styles.modalIngredientName}>{ingredient.name}</Text>
+                      <Text style={styles.modalResearchText}>{ingredient.research_summary}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {analysis.beneficial_ingredients && analysis.beneficial_ingredients.length > 0 && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>✅ Beneficial Ingredients Research</Text>
+                  {analysis.beneficial_ingredients.map((ingredient, index) => (
+                    <View key={index} style={styles.modalItem}>
+                      <Text style={styles.modalIngredientName}>{ingredient.name}</Text>
+                      <Text style={styles.modalResearchText}>{ingredient.research_summary}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+            
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setShowResearchModal(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
