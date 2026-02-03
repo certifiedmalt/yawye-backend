@@ -102,14 +102,14 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
-            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers."
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Provide clear, consumer-friendly explanations."
         ).with_model("openai", "gpt-5.2")
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
-FOCUS: Identify ultra-processed food (UPF) ingredients and markers of industrial processing.
+FOCUS: Identify ultra-processed food (UPF) ingredients and their direct health impacts.
 
 PRIORITIZE AS HIGH SEVERITY:
 - Emulsifiers (E471, mono/diglycerides, lecithins, polysorbates)
@@ -121,42 +121,43 @@ PRIORITIZE AS HIGH SEVERITY:
 - Flavor enhancers (MSG, hydrolyzed proteins, yeast extract)
 - Added sugars (high fructose corn syrup, glucose syrup, invert sugar)
 
-PROCESSING SCORE SYSTEM:
-- Score 8-10: Whole/minimally processed ingredients (real fruits, nuts, whole grains, simple ingredients)
-- Score 5-7: Moderately processed (refined flour, sugar, salt, some processing)
-- Score 1-4: Ultra-processed (multiple additives, emulsifiers, artificial ingredients, heavily processed)
-
-Provide a JSON response with this exact structure:
+RESPONSE FORMAT - Provide JSON with this EXACT structure:
 {{
   "harmful_ingredients": [
     {{
       "name": "ingredient name",
-      "health_risk": "explain why this UPF ingredient is harmful (focus on processing, not natural content)",
+      "health_impact": "Clear, direct health impact in 1-2 sentences. Focus on WHAT it does to your body, not technical details. Consumer-friendly language.",
       "severity": "high/medium/low",
-      "processing_level": "NOVA 4 - ultra-processed" or "NOVA 3 - processed" or "NOVA 2 - processed culinary ingredient",
-      "study_reference": "Brief mention of research on ultra-processed foods and health outcomes (e.g., 'Studies link emulsifiers to gut inflammation and metabolic syndrome' or 'Research shows artificial sweeteners disrupt gut microbiome')"
+      "processing_level": "NOVA 4 - ultra-processed" or "NOVA 3 - processed",
+      "research_summary": "Brief 2-3 sentence summary of key research findings. Mention specific health outcomes studied (e.g., 'Studies show increased inflammation markers and gut dysbiosis in regular consumers')"
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "explain health benefit",
-      "processing_level": "NOVA 1 - whole/minimally processed" or "natural ingredient",
-      "study_reference": "Research on health benefits (e.g., 'Studies show whole grains reduce cardiovascular disease risk by 30%')"
+      "health_benefit": "Clear, positive health impact in 1-2 sentences. Focus on benefits to the body.",
+      "processing_level": "NOVA 1 - whole/minimally processed",
+      "research_summary": "Brief 2-3 sentence summary of research. Focus on proven benefits (e.g., 'Multiple studies link regular consumption to 30% reduced cardiovascular disease risk')"
     }}
   ],
   "overall_score": 1-10,
-  "upf_score": "percentage of ingredients that are ultra-processed (0-100%)",
+  "upf_score": "percentage like 75%",
   "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
-  "recommendation": "Clear recommendation based on processing level and UPF content"
+  "recommendation": "One clear sentence recommendation based on the analysis"
 }}
 
-IMPORTANT: 
-- The more processed and artificial the ingredients, the LOWER the score
-- Products with mostly UPF ingredients should score 1-3
-- Focus on ADDITIVES and PROCESSING, not natural sugars or fats from whole foods
-- Be specific about why industrial processing is harmful
-- Cite research on ultra-processed foods, not general nutrition advice"""
+WRITING STYLE:
+- Health impacts: Clear, direct, consumer-friendly (8th grade reading level)
+- Research summaries: Factual, specific, cite real findings
+- No jargon in health impacts
+- Research can be more technical but still accessible
+
+SCORING:
+- 8-10: Whole/minimally processed, mostly beneficial ingredients
+- 5-7: Some processing, mix of good and concerning ingredients  
+- 1-4: Ultra-processed, multiple harmful additives
+
+Be honest and specific. If it's bad, say so clearly."""
         
         user_message = UserMessage(text=prompt)
         response = await chat.send_message(user_message)
