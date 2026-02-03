@@ -275,8 +275,6 @@ export default function Result() {
           </View>
         </View>
       )}
-        </TouchableOpacity>
-      </ScrollView>
     </SafeAreaView>
   );
 }
