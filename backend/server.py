@@ -396,7 +396,7 @@ async def get_favorites(current_user = Depends(get_current_user)):
 async def upgrade_subscription(current_user = Depends(get_current_user)):
     # Simple upgrade (in production, integrate with payment processor)
     await users_collection.update_one(
-        {" _id": current_user["_id"]},
+        {"_id": current_user["_id"]},
         {"$set": {"subscription_tier": "premium"}}
     )
     
