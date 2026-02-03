@@ -144,9 +144,33 @@ export default function Result() {
 
         <View style={[styles.scoreCard, { borderColor: scoreColor }]}>
           <Text style={styles.scoreLabel}>Health Score</Text>
-          <Text style={[styles.scoreValue, { color: scoreColor }]}>
-            {analysis.overall_score}/10
-          </Text>
+
+          {/* Animated circular score ring */}
+          <View style={styles.scoreRingContainer}>
+            <View style={styles.scoreRingBackground} />
+            <Animated.View
+              style={[
+                styles.scoreRingFill,
+                {
+                  borderColor: scoreColor,
+                  transform: [
+                    {
+                      rotateZ: scoreAnim.interpolate({
+                        inputRange: [0, 10],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+            <View style={styles.scoreRingInner}>
+              <Text style={[styles.scoreValue, { color: scoreColor }]}>
+                {analysis.overall_score}
+              </Text>
+              <Text style={styles.scoreOutOf}>/10</Text>
+            </View>
+          </View>
           {analysis.processing_category && (
             <View style={styles.processingBadge}>
               <Text style={styles.processingText}>{analysis.processing_category}</Text>
