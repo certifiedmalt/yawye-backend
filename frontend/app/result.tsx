@@ -51,12 +51,24 @@ export default function Result() {
   const [productData, setProductData] = useState<ProductData | null>(null);
   const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
   const [showResearchModal, setShowResearchModal] = useState(false);
+  const confettiRef = useRef<any>(null);
 
   useEffect(() => {
     if (params.productData) {
       try {
         const data = JSON.parse(params.productData as string);
         setProductData(data);
+        
+        // Celebrate healthy products!
+        if (data.analysis.overall_score >= 8) {
+          // Trigger confetti
+          confettiRef.current?.start();
+          // Haptic feedback
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else if (data.analysis.overall_score <= 3) {
+          // Warning haptic for unhealthy products
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
       } catch (error) {
         console.error('Error parsing product data:', error);
       }
