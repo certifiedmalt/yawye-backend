@@ -3,8 +3,8 @@ import Purchases, { PurchasesOffering, CustomerInfo } from 'react-native-purchas
 import { Platform } from 'react-native';
 
 const REVENUECAT_API_KEY = {
-  ios: 'YOUR_IOS_API_KEY_HERE',
-  android: 'YOUR_ANDROID_API_KEY_HERE',
+  ios: 'appl_test_UVSbyqEktCmCDPUoYrrsUqkuWhk',
+  android: 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx',
 };
 
 interface SubscriptionContextType {
