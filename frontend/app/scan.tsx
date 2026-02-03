@@ -73,7 +73,7 @@ export default function Scan() {
       // Update gamification streak (non-blocking)
       try {
         await axios.post(
-          `${BACKEND_URL}/api/gamification/stats`,
+          `${BACKEND_URL}/api/gamification/update-streak`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -138,7 +138,7 @@ export default function Scan() {
       // Update gamification streak (non-blocking)
       try {
         await axios.post(
-          `${BACKEND_URL}/api/gamification/stats`,
+          `${BACKEND_URL}/api/gamification/update-streak`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
