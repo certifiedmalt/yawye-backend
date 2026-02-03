@@ -197,13 +197,31 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
   },
   scanButtonText: {
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
     marginTop: 12,
+  },
+  assistantButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  assistantButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  assistantSubtext: {
+    color: '#E3F2FD',
+    fontSize: 14,
+    marginTop: 4,
   },
   features: {
     marginBottom: 24,
