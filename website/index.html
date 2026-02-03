@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>You Are What You Eat – Scan Food, Spot Ultra‑Processed Ingredients</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    name="description"
+    content="You Are What You Eat is a mobile app that scans food barcodes, spots ultra‑processed ingredients, shows a health score, and helps you build healthier habits with streaks, XP, and a daily quiz."
+  />
+  <style>
+    :root {
+      --bg: #050505;
+      --card: #111111;
+      --accent-green: #00e676;
+      --accent-yellow: #ffd54f;
+      --accent-red: #ff5252;
+      --accent-blue: #2196f3;
+      --accent-gold: #ffd700;
+      --text-main: #ffffff;
+      --text-muted: #aaaaaa;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent-green);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      font-size: 20px;
+    }
+
+    .logo span {
+      color: var(--accent-green);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 32px;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    @media (max-width: 768px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .hero-title {
+      font-size: clamp(28px, 4vw, 36px);
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      max-width: 480px;
+    }
+
+    .hero-badges {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .badge {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #141414;
+      border: 1px solid #262626;
+      color: var(--text-muted);
+    }
+
+    .badge span {
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent-green);
+      color: #000;
+      padding: 12px 20px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-main);
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      border: 1px solid #333333;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hero-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .hero-card {
+      background: radial-gradient(circle at top left, #1b4b2e 0, #050505 55%);
+      border-radius: 20px;
+      padding: 20px 18px;
+      border: 1px solid #1f1f1f;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-score-ring {
+      width: 120px;
+      height: 120px;
+      border-radius: 60px;
+      border: 8px solid var(--accent-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .hero-score-inner {
+      width: 80px;
+      height: 80px;
+      border-radius: 40px;
+      background: #050505;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero-score-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent-green);
+      line-height: 1;
+    }
+
+    .hero-score-outof {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .hero-chip {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1e2723;
+      color: var(--accent-green);
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+
+    .hero-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .hero-card-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .hero-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .hero-pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #161616;
+      border: 1px solid #222222;
+      color: var(--text-muted);
+    }
+
+    .hero-accent-dot {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(0, 230, 118, 0.2), transparent);
+      top: -60px;
+      right: -40px;
+      pointer-events: none;
+    }
+
+    section {
+      margin-bottom: 40px;
+    }
+
+    h2.section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .section-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      max-width: 640px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 16px 16px 18px;
+      border: 1px solid #191919;
+    }
+
+    .feature-label {
+      font-size: 12px;
+      color: var(--accent-green);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .feature-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature-text {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .feature-tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+
+    .feature-tag {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #151515;
+      border: 1px solid #222222;
+      color: var(--text-muted);
+    }
+
+    .pricing-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 18px 16px 20px;
+      border: 1px solid #2a2615;
+    }
+
+    .pricing-plan {
+      font-size: 13px;
+      color: var(--accent-gold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .pricing-price {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .pricing-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .pricing-list {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .pricing-list li {
+      margin-bottom: 4px;
+    }
+
+    .pricing-list li::before {
+      content: "• ";
+      color: var(--accent-green);
+    }
+
+    .legal-box {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: #050505;
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid #222222;
+      margin-top: 8px;
+    }
+
+    footer {
+      border-top: 1px solid #151515;
+      padding-top: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="logo">
+        YOU ARE WHAT <span>YOU EAT</span>
+      </div>
+      <nav>
+        <a href="#features">Features</a> ·
+        <a href="#pricing">Pricing</a> ·
+        <a href="#legal">Legal</a>
+      </nav>
+    </header>
+
+    <main>
+      <!-- HERO -->
+      <section class="hero">
+        <div>
+          <h1 class="hero-title">
+            Scan your food. <br />See what you're really eating.
+          </h1>
+          <p class="hero-subtitle">
+            The You Are What You Eat app scans food barcodes, spots ultra‑processed
+            ingredients, gives a clear health score, and turns better choices into
+            a fun, streak‑building game.
+          </p>
+
+          <div class="hero-badges">
+            <div class="badge"><span>NEW</span> Health score ring & confetti</div>
+            <div class="badge">Streaks · XP · Daily quests</div>
+            <div class="badge">AI‑powered ingredient analysis</div>
+          </div>
+
+          <div class="hero-cta">
+            <button class="btn-primary" type="button">
+              Coming to Google Play
+            </button>
+            <button class="btn-secondary" type="button">
+              iOS version coming soon
+            </button>
+          </div>
+          <p class="hero-note">
+            Educational only – not medical advice. Always consult healthcare professionals
+            for personal health and diet decisions.
+          </p>
+        </div>
+
+        <aside class="hero-card">
+          <div class="hero-accent-dot"></div>
+          <span class="hero-chip">Example result</span>
+          <div class="hero-score-ring">
+            <div class="hero-score-inner">
+              <div class="hero-score-value">8</div>
+              <div class="hero-score-outof">/10</div>
+            </div>
+          </div>
+          <h3 class="hero-card-title">Wholegrain Oat Cereal</h3>
+          <p class="hero-card-text">
+            Mostly minimally processed ingredients, high in fibre, low in additives.
+            Occasional healthy choice for most people.
+          </p>
+          <div class="hero-pill-row">
+            <span class="hero-pill">🟢 Minimally processed</span>
+            <span class="hero-pill">🧪 No artificial colours</span>
+            <span class="hero-pill">🥣 High fibre</span>
+          </div>
+        </aside>
+      </section>
+
+      <!-- FEATURES -->
+      <section id="features">
+        <h2 class="section-title">What the app does</h2>
+        <p class="section-subtitle">
+          You Are What You Eat is built to be simple enough for the supermarket aisle,
+          but smart enough to help you gradually understand ultra‑processed foods (UPFs)
+          and ingredients over time.
+        </p>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-label">Scan</div>
+            <h3 class="feature-title">Barcode scanner + manual entry</h3>
+            <p class="feature-text">
+              Point your camera at any food barcode, or enter the code manually.
+              The app pulls product data, ingredients and images, then runs an
+              AI‑powered analysis focused on ultra‑processed ingredients.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-label">Results</div>
+            <h3 class="feature-title">Health score & ingredient breakdown</h3>
+            <p class="feature-text">
+              See a Health Score (1–10) with a coloured ring, plus harmful vs
+              beneficial ingredients explained in plain English. High‑risk
+              additives and ultra‑processed markers are flagged clearly.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-label">Habits</div>
+            <h3 class="feature-title">Streaks, XP, quests & badges</h3>
+            <p class="feature-text">
+              Build healthier habits with daily scan streaks, XP and levels,
+              daily quests (“Scan 3 products”, “Find a healthy product”), and
+              unlockable badges. The app nudges you with gentle reminders so
+              you don’t break your streak.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-label">Learn</div>
+            <h3 class="feature-title">Daily Food Quiz & AI assistant</h3>
+            <p class="feature-text">
+              Answer one short nutrition question per day and get XP and a
+              simple explanation. Ask the AI health education assistant general
+              questions about ingredients, labels and ultra‑processed foods.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- PRICING -->
+      <section id="pricing">
+        <h2 class="section-title">Pricing</h2>
+        <p class="section-subtitle">
+          We plan to offer a free tier with limited daily scans and a Premium
+          tier with unlimited scans and full features. Exact pricing may vary
+          by region when listed on Google Play and the App Store.
+        </p>
+
+        <div class="pricing-card">
+          <div class="pricing-plan">Premium</div>
+          <div class="pricing-price">$X.XX / month</div>
+          <div class="pricing-note">
+            Billed via Google Play or App Store. Cancel anytime.
+          </div>
+          <ul class="pricing-list">
+            <li>Unlimited daily scans</li>
+            <li>Full ingredient and research analysis</li>
+            <li>Scan history & favourites</li>
+            <li>All streaks, XP, quests, badges & quizzes</li>
+          </ul>
+          <div class="legal-box">
+            <strong>Note:</strong> Payments are processed securely by Google or Apple.
+            We never see your full payment details.
+          </div>
+        </div>
+      </section>
+
+      <!-- LEGAL -->
+      <section id="legal">
+        <h2 class="section-title">Legal & Safety</h2>
+        <p class="section-subtitle">
+          You Are What You Eat is designed for general education. It is not a
+          medical tool and does not replace professional advice.
+        </p>
+
+        <div class="legal-box">
+          <strong>Important disclaimer</strong><br />
+          The app provides general educational information about food ingredients
+          and ultra‑processed foods only. It does not provide medical advice,
+          diagnosis, or treatment. Always consult qualified healthcare
+          professionals for personalised guidance about your health, diet,
+          medications, or medical conditions.
+        </div>
+
+        <p style="margin-top: 12px; font-size: 13px;">
+          You can read our full policies here:
+        </p>
+        <ul style="font-size: 13px; margin-left: 18px; margin-top: 6px;">
+          <li>
+            <a href="YOUR_PRIVACY_POLICY_URL" target="_blank" rel="noopener">
+              Privacy Policy
+            </a>
+          </li>
+          <li>
+            <a href="YOUR_TERMS_OF_SERVICE_URL" target="_blank" rel="noopener">
+              Terms of Service
+            </a>
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <div>© 2025 You Are What You Eat. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#legal">Legal</a>
+        <a href="YOUR_PRIVACY_POLICY_URL" target="_blank" rel="noopener">Privacy Policy</a>
+        <a href="YOUR_TERMS_OF_SERVICE_URL" target="_blank" rel="noopener">Terms</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
