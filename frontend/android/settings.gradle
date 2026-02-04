@@ -31,7 +31,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
 }
 expoAutolinking.useExpoModules()
 
-rootProject.name = 'YouAreWhatYouEat'
+rootProject.name = 'You Are What You Eat'
 
 expoAutolinking.useExpoVersionCatalog()
 
