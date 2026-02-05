@@ -282,7 +282,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     
     # Fetch product from Open Food Facts
     try:
-        response = requests.get(f"{OFF_API_URL}/{scan_req.barcode}.json", timeout=10)
+        response = requests.get(f"{OFF_API_URL}/{scan_req.barcode}.json", timeout=30)
         if response.status_code != 200:
             raise HTTPException(status_code=404, detail="Product not found")
         
