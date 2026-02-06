@@ -603,8 +603,21 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     product_data = fetch_from_openfoodfacts(barcode)
     source = "openfoodfacts"
     
-    # STEP 3: If Open Food Facts fails, try UPC Item DB (backup)
+    # STEP 3: If Open Food Facts fails, try USDA FoodData Central
     if not product_data:
+        logger.info(f"Trying USDA for {barcode}")
+        product_data = fetch_from_usda(barcode)
+        source = "usda"
+    
+    # STEP 4: If USDA fails, try FatSecret
+    if not product_data:
+        logger.info(f"Trying FatSecret for {barcode}")
+        product_data = fetch_from_fatsecret(barcode)
+        source = "fatsecret"
+    
+    # STEP 5: If all above fail, try UPC Item DB (last resort)
+    if not product_data:
+        logger.info(f"Trying UPC Item DB for {barcode}")
         product_data = fetch_from_upcitemdb(barcode)
         source = "upcitemdb"
     
