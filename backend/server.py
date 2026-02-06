@@ -411,6 +411,16 @@ async def get_me(current_user = Depends(get_current_user)):
 
 @app.post("/api/scan")
 async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
+    """
+    Improved barcode scanning with:
+    - Local caching for instant results
+    - Retry logic with exponential backoff
+    - Multiple API sources (Open Food Facts + UPC Item DB backup)
+    - Analytics tracking
+    """
+    start_time = time.time()
+    barcode = scan_req.barcode.strip()
+    
     # Check subscription limits
     subscription_tier = current_user.get("subscription_tier", "free")
     daily_scans = current_user.get("daily_scans", 0)
@@ -421,40 +431,23 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             detail="Daily scan limit reached. Upgrade to premium for unlimited scans."
         )
     
-    # Fetch product from Open Food Facts
-    try:
-        response = requests.get(f"{OFF_API_URL}/{scan_req.barcode}.json", timeout=30)
-        if response.status_code != 200:
-            raise HTTPException(status_code=404, detail="Product not found")
+    # STEP 1: Check cache first (instant results!)
+    cached_product = await get_cached_product(barcode)
+    if cached_product:
+        response_time = time.time() - start_time
+        await log_scan_analytics(barcode, True, "cache", response_time)
         
-        data = response.json()
-        if data.get("status") != 1:
-            raise HTTPException(status_code=404, detail="Product not found")
-        
-        product = data.get("product", {})
-        
-        # Extract product info
-        product_name = product.get("product_name", "Unknown Product")
-        brands = product.get("brands", "Unknown Brand")
-        ingredients_text = product.get("ingredients_text", "")
-        image_url = product.get("image_url", "")
-        
-        if not ingredients_text:
-            raise HTTPException(status_code=404, detail="No ingredients found for this product")
-        
-        # Analyze ingredients with AI
-        analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
-        
-        # Save scan to database
+        # Save to user's scan history
         scan_doc = {
             "user_id": str(current_user["_id"]),
-            "barcode": scan_req.barcode,
-            "product_name": product_name,
-            "brands": brands,
-            "ingredients_text": ingredients_text,
-            "image_url": image_url,
-            "analysis": analysis,
-            "scanned_at": datetime.utcnow()
+            "barcode": barcode,
+            "product_name": cached_product.get("product_name"),
+            "brands": cached_product.get("brands"),
+            "ingredients_text": cached_product.get("ingredients_text"),
+            "image_url": cached_product.get("image_url"),
+            "analysis": cached_product.get("analysis"),
+            "scanned_at": datetime.utcnow(),
+            "from_cache": True
         }
         await scans_collection.insert_one(scan_doc)
         
@@ -465,15 +458,107 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         )
         
         return {
-            "product_name": product_name,
-            "brands": brands,
-            "ingredients_text": ingredients_text,
-            "image_url": image_url,
-            "analysis": analysis
+            "product_name": cached_product.get("product_name"),
+            "brands": cached_product.get("brands"),
+            "ingredients_text": cached_product.get("ingredients_text"),
+            "image_url": cached_product.get("image_url"),
+            "analysis": cached_product.get("analysis"),
+            "from_cache": True,
+            "response_time_ms": int(response_time * 1000)
         }
+    
+    # STEP 2: Try Open Food Facts (primary source)
+    product_data = fetch_from_openfoodfacts(barcode)
+    source = "openfoodfacts"
+    
+    # STEP 3: If Open Food Facts fails, try UPC Item DB (backup)
+    if not product_data:
+        product_data = fetch_from_upcitemdb(barcode)
+        source = "upcitemdb"
+    
+    # STEP 4: If all sources fail, return 404
+    if not product_data:
+        response_time = time.time() - start_time
+        await log_scan_analytics(barcode, False, "none", response_time, "Product not found in any database")
+        raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
+    
+    # STEP 5: Check if we have ingredients (required for analysis)
+    ingredients_text = product_data.get("ingredients_text", "")
+    if not ingredients_text:
+        # Still return basic info even without ingredients
+        response_time = time.time() - start_time
+        await log_scan_analytics(barcode, True, source, response_time, "No ingredients")
         
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch product data: {str(e)}")
+        return {
+            "product_name": product_data.get("product_name"),
+            "brands": product_data.get("brands"),
+            "ingredients_text": "",
+            "image_url": product_data.get("image_url"),
+            "analysis": {
+                "harmful_ingredients": [],
+                "beneficial_ingredients": [],
+                "overall_score": 5,
+                "recommendation": "No ingredient information available for this product. Check the packaging for details.",
+                "nova_group": None,
+                "additives": []
+            },
+            "warning": "No ingredients found - limited analysis available"
+        }
+    
+    # STEP 6: Analyze ingredients with AI
+    try:
+        analysis = await analyze_ingredients_with_ai(
+            product_data.get("product_name", "Unknown"),
+            ingredients_text
+        )
+    except Exception as e:
+        logger.error(f"AI analysis failed: {e}")
+        analysis = {
+            "harmful_ingredients": [],
+            "beneficial_ingredients": [],
+            "overall_score": 5,
+            "recommendation": "Analysis temporarily unavailable. Please try again.",
+            "nova_group": None,
+            "additives": []
+        }
+    
+    # STEP 7: Cache the result for future fast lookups
+    product_data["analysis"] = analysis
+    await cache_product(barcode, product_data)
+    
+    # STEP 8: Save to user's scan history
+    scan_doc = {
+        "user_id": str(current_user["_id"]),
+        "barcode": barcode,
+        "product_name": product_data.get("product_name"),
+        "brands": product_data.get("brands"),
+        "ingredients_text": ingredients_text,
+        "image_url": product_data.get("image_url"),
+        "analysis": analysis,
+        "scanned_at": datetime.utcnow(),
+        "source": source
+    }
+    await scans_collection.insert_one(scan_doc)
+    
+    # Update user's daily scan count
+    await users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {"$inc": {"daily_scans": 1}}
+    )
+    
+    # Log analytics
+    response_time = time.time() - start_time
+    await log_scan_analytics(barcode, True, source, response_time)
+    
+    return {
+        "product_name": product_data.get("product_name"),
+        "brands": product_data.get("brands"),
+        "ingredients_text": ingredients_text,
+        "image_url": product_data.get("image_url"),
+        "analysis": analysis,
+        "source": source,
+        "response_time_ms": int(response_time * 1000)
+    }
 
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
