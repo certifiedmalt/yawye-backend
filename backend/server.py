@@ -56,6 +56,13 @@ ALGORITHM = "HS256"
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product"
 # Backup API - UPC Item DB
 UPC_API_URL = "https://api.upcitemdb.com/prod/trial/lookup"
+# USDA FoodData Central API (Free)
+USDA_API_URL = "https://api.nal.usda.gov/fdc/v1"
+USDA_API_KEY = os.getenv("USDA_API_KEY", "DEMO_KEY")  # Free demo key works for testing
+# FatSecret API (Free tier - 5000 calls/month)
+FATSECRET_API_URL = "https://platform.fatsecret.com/rest/server.api"
+FATSECRET_CLIENT_ID = os.getenv("FATSECRET_CLIENT_ID", "")
+FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
