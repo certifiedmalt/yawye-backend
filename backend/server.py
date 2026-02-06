@@ -54,7 +54,7 @@ scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 # Security
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-SECRET_KEY = "your-secret-key-change-in-production"
+SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
 
 # Open Food Facts API
