@@ -54,9 +54,142 @@ ALGORITHM = "HS256"
 
 # Open Food Facts API
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product"
+# Backup API - UPC Item DB
+UPC_API_URL = "https://api.upcitemdb.com/prod/trial/lookup"
 
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
+
+# Cache settings
+CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
+
+# Analytics tracking
+async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None):
+    """Log scan analytics for monitoring"""
+    try:
+        await scan_analytics_collection.insert_one({
+            "barcode": barcode,
+            "success": success,
+            "source": source,  # "cache", "openfoodfacts", "upcitemdb"
+            "response_time_ms": int(response_time * 1000),
+            "error": error,
+            "timestamp": datetime.utcnow()
+        })
+        logger.info(f"SCAN: barcode={barcode} success={success} source={source} time={response_time:.2f}s")
+    except Exception as e:
+        logger.error(f"Failed to log analytics: {e}")
+
+# Product caching functions
+async def get_cached_product(barcode: str) -> Optional[Dict[str, Any]]:
+    """Get product from cache if exists and not expired"""
+    try:
+        cached = await product_cache_collection.find_one({"barcode": barcode})
+        if cached:
+            # Check if cache is still valid
+            cache_age = datetime.utcnow() - cached.get("cached_at", datetime.utcnow())
+            if cache_age.days < CACHE_EXPIRY_DAYS:
+                logger.info(f"CACHE HIT: {barcode}")
+                return cached
+            else:
+                logger.info(f"CACHE EXPIRED: {barcode}")
+        return None
+    except Exception as e:
+        logger.error(f"Cache lookup error: {e}")
+        return None
+
+async def cache_product(barcode: str, product_data: Dict[str, Any]):
+    """Cache product data for faster future lookups"""
+    try:
+        cache_doc = {
+            "barcode": barcode,
+            "product_name": product_data.get("product_name"),
+            "brands": product_data.get("brands"),
+            "ingredients_text": product_data.get("ingredients_text"),
+            "image_url": product_data.get("image_url"),
+            "analysis": product_data.get("analysis"),
+            "cached_at": datetime.utcnow(),
+            "source": product_data.get("source", "openfoodfacts")
+        }
+        await product_cache_collection.update_one(
+            {"barcode": barcode},
+            {"$set": cache_doc},
+            upsert=True
+        )
+        logger.info(f"CACHED: {barcode}")
+    except Exception as e:
+        logger.error(f"Cache save error: {e}")
+
+# Retry logic for API calls
+def fetch_with_retry(url: str, max_retries: int = 3, timeout: int = 15) -> Optional[requests.Response]:
+    """Fetch URL with retry logic and exponential backoff"""
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, timeout=timeout)
+            if response.status_code == 200:
+                return response
+            elif response.status_code == 404:
+                return response  # Product genuinely not found
+        except requests.exceptions.Timeout:
+            logger.warning(f"Timeout on attempt {attempt + 1} for {url}")
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Request error on attempt {attempt + 1}: {e}")
+        
+        # Exponential backoff
+        if attempt < max_retries - 1:
+            wait_time = (2 ** attempt) * 0.5  # 0.5s, 1s, 2s
+            time.sleep(wait_time)
+    
+    return None
+
+# Fetch from Open Food Facts
+def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
+    """Fetch product data from Open Food Facts API"""
+    start_time = time.time()
+    try:
+        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=3, timeout=20)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get("status") == 1:
+                product = data.get("product", {})
+                return {
+                    "product_name": product.get("product_name", "Unknown Product"),
+                    "brands": product.get("brands", "Unknown Brand"),
+                    "ingredients_text": product.get("ingredients_text", ""),
+                    "image_url": product.get("image_url", ""),
+                    "source": "openfoodfacts",
+                    "fetch_time": time.time() - start_time
+                }
+    except Exception as e:
+        logger.error(f"Open Food Facts error: {e}")
+    
+    return None
+
+# Fetch from UPC Item DB (backup)
+def fetch_from_upcitemdb(barcode: str) -> Optional[Dict[str, Any]]:
+    """Fetch product data from UPC Item DB as backup"""
+    start_time = time.time()
+    try:
+        response = fetch_with_retry(f"{UPC_API_URL}?upc={barcode}", max_retries=2, timeout=10)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+            if items:
+                item = items[0]
+                # UPC Item DB doesn't have ingredients, but has basic info
+                return {
+                    "product_name": item.get("title", "Unknown Product"),
+                    "brands": item.get("brand", "Unknown Brand"),
+                    "ingredients_text": item.get("description", ""),  # May be empty
+                    "image_url": item.get("images", [""])[0] if item.get("images") else "",
+                    "source": "upcitemdb",
+                    "fetch_time": time.time() - start_time
+                }
+    except Exception as e:
+        logger.error(f"UPC Item DB error: {e}")
+    
+    return None
 
 # Models
 class UserRegister(BaseModel):
