@@ -15,6 +15,11 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 import asyncio
 import time
 import logging
+import random
+import hashlib
+import hmac
+import urllib.parse
+import base64
 
 # Setup logging for analytics
 logging.basicConfig(level=logging.INFO)
