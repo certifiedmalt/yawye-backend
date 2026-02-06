@@ -560,6 +560,57 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         "response_time_ms": int(response_time * 1000)
     }
 
+@app.get("/api/analytics/scans")
+async def get_scan_analytics():
+    """Get scan analytics summary for monitoring"""
+    try:
+        # Get stats from the last 24 hours
+        since = datetime.utcnow() - timedelta(hours=24)
+        
+        pipeline = [
+            {"$match": {"timestamp": {"$gte": since}}},
+            {"$group": {
+                "_id": None,
+                "total_scans": {"$sum": 1},
+                "successful_scans": {"$sum": {"$cond": ["$success", 1, 0]}},
+                "cache_hits": {"$sum": {"$cond": [{"$eq": ["$source", "cache"]}, 1, 0]}},
+                "avg_response_time_ms": {"$avg": "$response_time_ms"},
+                "openfoodfacts_count": {"$sum": {"$cond": [{"$eq": ["$source", "openfoodfacts"]}, 1, 0]}},
+                "upcitemdb_count": {"$sum": {"$cond": [{"$eq": ["$source", "upcitemdb"]}, 1, 0]}}
+            }}
+        ]
+        
+        result = await scan_analytics_collection.aggregate(pipeline).to_list(1)
+        
+        if result:
+            stats = result[0]
+            total = stats.get("total_scans", 0)
+            successful = stats.get("successful_scans", 0)
+            cache_hits = stats.get("cache_hits", 0)
+            
+            return {
+                "period": "last_24_hours",
+                "total_scans": total,
+                "successful_scans": successful,
+                "success_rate": round((successful / total * 100), 1) if total > 0 else 0,
+                "cache_hit_rate": round((cache_hits / total * 100), 1) if total > 0 else 0,
+                "avg_response_time_ms": round(stats.get("avg_response_time_ms", 0), 0),
+                "sources": {
+                    "cache": cache_hits,
+                    "openfoodfacts": stats.get("openfoodfacts_count", 0),
+                    "upcitemdb": stats.get("upcitemdb_count", 0)
+                }
+            }
+        
+        return {
+            "period": "last_24_hours",
+            "total_scans": 0,
+            "message": "No scan data available"
+        }
+    except Exception as e:
+        logger.error(f"Analytics error: {e}")
+        return {"error": str(e)}
+
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
     scans = await scans_collection.find(
