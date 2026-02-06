@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
@@ -13,6 +13,12 @@ from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import asyncio
+import time
+import logging
+
+# Setup logging for analytics
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("barcode_scanner")
 
 load_dotenv()
 
