@@ -43,6 +43,8 @@ db = client[DB_NAME]
 users_collection = db["users"]
 scans_collection = db["scans"]
 favorites_collection = db["favorites"]
+product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
+scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 
 # Security
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
