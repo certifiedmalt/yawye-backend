@@ -1,15 +1,13 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import Purchases, { PurchasesOffering, CustomerInfo } from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-const REVENUECAT_API_KEY = {
-  ios: 'appl_test_UVSbyqEktCmCDPUoYrrsUqkuWhk',
-  android: 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx',
-};
+// RevenueCat is disabled until real API keys are configured.
+// This prevents native SDK crashes on production builds with test keys.
+const REVENUECAT_ENABLED = false;
 
 interface SubscriptionContextType {
-  offerings: PurchasesOffering | null;
-  customerInfo: CustomerInfo | null;
+  offerings: any | null;
+  customerInfo: any | null;
   isLoading: boolean;
   isPremium: boolean;
   purchasePackage: (packageId: string) => Promise<void>;
@@ -19,51 +17,54 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const [offerings, setOfferings] = useState<PurchasesOffering | null>(null);
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [offerings, setOfferings] = useState<any | null>(null);
+  const [customerInfo, setCustomerInfo] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    initializePurchases();
+    if (REVENUECAT_ENABLED && Platform.OS !== 'web') {
+      initializePurchases();
+    }
   }, []);
 
   const initializePurchases = async () => {
     try {
-      // Initialize RevenueCat
-      const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY.ios : REVENUECAT_API_KEY.android;
+      setIsLoading(true);
+      // Only import and use RevenueCat when enabled
+      const Purchases = require('react-native-purchases').default;
+      const apiKey = Platform.OS === 'ios'
+        ? 'appl_test_UVSbyqEktCmCDPUoYrrsUqkuWhk'
+        : 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx';
+
+      await Purchases.configure({ apiKey });
       
-      // Only initialize if not in web
-      if (Platform.OS !== 'web') {
-        await Purchases.configure({ apiKey });
-        
-        // Get current offerings
-        const offerings = await Purchases.getOfferings();
-        if (offerings.current) {
-          setOfferings(offerings.current);
-        }
-        
-        // Get customer info
-        const info = await Purchases.getCustomerInfo();
-        setCustomerInfo(info);
+      const offeringsResult = await Purchases.getOfferings();
+      if (offeringsResult.current) {
+        setOfferings(offeringsResult.current);
       }
+      
+      const info = await Purchases.getCustomerInfo();
+      setCustomerInfo(info);
     } catch (error) {
-      console.error('Error initializing purchases:', error);
+      console.warn('RevenueCat init skipped or failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const purchasePackage = async (packageId: string) => {
+    if (!REVENUECAT_ENABLED || !offerings) {
+      console.warn('Purchases not available');
+      return;
+    }
     try {
-      if (!offerings) return;
-      
+      const Purchases = require('react-native-purchases').default;
       const packageToPurchase = offerings.availablePackages.find(
-        (pkg) => pkg.identifier === packageId
+        (pkg: any) => pkg.identifier === packageId
       );
-      
       if (packageToPurchase) {
-        const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-        setCustomerInfo(customerInfo);
+        const { customerInfo: info } = await Purchases.purchasePackage(packageToPurchase);
+        setCustomerInfo(info);
       }
     } catch (error: any) {
       if (error.userCancelled) {
@@ -76,7 +77,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   const restorePurchases = async () => {
+    if (!REVENUECAT_ENABLED) {
+      console.warn('Purchases not available');
+      return;
+    }
     try {
+      const Purchases = require('react-native-purchases').default;
       const info = await Purchases.restorePurchases();
       setCustomerInfo(info);
     } catch (error) {
@@ -85,7 +91,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isPremium = customerInfo?.entitlements.active['premium'] !== undefined;
+  const isPremium = false; // Default to free tier until RevenueCat is enabled
 
   return (
     <SubscriptionContext.Provider
