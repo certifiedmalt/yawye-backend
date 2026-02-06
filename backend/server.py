@@ -172,6 +172,131 @@ def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
     
     return None
 
+# Fetch from USDA FoodData Central (Free API)
+def fetch_from_usda(barcode: str) -> Optional[Dict[str, Any]]:
+    """Fetch product data from USDA FoodData Central"""
+    start_time = time.time()
+    try:
+        # Search by UPC/GTIN code
+        search_url = f"{USDA_API_URL}/foods/search?query={barcode}&dataType=Branded&pageSize=1&api_key={USDA_API_KEY}"
+        response = fetch_with_retry(search_url, max_retries=2, timeout=15)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            foods = data.get("foods", [])
+            if foods:
+                food = foods[0]
+                # Extract ingredients from USDA format
+                ingredients = food.get("ingredients", "")
+                
+                return {
+                    "product_name": food.get("description", "Unknown Product"),
+                    "brands": food.get("brandOwner", food.get("brandName", "Unknown Brand")),
+                    "ingredients_text": ingredients,
+                    "image_url": "",  # USDA doesn't provide images
+                    "source": "usda",
+                    "fetch_time": time.time() - start_time,
+                    "nutrition": {
+                        "calories": next((n.get("value") for n in food.get("foodNutrients", []) if n.get("nutrientName") == "Energy"), None),
+                        "protein": next((n.get("value") for n in food.get("foodNutrients", []) if n.get("nutrientName") == "Protein"), None),
+                        "fat": next((n.get("value") for n in food.get("foodNutrients", []) if "Total lipid" in n.get("nutrientName", "")), None),
+                        "carbs": next((n.get("value") for n in food.get("foodNutrients", []) if "Carbohydrate" in n.get("nutrientName", "")), None),
+                    }
+                }
+        
+        # Also try searching by product name extracted from barcode lookup
+        logger.info(f"USDA: No direct barcode match for {barcode}, trying alternate search")
+        
+    except Exception as e:
+        logger.error(f"USDA API error: {e}")
+    
+    return None
+
+# Fetch from FatSecret API (Free tier - 5000 calls/month)
+def fetch_from_fatsecret(barcode: str) -> Optional[Dict[str, Any]]:
+    """Fetch product data from FatSecret API"""
+    start_time = time.time()
+    
+    # FatSecret requires OAuth 1.0 authentication
+    if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
+        logger.debug("FatSecret credentials not configured")
+        return None
+    
+    try:
+        import hashlib
+        import hmac
+        import urllib.parse
+        
+        # OAuth 1.0 signature base
+        oauth_params = {
+            "oauth_consumer_key": FATSECRET_CLIENT_ID,
+            "oauth_signature_method": "HMAC-SHA1",
+            "oauth_timestamp": str(int(time.time())),
+            "oauth_nonce": ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=16)),
+            "oauth_version": "1.0",
+            "method": "food.find_id_for_barcode",
+            "barcode": barcode,
+            "format": "json"
+        }
+        
+        # Create signature base string
+        sorted_params = sorted(oauth_params.items())
+        param_string = urllib.parse.urlencode(sorted_params)
+        base_string = f"GET&{urllib.parse.quote(FATSECRET_API_URL, safe='')}&{urllib.parse.quote(param_string, safe='')}"
+        
+        # Sign with HMAC-SHA1
+        signing_key = f"{FATSECRET_CLIENT_SECRET}&"
+        signature = hmac.new(
+            signing_key.encode('utf-8'),
+            base_string.encode('utf-8'),
+            hashlib.sha1
+        ).digest()
+        
+        import base64
+        oauth_params["oauth_signature"] = base64.b64encode(signature).decode('utf-8')
+        
+        # Make request
+        url = f"{FATSECRET_API_URL}?{urllib.parse.urlencode(oauth_params)}"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "food_id" in data:
+                food_id = data["food_id"]["value"]
+                
+                # Get food details
+                oauth_params["method"] = "food.get.v2"
+                oauth_params["food_id"] = food_id
+                oauth_params["oauth_timestamp"] = str(int(time.time()))
+                oauth_params["oauth_nonce"] = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=16))
+                del oauth_params["barcode"]
+                
+                # Re-sign
+                sorted_params = sorted(oauth_params.items())
+                param_string = urllib.parse.urlencode(sorted_params)
+                base_string = f"GET&{urllib.parse.quote(FATSECRET_API_URL, safe='')}&{urllib.parse.quote(param_string, safe='')}"
+                signature = hmac.new(signing_key.encode('utf-8'), base_string.encode('utf-8'), hashlib.sha1).digest()
+                oauth_params["oauth_signature"] = base64.b64encode(signature).decode('utf-8')
+                
+                detail_url = f"{FATSECRET_API_URL}?{urllib.parse.urlencode(oauth_params)}"
+                detail_response = requests.get(detail_url, timeout=10)
+                
+                if detail_response.status_code == 200:
+                    food_data = detail_response.json().get("food", {})
+                    return {
+                        "product_name": food_data.get("food_name", "Unknown Product"),
+                        "brands": food_data.get("brand_name", "Unknown Brand"),
+                        "ingredients_text": "",  # FatSecret doesn't provide ingredients in free tier
+                        "image_url": "",
+                        "source": "fatsecret",
+                        "fetch_time": time.time() - start_time
+                    }
+                    
+    except Exception as e:
+        logger.error(f"FatSecret API error: {e}")
+    
+    return None
+
 # Fetch from UPC Item DB (backup)
 def fetch_from_upcitemdb(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from UPC Item DB as backup"""
