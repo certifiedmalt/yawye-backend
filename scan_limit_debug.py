@@ -6,7 +6,7 @@ Focused test for scan limit issue
 import requests
 import json
 
-BASE_URL = "https://eatwhatyouare.preview.emergentagent.com/api"
+BASE_URL = "https://nutrition-launch.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "testuser@foodscan.com"
 TEST_USER_PASSWORD = "SecurePass123!"
 NUTELLA_BARCODE = "3017620422003"
