@@ -604,6 +604,7 @@ async def reset_password(req: PasswordResetConfirm):
     }
 
 @app.get("/api/auth/me")
+async def get_me(current_user = Depends(get_current_user)):
     # Reset daily scans if needed
     last_reset = current_user.get("last_scan_reset", datetime.utcnow())
     if datetime.utcnow() - last_reset > timedelta(days=1):
