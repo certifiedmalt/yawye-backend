@@ -545,6 +545,11 @@ Be honest and specific. If it's bad, say so clearly."""
         }
 
 # Routes
+@app.get("/api/download/icon")
+async def download_icon():
+    icon_path = "/app/frontend/assets/images/icon.png"
+    return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
