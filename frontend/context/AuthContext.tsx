@@ -65,13 +65,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await axios.post(`${BACKEND_URL}/api/auth/login`, {
         email,
         password,
-      });
+      }, { timeout: 15000 });
       const { token: newToken, user: newUser } = response.data;
       await AsyncStorage.setItem('token', newToken);
       setToken(newToken);
       setUser(newUser);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Login failed');
+      if (error.response) {
+        throw new Error(error.response.data?.detail || 'Invalid email or password');
+      } else if (error.code === 'ECONNABORTED') {
+        throw new Error('Connection timed out. Please check your internet and try again.');
+      } else {
+        throw new Error('Cannot connect to server. Please check your internet connection.');
+      }
     }
   };
 
@@ -81,13 +87,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         name,
-      });
+      }, { timeout: 15000 });
       const { token: newToken, user: newUser } = response.data;
       await AsyncStorage.setItem('token', newToken);
       setToken(newToken);
       setUser(newUser);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Registration failed');
+      if (error.response) {
+        throw new Error(error.response.data?.detail || 'Registration failed');
+      } else if (error.code === 'ECONNABORTED') {
+        throw new Error('Connection timed out. Please check your internet and try again.');
+      } else {
+        throw new Error('Cannot connect to server. Please check your internet connection.');
+      }
     }
   };
 
