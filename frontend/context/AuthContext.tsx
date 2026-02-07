@@ -1,10 +1,12 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import Constants from 'expo-constants';
+import axios, { AxiosError } from 'axios';
+import { AppState, AppStateStatus } from 'react-native';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://nutrition-launch.preview.emergentagent.com';
-console.log('[AUTH] Backend URL:', BACKEND_URL);
+
+// Global axios defaults - timeout on ALL requests
+axios.defaults.timeout = 15000;
 
 interface User {
   id: string;
@@ -22,6 +24,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   loading: boolean;
+  backendUrl: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,10 +33,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     loadStoredAuth();
+
+    // Handle app coming back to foreground — refresh user data
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        if (token) {
+          fetchUser(token).catch(() => {});
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
   }, []);
+
+  // Global 401 interceptor — auto-logout on expired tokens
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        if (error.response?.status === 401 && token) {
+          // Token expired or invalid - auto logout
+          const url = error.config?.url || '';
+          // Don't auto-logout on login/register attempts
+          if (!url.includes('/auth/login') && !url.includes('/auth/register') && !url.includes('/auth/forgot')) {
+            await logout();
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [token]);
 
   const loadStoredAuth = async () => {
     try {
@@ -43,7 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUser(storedToken);
       }
     } catch (error) {
-      console.error('Error loading auth:', error);
+      // Token invalid or expired — clear it silently
+      await AsyncStorage.removeItem('token');
     } finally {
       setLoading(false);
     }
@@ -56,7 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       setUser(response.data);
     } catch (error) {
-      console.error('Error fetching user:', error);
       await logout();
     }
   };
@@ -66,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await axios.post(`${BACKEND_URL}/api/auth/login`, {
         email,
         password,
-      }, { timeout: 15000 });
+      });
       const { token: newToken, user: newUser } = response.data;
       await AsyncStorage.setItem('token', newToken);
       setToken(newToken);
@@ -88,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         name,
-      }, { timeout: 15000 });
+      });
       const { token: newToken, user: newUser } = response.data;
       await AsyncStorage.setItem('token', newToken);
       setToken(newToken);
@@ -106,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('notifications_scheduled');
     setToken(null);
     setUser(null);
   };
@@ -117,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, refreshUser, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, refreshUser, loading, backendUrl: BACKEND_URL }}>
       {children}
     </AuthContext.Provider>
   );
