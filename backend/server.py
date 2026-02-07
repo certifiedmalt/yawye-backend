@@ -18,6 +18,9 @@ import logging
 import random
 import hashlib
 import hmac
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import urllib.parse
 import base64
 
