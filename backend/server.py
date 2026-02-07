@@ -60,6 +60,71 @@ security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
 
+# Email Configuration
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.apl.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "Youarewhatyoueat.sup@apl.com")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "Youarewhatyoueat.sup@apl.com")
+
+async def send_reset_email(to_email: str, reset_code: str):
+    """Send password reset code via email"""
+    if not SMTP_PASSWORD:
+        logger.warning("SMTP_PASSWORD not set - email sending disabled")
+        return False
+    
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "You Are What You Eat - Password Reset Code"
+        msg["From"] = f"You Are What You Eat <{SMTP_FROM}>"
+        msg["To"] = to_email
+
+        # Plain text version
+        text = f"""Hi there,
+
+You requested a password reset for your You Are What You Eat account.
+
+Your reset code is: {reset_code}
+
+This code expires in 15 minutes. If you didn't request this, you can safely ignore this email.
+
+- The You Are What You Eat Team"""
+
+        # HTML version
+        html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #0c0c0c; color: #ffffff; border-radius: 12px;">
+            <h2 style="color: #00e676; text-align: center;">You Are What You Eat</h2>
+            <p>Hi there,</p>
+            <p>You requested a password reset. Here's your code:</p>
+            <div style="background: #1a1a1a; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #00e676;">{reset_code}</span>
+            </div>
+            <p style="color: #888; font-size: 14px;">This code expires in 15 minutes.</p>
+            <p style="color: #888; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+            <hr style="border: 1px solid #333; margin: 20px 0;">
+            <p style="color: #666; font-size: 12px; text-align: center;">You Are What You Eat - Scan smarter, eat better.</p>
+        </div>
+        """
+
+        msg.attach(MIMEText(text, "plain"))
+        msg.attach(MIMEText(html, "html"))
+
+        # Send via SMTP in a thread to not block async
+        def _send():
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_FROM, to_email, msg.as_string())
+        
+        await asyncio.get_event_loop().run_in_executor(None, _send)
+        logger.info(f"Reset email sent to {to_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
+        return False
+
 # Open Food Facts API
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product"
 # Backup API - UPC Item DB
