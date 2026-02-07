@@ -41,6 +41,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Simple rate limiter for auth endpoints
+rate_limit_store: Dict[str, list] = {}
+RATE_LIMIT_WINDOW = 300  # 5 minutes
+RATE_LIMIT_MAX = 10  # max attempts per window
+
+def check_rate_limit(key: str) -> bool:
+    """Returns True if request is allowed, False if rate limited"""
+    now = time.time()
+    if key not in rate_limit_store:
+        rate_limit_store[key] = []
+    # Clean old entries
+    rate_limit_store[key] = [t for t in rate_limit_store[key] if now - t < RATE_LIMIT_WINDOW]
+    if len(rate_limit_store[key]) >= RATE_LIMIT_MAX:
+        return False
+    rate_limit_store[key].append(now)
+    return True
+
 # MongoDB
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = os.getenv("DB_NAME")
