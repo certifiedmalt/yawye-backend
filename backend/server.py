@@ -621,12 +621,17 @@ async def forgot_password(req: PasswordResetRequest):
         {"$set": {"reset_code": code, "reset_code_expires": expires}}
     )
     
-    # For now, return the code in the response (no email service yet)
-    # In production, this would send an email
-    return {
-        "message": "If an account exists with that email, a reset code has been sent.",
-        "reset_code": code  # TODO: Remove this once email service is set up
-    }
+    # Try to send email
+    email_sent = await send_reset_email(req.email, code)
+    
+    if email_sent:
+        return {"message": "A reset code has been sent to your email."}
+    else:
+        # Fallback: return code in response if email not configured
+        return {
+            "message": "Reset code generated.",
+            "reset_code": code
+        }
 
 # Password Reset - Confirm with Code
 @app.post("/api/auth/reset-password")
