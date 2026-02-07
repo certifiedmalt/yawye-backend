@@ -602,6 +602,10 @@ async def register(user: UserRegister):
 
 @app.post("/api/auth/login")
 async def login(user: UserLogin):
+    # Rate limiting
+    if not check_rate_limit(f"login:{user.email}"):
+        raise HTTPException(status_code=429, detail="Too many login attempts. Please wait 5 minutes.")
+    
     # Find user
     db_user = await users_collection.find_one({"email": user.email})
     if not db_user or not verify_password(user.password, db_user["password"]):
@@ -623,6 +627,10 @@ async def login(user: UserLogin):
 # Password Reset - Request Code
 @app.post("/api/auth/forgot-password")
 async def forgot_password(req: PasswordResetRequest):
+    # Rate limiting
+    if not check_rate_limit(f"reset:{req.email}"):
+        raise HTTPException(status_code=429, detail="Too many reset attempts. Please wait 5 minutes.")
+    
     user = await users_collection.find_one({"email": req.email})
     if not user:
         # Don't reveal if email exists - always return success
