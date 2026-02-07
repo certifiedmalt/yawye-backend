@@ -263,7 +263,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   levelCard: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     backgroundColor: '#1a1a1a',
     borderRadius: 16,
     padding: 24,
