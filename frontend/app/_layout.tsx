@@ -113,6 +113,7 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="auth/login" options={{ title: 'Login', headerShown: false }} />
             <Stack.Screen name="auth/register" options={{ title: 'Register', headerShown: false }} />
+            <Stack.Screen name="auth/forgot-password" options={{ title: 'Reset Password', headerShown: false }} />
             <Stack.Screen name="main" options={{ headerShown: false }} />
             <Stack.Screen name="scan" options={{ title: 'Scan Product' }} />
             <Stack.Screen name="result" options={{ title: 'Product Analysis' }} />
