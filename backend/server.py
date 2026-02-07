@@ -77,12 +77,12 @@ security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
 
-# Email Configuration
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.apl.com")
+# Email Configuration (AOL SMTP)
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.aol.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "Youarewhatyoueat.sup@apl.com")
+SMTP_USER = os.getenv("SMTP_USER", "Youarewhatyoueat.sup@aol.com")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "Youarewhatyoueat.sup@apl.com")
+SMTP_FROM = os.getenv("SMTP_FROM", "Youarewhatyoueat.sup@aol.com")
 
 async def send_reset_email(to_email: str, reset_code: str):
     """Send password reset code via email"""
