@@ -261,7 +261,9 @@ export default function Main() {
               • Save favorites{"\n"}
               • Scan history
             </Text>
-            <TouchableOpacity style={styles.upgradeButton}>
+            <TouchableOpacity style={styles.upgradeButton} onPress={() => {
+              Alert.alert('Coming Soon', 'Premium subscriptions will be available soon. Stay tuned!');
+            }}>
               <Text style={styles.upgradeButtonText}>Upgrade Now - $4.99/month</Text>
             </TouchableOpacity>
           </View>
