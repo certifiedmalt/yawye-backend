@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import Constants from 'expo-constants';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://nutrition-launch.preview.emergentagent.com';
+console.log('[AUTH] Backend URL:', BACKEND_URL);
 
 interface User {
   id: string;
