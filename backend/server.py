@@ -535,9 +535,6 @@ async def login(user: UserLogin):
         }
     }
 
-@app.get("/api/auth/me")
-async def get_me(current_user = Depends(get_current_user)):
-
 # Password Reset - Request Code
 @app.post("/api/auth/forgot-password")
 async def forgot_password(req: PasswordResetRequest):
