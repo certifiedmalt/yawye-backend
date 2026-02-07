@@ -514,4 +514,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
   },
+  settingsSection: {
+    marginTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+    paddingTop: 20,
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    gap: 12,
+  },
+  settingsItemText: {
+    color: '#FF5252',
+    fontSize: 15,
+  },
+  versionText: {
+    color: '#444',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
 });
