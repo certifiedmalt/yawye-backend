@@ -338,6 +338,14 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+
 class ScanRequest(BaseModel):
     barcode: str
 
