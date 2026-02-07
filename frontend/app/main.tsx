@@ -268,6 +268,42 @@ export default function Main() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Account Settings */}
+        <View style={styles.settingsSection}>
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => {
+              Alert.alert(
+                'Delete Account',
+                'Are you sure you want to delete your account? This action cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await axios.delete(`${BACKEND_URL}/api/auth/delete-account`, {
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        await logout();
+                        router.replace('/auth/login');
+                      } catch (e) {
+                        Alert.alert('Error', 'Failed to delete account. Please try again.');
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FF5252" />
+            <Text style={styles.settingsItemText}>Delete Account</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.versionText}>v1.0.6</Text>
       </ScrollView>
     </SafeAreaView>
   );
