@@ -676,6 +676,17 @@ async def reset_password(req: PasswordResetConfirm):
         }
     }
 
+# Delete Account
+@app.delete("/api/auth/delete-account")
+async def delete_account(current_user = Depends(get_current_user)):
+    user_id = current_user["_id"]
+    # Delete user data
+    await users_collection.delete_one({"_id": user_id})
+    # Delete related data
+    await favorites_collection.delete_many({"user_id": str(user_id)})
+    await scan_analytics_collection.delete_many({"user_id": str(user_id)})
+    return {"message": "Account deleted successfully"}
+
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
     # Reset daily scans if needed
