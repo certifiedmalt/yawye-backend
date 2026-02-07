@@ -15,7 +15,6 @@ import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
