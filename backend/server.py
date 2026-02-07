@@ -537,6 +537,76 @@ async def login(user: UserLogin):
 
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
+
+# Password Reset - Request Code
+@app.post("/api/auth/forgot-password")
+async def forgot_password(req: PasswordResetRequest):
+    user = await users_collection.find_one({"email": req.email})
+    if not user:
+        # Don't reveal if email exists - always return success
+        return {"message": "If an account exists with that email, a reset code has been sent."}
+    
+    # Generate 6-digit code
+    code = str(random.randint(100000, 999999))
+    expires = datetime.utcnow() + timedelta(minutes=15)
+    
+    # Store reset code in user document
+    await users_collection.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"reset_code": code, "reset_code_expires": expires}}
+    )
+    
+    # For now, return the code in the response (no email service yet)
+    # In production, this would send an email
+    return {
+        "message": "If an account exists with that email, a reset code has been sent.",
+        "reset_code": code  # TODO: Remove this once email service is set up
+    }
+
+# Password Reset - Confirm with Code
+@app.post("/api/auth/reset-password")
+async def reset_password(req: PasswordResetConfirm):
+    user = await users_collection.find_one({"email": req.email})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid reset request")
+    
+    # Check code
+    stored_code = user.get("reset_code")
+    code_expires = user.get("reset_code_expires")
+    
+    if not stored_code or not code_expires:
+        raise HTTPException(status_code=400, detail="No reset code found. Please request a new one.")
+    
+    if datetime.utcnow() > code_expires:
+        raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one.")
+    
+    if req.code != stored_code:
+        raise HTTPException(status_code=400, detail="Invalid reset code")
+    
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Update password and clear reset code
+    hashed = get_password_hash(req.new_password)
+    await users_collection.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password": hashed}, "$unset": {"reset_code": "", "reset_code_expires": ""}}
+    )
+    
+    # Return token so user is auto-logged in
+    token = create_access_token({"sub": str(user["_id"])})
+    return {
+        "message": "Password reset successfully",
+        "token": token,
+        "user": {
+            "id": str(user["_id"]),
+            "email": user["email"],
+            "name": user["name"],
+            "subscription_tier": user.get("subscription_tier", "free")
+        }
+    }
+
+@app.get("/api/auth/me")
     # Reset daily scans if needed
     last_reset = current_user.get("last_scan_reset", datetime.utcnow())
     if datetime.utcnow() - last_reset > timedelta(days=1):
