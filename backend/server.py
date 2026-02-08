@@ -130,7 +130,7 @@ OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product"
 UPC_API_URL = "https://api.upcitemdb.com/prod/trial/lookup"
 # USDA FoodData Central API (Free)
 USDA_API_URL = "https://api.nal.usda.gov/fdc/v1"
-USDA_API_KEY = os.getenv("USDA_API_KEY", "DEMO_KEY")  # Free demo key works for testing
+USDA_API_KEY = os.getenv("USDA_API_KEY", "8j33kUA9sULTBKp9NVrNZj0YYmpwSbFc4ZDvbxTc")
 # FatSecret API (Free tier - 5000 calls/month)
 FATSECRET_API_URL = "https://platform.fatsecret.com/rest/server.api"
 FATSECRET_CLIENT_ID = os.getenv("FATSECRET_CLIENT_ID", "")
