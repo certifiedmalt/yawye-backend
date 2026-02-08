@@ -776,27 +776,60 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "response_time_ms": int(response_time * 1000)
         }
     
-    # STEP 2: Try Open Food Facts (primary source)
-    product_data = fetch_from_openfoodfacts(barcode)
-    source = "openfoodfacts"
+    # STEP 2: Parallel API calls with smart routing based on barcode prefix
+    # UK/EU barcodes start with 50/40-44, US barcodes start with 0
+    barcode_prefix = barcode[:2] if len(barcode) >= 2 else ""
     
-    # STEP 3: If Open Food Facts fails, try USDA FoodData Central
-    if not product_data:
-        logger.info(f"Trying USDA for {barcode}")
-        product_data = fetch_from_usda(barcode)
-        source = "usda"
+    # Run all API sources in parallel using ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     
-    # STEP 4: If USDA fails, try FatSecret
+    product_data = None
+    source = "none"
+    
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # Smart ordering: prioritize based on barcode region
+        if barcode_prefix in ['50', '40', '41', '42', '43', '44', '45', '46', '47', '48', '49', '87', '90', '93', '94']:
+            # EU/UK barcode — Open Food Facts first, then others in parallel
+            futures = {
+                executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+                executor.submit(fetch_from_usda, barcode): "usda",
+                executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+            }
+        elif barcode_prefix in ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09']:
+            # US/Canada barcode — USDA first, then others in parallel
+            futures = {
+                executor.submit(fetch_from_usda, barcode): "usda",
+                executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+                executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+            }
+        else:
+            # Other regions — try all simultaneously
+            futures = {
+                executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+                executor.submit(fetch_from_usda, barcode): "usda",
+                executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+            }
+        
+        # Return the FIRST successful result
+        for future in as_completed(futures, timeout=20):
+            src = futures[future]
+            try:
+                result = future.result()
+                if result:
+                    product_data = result
+                    source = src
+                    # Cancel remaining futures
+                    for f in futures:
+                        f.cancel()
+                    break
+            except Exception as e:
+                logger.warning(f"{src} error: {e}")
+    
+    # STEP 3: If parallel calls all failed, try FatSecret as last resort
     if not product_data:
-        logger.info(f"Trying FatSecret for {barcode}")
+        logger.info(f"All parallel sources failed for {barcode}, trying FatSecret")
         product_data = fetch_from_fatsecret(barcode)
         source = "fatsecret"
-    
-    # STEP 5: If all above fail, try UPC Item DB (last resort)
-    if not product_data:
-        logger.info(f"Trying UPC Item DB for {barcode}")
-        product_data = fetch_from_upcitemdb(barcode)
-        source = "upcitemdb"
     
     # STEP 4: If all sources fail, return 404
     if not product_data:
