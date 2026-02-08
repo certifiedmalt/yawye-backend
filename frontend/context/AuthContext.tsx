@@ -5,6 +5,11 @@ import { AppState, AppStateStatus } from 'react-native';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://nutrition-launch.preview.emergentagent.com';
 
+// Debug logging
+if (__DEV__) {
+  console.log('[AUTH] Backend URL:', BACKEND_URL);
+}
+
 // Global axios defaults - timeout on ALL requests
 axios.defaults.timeout = 15000;
 
