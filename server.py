@@ -12,7 +12,7 @@ from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+import openai
 import asyncio
 import time
 import logging
@@ -456,68 +456,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
     """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
-            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Provide clear, consumer-friendly explanations."
-        ).with_model("openai", "gpt-5.2")
+        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
         
-        prompt = f"""Analyze these ingredients from {product_name}:
-
-{ingredients}
-
-FOCUS: Identify ultra-processed food (UPF) ingredients and their direct health impacts.
-
-PRIORITIZE AS HIGH SEVERITY:
-- Emulsifiers (E471, mono/diglycerides, lecithins, polysorbates)
-- Artificial sweeteners (aspartame, sucralose, acesulfame K)
-- Preservatives (sodium benzoate, potassium sorbate, BHA, BHT)
-- Artificial colors (tartrazine, sunset yellow, etc.)
-- Modified starches, maltodextrin, dextrose
-- Hydrogenated oils, palm oil, interesterified fats
-- Flavor enhancers (MSG, hydrolyzed proteins, yeast extract)
-- Added sugars (high fructose corn syrup, glucose syrup, invert sugar)
-
-RESPONSE FORMAT - Provide JSON with this EXACT structure:
-{{
-  "harmful_ingredients": [
-    {{
-      "name": "ingredient name",
-      "health_impact": "Clear, direct health impact in 1-2 sentences. Focus on WHAT it does to your body, not technical details. Consumer-friendly language.",
-      "severity": "high/medium/low",
-      "processing_level": "NOVA 4 - ultra-processed" or "NOVA 3 - processed",
-      "research_summary": "Brief 2-3 sentence summary of key research findings. Mention specific health outcomes studied (e.g., 'Studies show increased inflammation markers and gut dysbiosis in regular consumers')"
-    }}
-  ],
-  "beneficial_ingredients": [
-    {{
-      "name": "ingredient name",
-      "health_benefit": "Clear, positive health impact in 1-2 sentences. Focus on benefits to the body.",
-      "processing_level": "NOVA 1 - whole/minimally processed",
-      "research_summary": "Brief 2-3 sentence summary of research. Focus on proven benefits (e.g., 'Multiple studies link regular consumption to 30% reduced cardiovascular disease risk')"
-    }}
-  ],
-  "overall_score": 1-10,
-  "upf_score": "percentage like 75%",
-  "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
-  "recommendation": "One clear sentence recommendation based on the analysis"
-}}
-
-WRITING STYLE:
-- Health impacts: Clear, direct, consumer-friendly (8th grade reading level)
-- Research summaries: Factual, specific, cite real findings
-- No jargon in health impacts
-- Research can be more technical but still accessible
-
-SCORING:
-- 8-10: Whole/minimally processed, mostly beneficial ingredients
-- 5-7: Some processing, mix of good and concerning ingredients  
-- 1-4: Ultra-processed, multiple harmful additives
-
-Be honest and specific. If it's bad, say so clearly."""
-        
-        user_message = UserMessage(text=prompt)
-        response = await chat.send_message(user_message)
+        completion = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Provide clear, consumer-friendly explanations."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
+        response = completion.choices[0].message.content
         
         # Parse JSON from response
         import json
@@ -1347,21 +1296,19 @@ If user asks forbidden topics, politely say: "I can't provide medical advice. Pl
         # Limit conversation history to last 10 messages
         recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
         
-        # Create chat with content filtering
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"assistant-{str(current_user['_id'])}-{datetime.utcnow().timestamp()}",
-            system_message=system_message
-        ).with_model("openai", "gpt-5.2")
-        
-        # Build conversation
+        # Build messages for OpenAI
+        messages = [{"role": "system", "content": system_message}]
         for msg in recent_history:
-            if msg["role"] == "user":
-                chat.send_message(UserMessage(text=msg["content"]))
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": chat_req.message})
         
-        # Send current message
-        user_message = UserMessage(text=chat_req.message)
-        response = await chat.send_message(user_message)
+        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
+        completion = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            temperature=0.7
+        )
+        response = completion.choices[0].message.content
         
         return {"response": response}
         
