@@ -12,7 +12,7 @@ from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+import openai
 import asyncio
 import time
 import logging
