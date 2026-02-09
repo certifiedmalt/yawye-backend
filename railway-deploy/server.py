@@ -503,7 +503,27 @@ async def download_icon():
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy"}
+    try:
+        # Test MongoDB connection
+        await users_collection.find_one({})
+        return {"status": "healthy", "db": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "db_error": str(e)}
+
+@app.get("/api/debug/test-register")
+async def debug_test_register():
+    try:
+        hashed = get_password_hash("test123")
+        result = await users_collection.insert_one({
+            "email": f"debug-{datetime.utcnow().timestamp()}@test.com",
+            "password": hashed,
+            "name": "Debug Test",
+            "subscription_tier": "free",
+            "daily_scans": 0,
+        })
+        return {"status": "ok", "id": str(result.inserted_id)}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "type": type(e).__name__}
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
