@@ -74,7 +74,6 @@ product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 
 # Security
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
@@ -432,10 +431,12 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
 
 def get_password_hash(password):
-    return pwd_context.hash(password[:72])
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
