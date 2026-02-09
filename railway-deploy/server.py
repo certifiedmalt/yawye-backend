@@ -1296,21 +1296,19 @@ If user asks forbidden topics, politely say: "I can't provide medical advice. Pl
         # Limit conversation history to last 10 messages
         recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
         
-        # Create chat with content filtering
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"assistant-{str(current_user['_id'])}-{datetime.utcnow().timestamp()}",
-            system_message=system_message
-        ).with_model("openai", "gpt-5.2")
-        
-        # Build conversation
+        # Build messages for OpenAI
+        messages = [{"role": "system", "content": system_message}]
         for msg in recent_history:
-            if msg["role"] == "user":
-                chat.send_message(UserMessage(text=msg["content"]))
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": chat_req.message})
         
-        # Send current message
-        user_message = UserMessage(text=chat_req.message)
-        response = await chat.send_message(user_message)
+        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
+        completion = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            temperature=0.7
+        )
+        response = completion.choices[0].message.content
         
         return {"response": response}
         
