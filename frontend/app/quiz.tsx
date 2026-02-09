@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://nutrition-launch.preview.emergentagent.com';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-production-66c05.up.railway.app';
 
 export default function Quiz() {
   const [question, setQuestion] = useState<any>(null);
