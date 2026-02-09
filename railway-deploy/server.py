@@ -62,7 +62,7 @@ def check_rate_limit(key: str) -> bool:
 
 # MongoDB
 MONGO_URL = os.getenv("MONGO_URL")
-DB_NAME = os.getenv("DB_NAME")
+DB_NAME = os.getenv("DB_NAME") or "yawye_db"
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
