@@ -548,6 +548,8 @@ Be honest and specific. If it's bad, say so clearly."""
 @app.get("/api/download/icon")
 async def download_icon():
     icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+    if not os.path.exists(icon_path):
+        raise HTTPException(status_code=404, detail="Icon not found")
     return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
 
 @app.get("/api/health")
