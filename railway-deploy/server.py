@@ -11,6 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
+import bcrypt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import openai
 import asyncio
