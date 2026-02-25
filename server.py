@@ -138,6 +138,7 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
@@ -456,9 +457,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using Gemini AI with focus on ultra-processed foods (UPFs)"""
     try:
-        import httpx
+        import google.generativeai as genai
+        
+        genai.configure(api_key=GOOGLE_API_KEY)
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
@@ -487,34 +491,11 @@ Scoring guide:
 
 Return ONLY valid JSON, no other text."""
 
-        # Use httpx to call Emergent API directly
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "https://emergent-api.fly.dev/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {EMERGENT_LLM_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "gpt-4o",
-                    "messages": [
-                        {"role": "system", "content": "You are a food science expert. Always respond with valid JSON only."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.3
-                }
-            )
-            
-            if response.status_code != 200:
-                print(f"AI API error: {response.status_code} - {response.text}")
-                raise Exception(f"API error: {response.status_code}")
-            
-            result = response.json()
-            response_text = result["choices"][0]["message"]["content"]
+        response = await model.generate_content_async(prompt)
+        response_text = response.text.strip()
         
         # Parse JSON from response
         import json
-        response_text = response_text.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         if response_text.startswith("```"):

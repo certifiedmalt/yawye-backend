@@ -11,5 +11,4 @@ pydantic[email]
 requests
 resend
 email-validator
-openai
-httpx
+google-generativeai
