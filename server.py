@@ -458,10 +458,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
     """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
-        client = openai.AsyncOpenAI(
-            api_key=EMERGENT_LLM_KEY,
-            base_url="https://api.emergentagent.com/v1"
-        )
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
@@ -486,21 +483,21 @@ Return JSON with this exact structure:
 Scoring guide:
 - 8-10: Whole/minimally processed, mostly beneficial ingredients
 - 5-7: Some processing, mix of good and concerning ingredients  
-- 1-4: Highly processed with multiple concerning ingredients"""
+- 1-4: Highly processed with multiple concerning ingredients
 
-        completion = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Provide clear, consumer-friendly explanations."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3
-        )
-        response = completion.choices[0].message.content
+Return ONLY valid JSON, no other text."""
+
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"analysis-{product_name[:20]}",
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Always respond with valid JSON only."
+        ).with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
         
         # Parse JSON from response
         import json
-        # Clean response to extract JSON
         response_text = response.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
