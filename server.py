@@ -490,7 +490,7 @@ Scoring guide:
 Return ONLY valid JSON, no other text."""
 
         response = await client.aio.models.generate_content(
-            model='gemini-1.5-flash-latest',
+            model='gemini-2.5-flash-lite',
             contents=prompt
         )
         response_text = response.text.strip()
