@@ -458,7 +458,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
     """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        import httpx
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
@@ -487,18 +487,34 @@ Scoring guide:
 
 Return ONLY valid JSON, no other text."""
 
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"analysis-{product_name[:20]}",
-            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Always respond with valid JSON only."
-        ).with_model("openai", "gpt-4o")
-        
-        user_message = UserMessage(text=prompt)
-        response = await chat.send_message(user_message)
+        # Use httpx to call Emergent API directly
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://emergent-api.fly.dev/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {EMERGENT_LLM_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {"role": "system", "content": "You are a food science expert. Always respond with valid JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.3
+                }
+            )
+            
+            if response.status_code != 200:
+                print(f"AI API error: {response.status_code} - {response.text}")
+                raise Exception(f"API error: {response.status_code}")
+            
+            result = response.json()
+            response_text = result["choices"][0]["message"]["content"]
         
         # Parse JSON from response
         import json
-        response_text = response.strip()
+        response_text = response_text.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         if response_text.startswith("```"):

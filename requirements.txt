@@ -12,4 +12,4 @@ requests
 resend
 email-validator
 openai
-emergentintegrations
+httpx
