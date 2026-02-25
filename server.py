@@ -460,6 +460,31 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
     try:
         client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
         
+        prompt = f"""Analyze these ingredients from {product_name}:
+
+{ingredients}
+
+FOCUS: Identify ultra-processed food (UPF) ingredients and their direct health impacts.
+
+Return JSON with this exact structure:
+{{
+  "harmful_ingredients": [
+    {{"name": "ingredient name", "concern": "brief health concern", "severity": "high/medium/low"}}
+  ],
+  "beneficial_ingredients": [
+    {{"name": "ingredient name", "benefit": "brief health benefit"}}
+  ],
+  "overall_score": 1-10 (10=healthiest),
+  "upf_score": "X%" (percentage of ultra-processed ingredients),
+  "processing_category": "Minimally Processed/Processed/Ultra-Processed",
+  "recommendation": "1-2 sentence practical advice"
+}}
+
+Scoring guide:
+- 8-10: Whole/minimally processed, mostly beneficial ingredients
+- 5-7: Some processing, mix of good and concerning ingredients  
+- 1-4: Highly processed with multiple concerning ingredients"""
+
         completion = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
