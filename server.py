@@ -461,7 +461,7 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
         import google.generativeai as genai
         
         genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
