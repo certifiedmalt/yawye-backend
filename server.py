@@ -783,20 +783,31 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
                 executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
             }
         
-        # Return the FIRST successful result
+        # Collect ALL results, prioritize ones WITH ingredients
+        results_with_ingredients = []
+        results_without_ingredients = []
+        
         for future in as_completed(futures, timeout=20):
             src = futures[future]
             try:
                 result = future.result()
                 if result:
-                    product_data = result
-                    source = src
-                    # Cancel remaining futures
-                    for f in futures:
-                        f.cancel()
-                    break
+                    if result.get("ingredients_text"):
+                        results_with_ingredients.append((result, src))
+                        logger.info(f"{src}: Found product WITH ingredients")
+                    else:
+                        results_without_ingredients.append((result, src))
+                        logger.info(f"{src}: Found product WITHOUT ingredients")
             except Exception as e:
                 logger.warning(f"{src} error: {e}")
+        
+        # Prefer results WITH ingredients
+        if results_with_ingredients:
+            product_data, source = results_with_ingredients[0]
+            logger.info(f"Using {source} (has ingredients)")
+        elif results_without_ingredients:
+            product_data, source = results_without_ingredients[0]
+            logger.info(f"Using {source} (no ingredients available)")
     
     # STEP 3: If parallel calls all failed, try FatSecret as last resort
     if not product_data:
