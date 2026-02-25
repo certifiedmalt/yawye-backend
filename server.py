@@ -466,7 +466,16 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
 
 {ingredients}
 
-FOCUS: Identify ultra-processed food (UPF) ingredients and their direct health impacts.
+CRITICAL PRINCIPLE: Processing is ALWAYS negative. The more processed a food is, the LOWER the score MUST be. This is non-negotiable.
+
+RULES:
+1. Ultra-processed foods (UPFs) should score 1-3 maximum
+2. Processed foods should score 3-5 maximum  
+3. Only minimally processed/whole foods can score 6-10
+4. Industrial seed/vegetable oils (canola/rapeseed, sunflower, soybean, corn oil, vegetable oil) are HARMFUL - they are inflammatory, highly processed, and should ALWAYS be flagged as concerning
+5. Any additive with an E-number is a processing marker and negative
+6. Emulsifiers, stabilizers, flavor enhancers = ultra-processed = low score
+7. Added sugars in any form (glucose syrup, fructose, dextrose, maltodextrin) = harmful
 
 Return JSON with this exact structure:
 {{
@@ -476,16 +485,19 @@ Return JSON with this exact structure:
   "beneficial_ingredients": [
     {{"name": "ingredient name", "benefit": "brief health benefit"}}
   ],
-  "overall_score": 1-10 (10=healthiest),
+  "overall_score": 1-10 (10=healthiest, remember: processed = low score ALWAYS),
   "upf_score": "X%" (percentage of ultra-processed ingredients),
   "processing_category": "Minimally Processed/Processed/Ultra-Processed",
   "recommendation": "1-2 sentence practical advice"
 }}
 
-Scoring guide:
-- 8-10: Whole/minimally processed, mostly beneficial ingredients
-- 5-7: Some processing, mix of good and concerning ingredients  
-- 1-4: Highly processed with multiple concerning ingredients
+Scoring guide (STRICT):
+- 8-10: ONLY whole foods with zero processing (fresh fruit, vegetables, raw nuts, plain meat/fish)
+- 5-7: Minimally processed (cheese, plain yogurt, bread with simple ingredients)
+- 3-4: Processed foods (some additives, refined ingredients)
+- 1-2: Ultra-processed (multiple additives, industrial ingredients, seed oils)
+
+NEVER classify processed seed oils as beneficial. They are industrial products.
 
 Return ONLY valid JSON, no other text."""
 
