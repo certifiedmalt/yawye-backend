@@ -458,10 +458,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
     """Analyze ingredients using Gemini AI with focus on ultra-processed foods (UPFs)"""
     try:
-        import google.generativeai as genai
+        from google import genai
         
-        genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        client = genai.Client(api_key=GOOGLE_API_KEY)
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
@@ -490,7 +489,10 @@ Scoring guide:
 
 Return ONLY valid JSON, no other text."""
 
-        response = await model.generate_content_async(prompt)
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
         response_text = response.text.strip()
         
         # Parse JSON from response
