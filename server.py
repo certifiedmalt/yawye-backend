@@ -13,7 +13,6 @@ import jwt
 from passlib.context import CryptContext
 import bcrypt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import openai
 import asyncio
 import time
 import logging
