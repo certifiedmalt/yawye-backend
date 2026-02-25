@@ -458,7 +458,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
     """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
-        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
+        client = openai.AsyncOpenAI(
+            api_key=EMERGENT_LLM_KEY,
+            base_url="https://api.emergentagent.com/v1"
+        )
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
@@ -1360,7 +1363,10 @@ If user asks forbidden topics, politely say: "I can't provide medical advice. Pl
             messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": chat_req.message})
         
-        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
+        client = openai.AsyncOpenAI(
+            api_key=EMERGENT_LLM_KEY,
+            base_url="https://api.emergentagent.com/v1"
+        )
         completion = await client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
