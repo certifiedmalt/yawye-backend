@@ -1,9 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { Platform } from 'react-native';
 
-// RevenueCat is disabled until real API keys are configured.
-// This prevents native SDK crashes on production builds with test keys.
-const REVENUECAT_ENABLED = false;
+// RevenueCat is ENABLED for production builds with real API keys.
+const REVENUECAT_ENABLED = true;
 
 interface SubscriptionContextType {
   offerings: any | null;
