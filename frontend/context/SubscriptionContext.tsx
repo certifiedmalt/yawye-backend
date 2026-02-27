@@ -90,7 +90,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isPremium = false; // Default to free tier until RevenueCat is enabled
+  // Check if user has active premium entitlement
+  const isPremium = customerInfo?.entitlements?.active?.premium !== undefined;
 
   return (
     <SubscriptionContext.Provider
