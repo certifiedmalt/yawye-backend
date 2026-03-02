@@ -106,7 +106,7 @@ async def send_reset_email(to_email: str, reset_code: str):
         """
 
         params = {
-            "from": "You Are What You Eat <onboarding@resend.dev>",
+            "from": "You Are What You Eat <noreply@yawye.app>",
             "to": [to_email],
             "subject": "Your Password Reset Code",
             "html": html_content,
