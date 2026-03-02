@@ -264,11 +264,37 @@ export default function Main() {
               • Save favorites{"\n"}
               • Scan history
             </Text>
-            <TouchableOpacity style={styles.upgradeButton} onPress={() => {
-              Alert.alert('Coming Soon', 'Premium subscriptions will be available soon. Stay tuned!');
-            }}>
-              <Text style={styles.upgradeButtonText}>Upgrade Now - $4.99/month</Text>
+            <TouchableOpacity 
+              style={[styles.upgradeButton, purchaseInProgress && styles.upgradeButtonDisabled]} 
+              disabled={purchaseInProgress}
+              onPress={async () => {
+                if (!offerings || !offerings.availablePackages || offerings.availablePackages.length === 0) {
+                  Alert.alert('Not Available', 'Subscriptions are not available at the moment. Please try again later.');
+                  return;
+                }
+                try {
+                  setPurchaseInProgress(true);
+                  // Find the monthly package
+                  const monthlyPackage = offerings.availablePackages.find(
+                    (pkg: any) => pkg.identifier === '$rc_monthly' || pkg.identifier === 'Monthly' || pkg.identifier.toLowerCase().includes('monthly')
+                  ) || offerings.availablePackages[0];
+                  
+                  await purchasePackage(monthlyPackage.identifier);
+                  Alert.alert('Success!', 'Welcome to Premium! Enjoy unlimited scans.');
+                  refreshUser();
+                } catch (error: any) {
+                  if (!error.userCancelled) {
+                    Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
+                  }
+                } finally {
+                  setPurchaseInProgress(false);
+                }
+              }}>
+              <Text style={styles.upgradeButtonText}>
+                {purchaseInProgress ? 'Processing...' : 'Start 7-Day Free Trial'}
+              </Text>
             </TouchableOpacity>
+            <Text style={styles.trialText}>Then £1.99/month. Cancel anytime.</Text>
           </View>
         )}
 
