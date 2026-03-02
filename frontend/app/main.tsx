@@ -300,6 +300,21 @@ export default function Main() {
 
         {/* Account Settings */}
         <View style={styles.settingsSection}>
+          {/* Manage Subscription - only show if premium */}
+          {user?.subscription_tier === 'premium' && (
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                import('react-native').then(({ Linking }) => {
+                  Linking.openURL('https://play.google.com/store/account/subscriptions');
+                });
+              }}
+            >
+              <Ionicons name="card-outline" size={20} color="#4CAF50" />
+              <Text style={styles.settingsItemText}>Manage Subscription</Text>
+            </TouchableOpacity>
+          )}
+          
           <TouchableOpacity
             style={styles.settingsItem}
             onPress={() => {
@@ -332,7 +347,7 @@ export default function Main() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.versionText}>v1.0.6</Text>
+        <Text style={styles.versionText}>v1.0.12</Text>
       </ScrollView>
     </SafeAreaView>
   );
