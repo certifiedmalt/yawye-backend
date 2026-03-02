@@ -476,10 +476,19 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
+  upgradeButtonDisabled: {
+    backgroundColor: '#888',
+  },
   upgradeButtonText: {
     color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  trialText: {
+    color: '#888',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
   },
   gamificationCard: {
     backgroundColor: '#1a1a1a',
