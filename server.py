@@ -1331,6 +1331,10 @@ class ChatRequest(BaseModel):
 async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_current_user)):
     """AI Health Assistant - Educational information only"""
     try:
+        from google import genai
+        
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        
         # Create system message with strong guardrails
         system_message = """You are a health education assistant for "You Are What You Eat" app. 
 
@@ -1361,27 +1365,24 @@ FORBIDDEN TOPICS:
 If user asks forbidden topics, politely say: "I can't provide medical advice. Please consult a healthcare professional for personalized guidance. I can help with general nutrition education instead - what would you like to know?"
 """
 
-        # Limit conversation history to last 10 messages
+        # Build conversation context
         recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
         
-        # Build messages for OpenAI
-        messages = [{"role": "system", "content": system_message}]
+        # Format conversation for Gemini
+        conversation_text = f"System: {system_message}\n\n"
         for msg in recent_history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-        messages.append({"role": "user", "content": chat_req.message})
+            role = "User" if msg["role"] == "user" else "Assistant"
+            conversation_text += f"{role}: {msg['content']}\n\n"
         
-        client = openai.AsyncOpenAI(
-            api_key=EMERGENT_LLM_KEY,
-            base_url="https://api.emergentagent.com/v1"
-        )
-        completion = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.7
-        )
-        response = completion.choices[0].message.content
+        conversation_text += f"User: {chat_req.message}\n\nAssistant:"
         
-        return {"response": response}
+        # Generate response with Gemini
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=conversation_text
+        )
+        
+        return {"response": response.text.strip()}
         
     except Exception as e:
         print(f"Assistant error: {e}")
