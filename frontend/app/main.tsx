@@ -268,16 +268,57 @@ export default function Main() {
               style={[styles.upgradeButton, purchaseInProgress && styles.upgradeButtonDisabled]} 
               disabled={purchaseInProgress}
               onPress={async () => {
-                if (!offerings || !offerings.availablePackages || offerings.availablePackages.length === 0) {
-                  Alert.alert('Not Available', 'Subscriptions are not available at the moment. Please try again later.');
+                console.log('Offerings:', JSON.stringify(offerings, null, 2));
+                
+                // Check if offerings exist
+                if (!offerings) {
+                  Alert.alert('Loading...', 'Please wait while we load subscription options. Try again in a moment.');
                   return;
                 }
+                
+                // Get available packages
+                const packages = offerings.availablePackages || [];
+                console.log('Available packages:', packages.length);
+                
+                if (packages.length === 0) {
+                  // Try to open Google Play subscription directly as fallback
+                  Alert.alert(
+                    'Subscribe',
+                    'Would you like to subscribe to Premium for £1.99/month with a 7-day free trial?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { 
+                        text: 'Subscribe', 
+                        onPress: async () => {
+                          try {
+                            const Purchases = require('react-native-purchases').default;
+                            // Try to get offerings again
+                            const offeringsResult = await Purchases.getOfferings();
+                            if (offeringsResult.current?.availablePackages?.length > 0) {
+                              const pkg = offeringsResult.current.availablePackages[0];
+                              await Purchases.purchasePackage(pkg);
+                              Alert.alert('Success!', 'Welcome to Premium!');
+                            } else {
+                              Alert.alert('Error', 'Could not load subscription. Please try again later.');
+                            }
+                          } catch (e: any) {
+                            if (!e.userCancelled) {
+                              Alert.alert('Error', 'Purchase failed. Please try again.');
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  );
+                  return;
+                }
+                
                 try {
                   setPurchaseInProgress(true);
                   // Find the monthly package
-                  const monthlyPackage = offerings.availablePackages.find(
+                  const monthlyPackage = packages.find(
                     (pkg: any) => pkg.identifier === '$rc_monthly' || pkg.identifier === 'Monthly' || pkg.identifier.toLowerCase().includes('monthly')
-                  ) || offerings.availablePackages[0];
+                  ) || packages[0];
                   
                   await purchasePackage(monthlyPackage.identifier);
                   Alert.alert('Success!', 'Welcome to Premium! Enjoy unlimited scans.');
