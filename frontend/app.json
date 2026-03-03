@@ -2,7 +2,7 @@
   "expo": {
     "name": "You Are What You Eat",
     "slug": "you-are-what-you-eat",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
