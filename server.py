@@ -709,21 +709,16 @@ async def delete_account(current_user = Depends(get_current_user)):
 
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
-    # Reset daily scans if needed
-    last_reset = current_user.get("last_scan_reset", datetime.utcnow())
-    if datetime.utcnow() - last_reset > timedelta(days=1):
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$set": {"daily_scans": 0, "last_scan_reset": datetime.utcnow()}}
-        )
-        current_user["daily_scans"] = 0
+    # No daily reset - scans are lifetime limited for free users
+    total_scans = current_user.get("total_scans", 0)
     
     return {
         "id": str(current_user["_id"]),
         "email": current_user["email"],
         "name": current_user["name"],
         "subscription_tier": current_user.get("subscription_tier", "free"),
-        "daily_scans": current_user.get("daily_scans", 0)
+        "total_scans": total_scans,
+        "scans_remaining": max(0, 5 - total_scans) if current_user.get("subscription_tier", "free") == "free" else "unlimited"
     }
 
 @app.post("/api/scan")
@@ -738,14 +733,14 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     start_time = time.time()
     barcode = scan_req.barcode.strip()
     
-    # Check subscription limits
+    # Check subscription limits - 5 TOTAL scans for free users (no daily reset)
     subscription_tier = current_user.get("subscription_tier", "free")
-    daily_scans = current_user.get("daily_scans", 0)
+    total_scans = current_user.get("total_scans", 0)
     
-    if subscription_tier == "free" and daily_scans >= 5:
+    if subscription_tier == "free" and total_scans >= 5:
         raise HTTPException(
             status_code=403,
-            detail="Daily scan limit reached. Upgrade to premium for unlimited scans."
+            detail="Free scan limit reached. Upgrade to premium for unlimited scans."
         )
     
     # STEP 1: Check cache first (instant results!)
@@ -768,10 +763,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         }
         await scans_collection.insert_one(scan_doc)
         
-        # Update user's daily scan count
+        # Update user's total scan count (no daily reset)
         await users_collection.update_one(
             {"_id": current_user["_id"]},
-            {"$inc": {"daily_scans": 1}}
+            {"$inc": {"total_scans": 1}}
         )
         
         return {
@@ -914,10 +909,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     }
     await scans_collection.insert_one(scan_doc)
     
-    # Update user's daily scan count
+    # Update user's total scan count (no daily reset)
     await users_collection.update_one(
         {"_id": current_user["_id"]},
-        {"$inc": {"daily_scans": 1}}
+        {"$inc": {"total_scans": 1}}
     )
     
     # Log analytics
