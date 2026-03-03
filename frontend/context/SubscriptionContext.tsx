@@ -33,7 +33,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const Purchases = require('react-native-purchases').default;
       const apiKey = Platform.OS === 'ios'
         ? 'appl_test_UVSbyqEktCmCDPUoYrrsUqkuWhk'  // TODO: Replace with iOS production key when ready
-        : 'goog_sSuefaqGfyQKJvmIkN';
+        : 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx';
 
       await Purchases.configure({ apiKey });
       
