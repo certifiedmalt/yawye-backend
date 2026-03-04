@@ -896,10 +896,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     }
     await scans_collection.insert_one(scan_doc)
     
-    # Update user's daily scan count
+    # Update user's total scan count
     await users_collection.update_one(
         {"_id": current_user["_id"]},
-        {"$inc": {"daily_scans": 1}}
+        {"$inc": {"total_scans": 1}}
     )
     
     # Log analytics
