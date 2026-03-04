@@ -222,14 +222,14 @@ export default function Main() {
         </TouchableOpacity>
 
         <View style={styles.features}>
-          <Text style={styles.featuresTitle}>What We Analyze</Text>
+          <Text style={styles.featuresTitle}>AI-Powered Analysis</Text>
           
           <View style={styles.featureItem}>
             <Ionicons name="warning" size={24} color="#FF5252" />
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>Harmful Ingredients</Text>
+              <Text style={styles.featureTitle}>Harmful Ingredients Explained</Text>
               <Text style={styles.featureDescription}>
-                Identify ingredients that may pose health risks with scientific references
+                AI identifies ultra-processed ingredients & seed oils, explaining WHY they're harmful
               </Text>
             </View>
           </View>
@@ -239,7 +239,7 @@ export default function Main() {
             <View style={styles.featureText}>
               <Text style={styles.featureTitle}>Beneficial Ingredients</Text>
               <Text style={styles.featureDescription}>
-                Discover healthy ingredients backed by research studies
+                Discover healthy whole-food ingredients backed by nutrition science
               </Text>
             </View>
           </View>
@@ -247,9 +247,9 @@ export default function Main() {
           <View style={styles.featureItem}>
             <Ionicons name="analytics" size={24} color="#2196F3" />
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>Overall Health Score</Text>
+              <Text style={styles.featureTitle}>Processing Score & Recommendations</Text>
               <Text style={styles.featureDescription}>
-                Get a comprehensive health rating from 1-10
+                Get health scores, UPF ratings, and personalized healthier alternatives
               </Text>
             </View>
           </View>

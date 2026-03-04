@@ -47,7 +47,7 @@ export default function Login() {
         <View style={styles.header}>
           <Ionicons name="scan-outline" size={80} color="#4CAF50" />
           <Text style={styles.title}>You Are What You Eat</Text>
-          <Text style={styles.subtitle}>Scan. Analyze. Eat Better.</Text>
+          <Text style={styles.subtitle}>AI-Powered Ingredient Analysis</Text>
         </View>
 
         <View style={styles.form}>
