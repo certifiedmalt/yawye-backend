@@ -121,7 +121,7 @@ export default function Main() {
     ]);
   };
 
-  const scansRemaining = user?.subscription_tier === 'premium' ? '∞' : (5 - (user?.daily_scans || 0));
+  const scansRemaining = user?.subscription_tier === 'premium' ? '∞' : Math.max(0, 5 - (user?.total_scans || 0));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -143,7 +143,7 @@ export default function Main() {
           <View style={styles.statItem}>
             <Ionicons name="scan-outline" size={32} color="#4CAF50" />
             <Text style={styles.statValue}>{scansRemaining}</Text>
-            <Text style={styles.statLabel}>Scans Remaining Today</Text>
+            <Text style={styles.statLabel}>Scans Remaining</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
