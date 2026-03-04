@@ -2,7 +2,7 @@
   "expo": {
     "name": "You Are What You Eat",
     "slug": "you-are-what-you-eat",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -21,7 +21,7 @@
         "backgroundColor": "#000000"
       },
       "package": "com.youarewhatyoueat.app",
-      "versionCode": 14,
+      "versionCode": 15,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",
@@ -70,6 +70,7 @@
         "projectId": "bcd7cf74-6fa3-4690-8ecf-1f01e912693d"
       }
     },
-    "owner": "certifiedmalt"
+    "owner": "certifiedmalt",
+    "description": "AI-powered food scanner that explains WHY ingredients are harmful. Unlike static scoring apps, our AI identifies ultra-processed ingredients and seed oils with scientific explanations and healthier alternatives."
   }
 }
