@@ -341,6 +341,15 @@ export default function Main() {
 
         {/* Account Settings */}
         <View style={styles.settingsSection}>
+          {/* About */}
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => router.push('/about')}
+          >
+            <Ionicons name="information-circle-outline" size={20} color="#4CAF50" />
+            <Text style={styles.settingsItemText}>About</Text>
+          </TouchableOpacity>
+
           {/* Manage Subscription - only show if premium */}
           {user?.subscription_tier === 'premium' && (
             <TouchableOpacity
@@ -388,7 +397,7 @@ export default function Main() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.versionText}>v1.0.12</Text>
+        <Text style={styles.versionText}>v1.0.15</Text>
       </ScrollView>
     </SafeAreaView>
   );
