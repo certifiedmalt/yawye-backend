@@ -37,7 +37,7 @@ Most food apps use government nutrition guidelines and accept advertising from f
 
 **Free to Start:**
 • 5 free scans to try the app
-• Premium: Unlimited scans for £1.99/month
+• Premium: Unlimited scans (monthly subscription)
 • 7-day free trial included
 
 Stop trusting food labels. Start understanding ingredients.
