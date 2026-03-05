@@ -281,35 +281,7 @@ export default function Main() {
                 console.log('Available packages:', packages.length);
                 
                 if (packages.length === 0) {
-                  // Try to open Google Play subscription directly as fallback
-                  Alert.alert(
-                    'Subscribe',
-                    'Would you like to subscribe to Premium for £1.99/month with a 7-day free trial?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Subscribe', 
-                        onPress: async () => {
-                          try {
-                            const Purchases = require('react-native-purchases').default;
-                            // Try to get offerings again
-                            const offeringsResult = await Purchases.getOfferings();
-                            if (offeringsResult.current?.availablePackages?.length > 0) {
-                              const pkg = offeringsResult.current.availablePackages[0];
-                              await Purchases.purchasePackage(pkg);
-                              Alert.alert('Success!', 'Welcome to Premium!');
-                            } else {
-                              Alert.alert('Error', 'Could not load subscription. Please try again later.');
-                            }
-                          } catch (e: any) {
-                            if (!e.userCancelled) {
-                              Alert.alert('Error', 'Purchase failed. Please try again.');
-                            }
-                          }
-                        }
-                      }
-                    ]
-                  );
+                  Alert.alert('Error', 'Subscription not available. Please try again later.');
                   return;
                 }
                 
@@ -335,7 +307,11 @@ export default function Main() {
                 {purchaseInProgress ? 'Processing...' : 'Start 7-Day Free Trial'}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.trialText}>Then £1.99/month. Cancel anytime.</Text>
+            <Text style={styles.trialText}>
+              {offerings?.availablePackages?.[0]?.product?.priceString 
+                ? `Then ${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
+                : 'Cancel anytime.'}
+            </Text>
           </View>
         )}
 
