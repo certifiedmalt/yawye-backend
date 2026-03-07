@@ -459,16 +459,16 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
-            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Provide clear, consumer-friendly explanations."
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. You also highlight beneficial whole food ingredients and their specific health benefits. Provide clear, consumer-friendly explanations."
         ).with_model("openai", "gpt-5.2")
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
-FOCUS: Identify ultra-processed food (UPF) ingredients and their direct health impacts.
+FOCUS: Identify ultra-processed food (UPF) ingredients AND beneficial whole food ingredients.
 
-PRIORITIZE AS HIGH SEVERITY:
+PRIORITIZE AS HIGH SEVERITY HARMFUL:
 - Emulsifiers (E471, mono/diglycerides, lecithins, polysorbates)
 - Artificial sweeteners (aspartame, sucralose, acesulfame K)
 - Preservatives (sodium benzoate, potassium sorbate, BHA, BHT)
@@ -478,6 +478,15 @@ PRIORITIZE AS HIGH SEVERITY:
 - Flavor enhancers (MSG, hydrolyzed proteins, yeast extract)
 - Added sugars (high fructose corn syrup, glucose syrup, invert sugar)
 
+HIGHLIGHT AS BENEFICIAL (always explain WHY):
+- Fruits: antioxidants, vitamins, fiber (e.g., "blueberries are rich in anthocyanins, powerful antioxidants linked to brain health")
+- Vegetables: vitamins, minerals, fiber
+- Proteins: amino acids, muscle health (e.g., "milk provides complete protein with all essential amino acids")
+- Whole grains: fiber, B vitamins, sustained energy
+- Nuts/seeds: healthy fats, vitamin E, minerals
+- Fermented foods: probiotics, gut health
+- Herbs/spices: antioxidants, anti-inflammatory compounds
+
 RESPONSE FORMAT - Provide JSON with this EXACT structure:
 {{
   "harmful_ingredients": [
@@ -486,15 +495,16 @@ RESPONSE FORMAT - Provide JSON with this EXACT structure:
       "health_impact": "Clear, direct health impact in 1-2 sentences. Focus on WHAT it does to your body, not technical details. Consumer-friendly language.",
       "severity": "high/medium/low",
       "processing_level": "NOVA 4 - ultra-processed" or "NOVA 3 - processed",
-      "research_summary": "Brief 2-3 sentence summary of key research findings. Mention specific health outcomes studied (e.g., 'Studies show increased inflammation markers and gut dysbiosis in regular consumers')"
+      "research_summary": "REQUIRED: 2-3 sentences about research findings. Be specific: cite types of studies (meta-analyses, clinical trials), health outcomes (inflammation, gut health, disease risk), and findings (e.g., '23% increased risk of metabolic syndrome in heavy consumers')."
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "Clear, positive health impact in 1-2 sentences. Focus on benefits to the body.",
+      "health_benefit": "REQUIRED: Clear explanation of specific health benefits. Include the KEY compounds (e.g., 'Rich in anthocyanins - powerful antioxidants', 'Contains complete protein with all 9 essential amino acids', 'High in omega-3 fatty acids'). 2-3 sentences.",
+      "benefit_type": "antioxidant/protein/vitamin/mineral/fiber/probiotic/healthy-fat",
       "processing_level": "NOVA 1 - whole/minimally processed",
-      "research_summary": "Brief 2-3 sentence summary of research. Focus on proven benefits (e.g., 'Multiple studies link regular consumption to 30% reduced cardiovascular disease risk')"
+      "research_summary": "REQUIRED: 2-3 sentences about proven benefits. Be specific: cite types of studies, health outcomes studied (brain health, heart health, cancer prevention), and findings (e.g., 'Regular consumption linked to 25% lower risk of cognitive decline')."
     }}
   ],
   "overall_score": 1-10,
