@@ -912,6 +912,38 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         {"$inc": {"total_scans": 1}}
     )
     
+    # Update daily quest progress
+    user_id = str(current_user["_id"])
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    if gamification:
+        daily_quests = gamification.get("daily_quests", {})
+        xp_earned = 0
+        
+        # Quest 1: Scan 3 products
+        if "scan_3_products" in daily_quests and not daily_quests["scan_3_products"]["completed"]:
+            current_progress = daily_quests["scan_3_products"].get("progress", 0) + 1
+            daily_quests["scan_3_products"]["progress"] = current_progress
+            if current_progress >= 3:
+                daily_quests["scan_3_products"]["completed"] = True
+                xp_earned += daily_quests["scan_3_products"]["xp"]
+        
+        # Quest 2: Find a healthy product (8+/10)
+        if "find_healthy_product" in daily_quests and not daily_quests["find_healthy_product"]["completed"]:
+            overall_score = analysis.get("overall_score", 0)
+            if overall_score >= 8:
+                daily_quests["find_healthy_product"]["completed"] = True
+                daily_quests["find_healthy_product"]["progress"] = 1
+                xp_earned += daily_quests["find_healthy_product"]["xp"]
+        
+        # Update gamification data
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {"daily_quests": daily_quests},
+                "$inc": {"xp": xp_earned}
+            }
+        )
+    
     # Log analytics
     response_time = time.time() - start_time
     await log_scan_analytics(barcode, True, source, response_time)
@@ -1326,6 +1358,23 @@ async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_curre
         from google import genai
         
         client = genai.Client(api_key=GOOGLE_API_KEY)
+        
+        # Update daily quest progress for using assistant
+        user_id = str(current_user["_id"])
+        gamification = await db["gamification"].find_one({"user_id": user_id})
+        if gamification:
+            daily_quests = gamification.get("daily_quests", {})
+            if "use_assistant" in daily_quests and not daily_quests["use_assistant"]["completed"]:
+                daily_quests["use_assistant"]["completed"] = True
+                daily_quests["use_assistant"]["progress"] = 1
+                xp_earned = daily_quests["use_assistant"]["xp"]
+                await db["gamification"].update_one(
+                    {"user_id": user_id},
+                    {
+                        "$set": {"daily_quests": daily_quests},
+                        "$inc": {"xp": xp_earned}
+                    }
+                )
         
         # Create system message with strong guardrails
         system_message = """You are a health education assistant for "You Are What You Eat" app. 
