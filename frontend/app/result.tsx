@@ -233,7 +233,9 @@ export default function Result() {
                 
                 {expandedResearch[`harmful_${index}`] && (
                   <View style={styles.researchContent}>
-                    <Text style={styles.researchText}>{ingredient.research_summary}</Text>
+                    <Text style={styles.researchText}>
+                      {ingredient.research_summary || ingredient.concern || 'Research data not available for this ingredient. The health impact information above summarizes the key concerns.'}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -273,7 +275,9 @@ export default function Result() {
                 
                 {expandedResearch[`beneficial_${index}`] && (
                   <View style={styles.researchContent}>
-                    <Text style={styles.researchText}>{ingredient.research_summary}</Text>
+                    <Text style={styles.researchText}>
+                      {ingredient.research_summary || ingredient.benefit || 'Research data not available for this ingredient. The health benefit information above summarizes the key advantages.'}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -317,7 +321,9 @@ export default function Result() {
                   {analysis.harmful_ingredients.map((ingredient, index) => (
                     <View key={index} style={styles.modalItem}>
                       <Text style={styles.modalIngredientName}>{ingredient.name}</Text>
-                      <Text style={styles.modalResearchText}>{ingredient.research_summary}</Text>
+                      <Text style={styles.modalResearchText}>
+                        {ingredient.research_summary || ingredient.concern || ingredient.health_impact || 'Research summary not available.'}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -329,7 +335,9 @@ export default function Result() {
                   {analysis.beneficial_ingredients.map((ingredient, index) => (
                     <View key={index} style={styles.modalItem}>
                       <Text style={styles.modalIngredientName}>{ingredient.name}</Text>
-                      <Text style={styles.modalResearchText}>{ingredient.research_summary}</Text>
+                      <Text style={styles.modalResearchText}>
+                        {ingredient.research_summary || ingredient.health_benefit || ingredient.benefit || 'Research summary not available.'}
+                      </Text>
                     </View>
                   ))}
                 </View>
