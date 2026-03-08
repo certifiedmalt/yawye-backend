@@ -459,72 +459,83 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
-            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. You also highlight beneficial whole food ingredients and their specific health benefits. Provide clear, consumer-friendly explanations."
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
         ).with_model("openai", "gpt-5.2")
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
-FOCUS: Identify ultra-processed food (UPF) ingredients AND beneficial whole food ingredients.
+FOCUS: Identify harmful UPF ingredients AND beneficial whole food nutrients.
 
-PRIORITIZE AS HIGH SEVERITY HARMFUL:
-- Emulsifiers (E471, mono/diglycerides, lecithins, polysorbates)
-- Artificial sweeteners (aspartame, sucralose, acesulfame K)
-- Preservatives (sodium benzoate, potassium sorbate, BHA, BHT)
-- Artificial colors (tartrazine, sunset yellow, etc.)
-- Modified starches, maltodextrin, dextrose
+=== HARMFUL INGREDIENTS TO FLAG (HIGH PRIORITY) ===
+- Seed/vegetable oils: sunflower, rapeseed, soybean, corn oil (inflammatory omega-6)
+- Emulsifiers: E471, mono/diglycerides, lecithins, polysorbates (gut barrier damage)
+- Artificial sweeteners: aspartame, sucralose, acesulfame K (metabolic disruption)
+- Preservatives: sodium benzoate, potassium sorbate, BHA, BHT
+- Artificial colors: tartrazine, sunset yellow, caramel color
+- Modified starches, maltodextrin, dextrose (blood sugar spikes)
 - Hydrogenated oils, palm oil, interesterified fats
-- Flavor enhancers (MSG, hydrolyzed proteins, yeast extract)
-- Added sugars (high fructose corn syrup, glucose syrup, invert sugar)
+- Flavor enhancers: MSG, hydrolyzed proteins, yeast extract
+- Added sugars: high fructose corn syrup, glucose syrup, invert sugar
 
-HIGHLIGHT AS BENEFICIAL (always explain WHY):
-- Fruits: antioxidants, vitamins, fiber (e.g., "blueberries are rich in anthocyanins, powerful antioxidants linked to brain health")
-- Vegetables: vitamins, minerals, fiber
-- Proteins: amino acids, muscle health (e.g., "milk provides complete protein with all essential amino acids")
-- Whole grains: fiber, B vitamins, sustained energy
-- Nuts/seeds: healthy fats, vitamin E, minerals
-- Fermented foods: probiotics, gut health
-- Herbs/spices: antioxidants, anti-inflammatory compounds
+=== BENEFICIAL INGREDIENTS TO HIGHLIGHT (EQUALLY IMPORTANT) ===
+PROTEIN SOURCES - Always highlight with specific benefits:
+- Milk/dairy: "Complete protein with all 9 essential amino acids, calcium for bone health"
+- Eggs: "High biological value protein, choline for brain function"
+- Meat/fish: Specify amino acid profile, B12, iron, omega-3 (if fish)
 
-RESPONSE FORMAT - Provide JSON with this EXACT structure:
+VITAMINS & ANTIOXIDANTS:
+- Vitamin C (citrus, berries): "Immune function, collagen synthesis. Linus Pauling Institute research shows 200mg/day optimal."
+- Vitamin A (carrots, sweet potato): "Vision, immune function, skin health"
+- Vitamin E (nuts, seeds): "Antioxidant, protects cell membranes"
+- Anthocyanins (berries, grapes): "Powerful antioxidants. 2019 meta-analysis: 12% reduced cardiovascular risk"
+- Lycopene (tomatoes): "Prostate health. Harvard study: 21% reduced prostate cancer risk"
+
+GUT HEALTH:
+- Fiber (whole grains, fruits, vegetables): "Feeds beneficial gut bacteria, promotes regularity"
+- Probiotics (yogurt, kefir, fermented foods): "Live cultures support microbiome diversity"
+- Prebiotics (garlic, onion, banana): "Feeds beneficial bacteria, improves gut barrier"
+
+HEALTHY FATS:
+- Omega-3 (fatty fish, flaxseed): "Anti-inflammatory. VITAL study: 28% reduced heart attack risk"
+- Olive oil: "Monounsaturated fats, polyphenols. Mediterranean diet research"
+- Avocado: "Heart-healthy fats, potassium, fiber"
+
+=== RESPONSE FORMAT (JSON) ===
 {{
   "harmful_ingredients": [
     {{
       "name": "ingredient name",
-      "health_impact": "Clear, direct health impact in 1-2 sentences. Focus on WHAT it does to your body, not technical details. Consumer-friendly language.",
+      "health_impact": "Clear explanation of harm to body. Consumer-friendly.",
       "severity": "high/medium/low",
-      "processing_level": "NOVA 4 - ultra-processed" or "NOVA 3 - processed",
-      "research_summary": "REQUIRED: 2-3 sentences about research findings. Be specific: cite types of studies (meta-analyses, clinical trials), health outcomes (inflammation, gut health, disease risk), and findings (e.g., '23% increased risk of metabolic syndrome in heavy consumers')."
+      "processing_level": "NOVA 4 - ultra-processed",
+      "research_summary": "Cite specific study type and findings. Example: 'A 2023 BMJ meta-analysis of 45 studies found regular UPF consumption associated with 24% higher cardiovascular mortality (Srour et al.)'"
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "REQUIRED: Clear explanation of specific health benefits. Include the KEY compounds (e.g., 'Rich in anthocyanins - powerful antioxidants', 'Contains complete protein with all 9 essential amino acids', 'High in omega-3 fatty acids'). 2-3 sentences.",
-      "benefit_type": "antioxidant/protein/vitamin/mineral/fiber/probiotic/healthy-fat",
+      "health_benefit": "Explain specific benefit with key compounds. Example: 'Rich in anthocyanins - powerful antioxidants that cross blood-brain barrier. Contains 25% daily vitamin C.'",
+      "benefit_type": "protein/vitamin/antioxidant/fiber/probiotic/healthy-fat/mineral",
+      "key_nutrients": "List key compounds: vitamin C, omega-3, anthocyanins, complete protein, etc.",
       "processing_level": "NOVA 1 - whole/minimally processed",
-      "research_summary": "REQUIRED: 2-3 sentences about proven benefits. Be specific: cite types of studies, health outcomes studied (brain health, heart health, cancer prevention), and findings (e.g., 'Regular consumption linked to 25% lower risk of cognitive decline')."
+      "research_summary": "Cite specific research. Example: 'Nurses Health Study (n=93,600): daily berry consumption linked to 32% slower cognitive decline over 6 years (Devore et al., 2012)'"
     }}
   ],
   "overall_score": 1-10,
-  "upf_score": "percentage like 75%",
+  "upf_score": "percentage",
   "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
-  "recommendation": "One clear sentence recommendation based on the analysis"
+  "recommendation": "Clear recommendation"
 }}
 
-WRITING STYLE:
-- Health impacts: Clear, direct, consumer-friendly (8th grade reading level)
-- Research summaries: Factual, specific, cite real findings
-- No jargon in health impacts
-- Research can be more technical but still accessible
-
-SCORING:
-- 8-10: Whole/minimally processed, mostly beneficial ingredients
-- 5-7: Some processing, mix of good and concerning ingredients  
-- 1-4: Ultra-processed, multiple harmful additives
-
-Be honest and specific. If it's bad, say so clearly."""
+IMPORTANT RULES:
+1. ALWAYS include beneficial_ingredients if ANY whole foods are present (fruits, vegetables, dairy, meat, fish, eggs, nuts, seeds, whole grains)
+2. For protein sources, ALWAYS mention amino acid completeness and specific benefits
+3. For fruits/vegetables, ALWAYS mention specific vitamins/antioxidants
+4. Research citations should reference real study types: meta-analysis, RCT, cohort study, Cochrane review
+5. Include author names and years when possible for credibility
+6. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed"""
         
         user_message = UserMessage(text=prompt)
         response = await chat.send_message(user_message)
@@ -740,43 +751,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
-    # STEP 1: Check cache first (instant results!)
-    cached_product = await get_cached_product(barcode)
-    if cached_product:
-        response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, "cache", response_time)
-        
-        # Save to user's scan history
-        scan_doc = {
-            "user_id": str(current_user["_id"]),
-            "barcode": barcode,
-            "product_name": cached_product.get("product_name"),
-            "brands": cached_product.get("brands"),
-            "ingredients_text": cached_product.get("ingredients_text"),
-            "image_url": cached_product.get("image_url"),
-            "analysis": cached_product.get("analysis"),
-            "scanned_at": datetime.utcnow(),
-            "from_cache": True
-        }
-        await scans_collection.insert_one(scan_doc)
-        
-        # Update user's total scan count
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$inc": {"total_scans": 1}}
-        )
-        
-        return {
-            "product_name": cached_product.get("product_name"),
-            "brands": cached_product.get("brands"),
-            "ingredients_text": cached_product.get("ingredients_text"),
-            "image_url": cached_product.get("image_url"),
-            "analysis": cached_product.get("analysis"),
-            "from_cache": True,
-            "response_time_ms": int(response_time * 1000)
-        }
+    # CACHE DISABLED - Always fetch fresh results for accuracy
+    # Each scan will get the latest AI analysis
     
-    # STEP 2: Parallel API calls with smart routing based on barcode prefix
+    # STEP 1: Parallel API calls with smart routing based on barcode prefix
     # UK/EU barcodes start with 50/40-44, US barcodes start with 0
     barcode_prefix = barcode[:2] if len(barcode) >= 2 else ""
     
@@ -888,11 +866,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "additives": []
         }
     
-    # STEP 7: Cache the result for future fast lookups
+    # CACHE DISABLED - No longer caching results
     product_data["analysis"] = analysis
-    await cache_product(barcode, product_data)
     
-    # STEP 8: Save to user's scan history
+    # STEP 7: Save to user's scan history
     scan_doc = {
         "user_id": str(current_user["_id"]),
         "barcode": barcode,

@@ -296,10 +296,10 @@ export default function Result() {
 
         <TouchableOpacity
           style={styles.scanAgainButton}
-          onPress={() => router.back()}
+          onPress={() => router.replace('/main')}
         >
-          <Ionicons name="scan" size={24} color="#fff" />
-          <Text style={styles.scanAgainText}>Scan Another Product</Text>
+          <Ionicons name="home" size={24} color="#fff" />
+          <Text style={styles.scanAgainText}>Return Home</Text>
         </TouchableOpacity>
       </ScrollView>
 
