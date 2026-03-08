@@ -13,6 +13,12 @@
         "buildType": "apk"
       }
     },
+    "amazon": {
+      "distribution": "store",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "android": {
         "buildType": "app-bundle"
