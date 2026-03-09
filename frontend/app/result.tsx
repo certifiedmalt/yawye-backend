@@ -8,6 +8,7 @@ import {
   Image,
   Animated,
   Easing,
+  Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,13 +22,17 @@ interface HarmfulIngredient {
   severity: string;
   processing_level?: string;
   research_summary: string;
+  study_link?: string;
 }
 
 interface BeneficialIngredient {
   name: string;
   health_benefit: string;
+  benefit_type?: string;
+  key_nutrients?: string;
   processing_level?: string;
   research_summary: string;
+  study_link?: string;
 }
 
 interface Analysis {
@@ -236,6 +241,15 @@ export default function Result() {
                     <Text style={styles.researchText}>
                       {ingredient.research_summary || ingredient.concern || 'Research data not available for this ingredient. The health impact information above summarizes the key concerns.'}
                     </Text>
+                    {ingredient.study_link && (
+                      <TouchableOpacity 
+                        onPress={() => Linking.openURL(ingredient.study_link!)}
+                        style={styles.studyLink}
+                      >
+                        <Ionicons name="open-outline" size={14} color="#4CAF50" />
+                        <Text style={styles.studyLinkText}>View Study</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
@@ -275,9 +289,23 @@ export default function Result() {
                 
                 {expandedResearch[`beneficial_${index}`] && (
                   <View style={styles.researchContent}>
+                    {ingredient.key_nutrients && (
+                      <Text style={styles.keyNutrients}>
+                        Key nutrients: {ingredient.key_nutrients}
+                      </Text>
+                    )}
                     <Text style={styles.researchText}>
                       {ingredient.research_summary || ingredient.benefit || 'Research data not available for this ingredient. The health benefit information above summarizes the key advantages.'}
                     </Text>
+                    {ingredient.study_link && (
+                      <TouchableOpacity 
+                        onPress={() => Linking.openURL(ingredient.study_link!)}
+                        style={styles.studyLink}
+                      >
+                        <Ionicons name="open-outline" size={14} color="#4CAF50" />
+                        <Text style={styles.studyLinkText}>View Study</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
@@ -672,5 +700,28 @@ const styles = StyleSheet.create({
   scoreOutOf: {
     fontSize: 16,
     color: '#888',
+  },
+  studyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+  },
+  studyLinkText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+  keyNutrients: {
+    fontSize: 13,
+    color: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 10,
+    fontWeight: '500',
   },
 });
