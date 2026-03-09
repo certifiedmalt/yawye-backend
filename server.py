@@ -457,13 +457,72 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using OpenAI GPT-5.2 with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)
+    Uses OpenAI GPT-4o if available, falls back to Google Gemini"""
+    
+    # Try OpenAI first
+    if OPENAI_API_KEY:
+        try:
+            client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+            
+            system_message = "You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
+            
+            prompt = create_analysis_prompt(product_name, ingredients)
+            
+            response = await client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                response_format={"type": "json_object"}
+            )
+            
+            import json
+            response_text = response.choices[0].message.content.strip()
+            return json.loads(response_text)
+        except Exception as e:
+            print(f"OpenAI error (falling back to Gemini): {e}")
+    
+    # Fallback to Gemini
     try:
-        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        client = genai.Client(api_key=GOOGLE_API_KEY)
         
         system_message = "You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
         
-        prompt = f"""Analyze these ingredients from {product_name}:
+        prompt = f"{system_message}\n\n{create_analysis_prompt(product_name, ingredients)}"
+        
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
+        
+        import json
+        response_text = response.text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        
+        return json.loads(response_text)
+    except Exception as e:
+        print(f"AI Analysis error: {e}")
+        return {
+            "harmful_ingredients": [],
+            "beneficial_ingredients": [],
+            "overall_score": 5,
+            "upf_score": "0%",
+            "processing_category": "Unknown",
+            "recommendation": "Unable to analyze ingredients at this time."
+        }
+
+def create_analysis_prompt(product_name: str, ingredients: str) -> str:
+    """Create the analysis prompt for AI models"""
+    return f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
@@ -503,20 +562,17 @@ PROTEIN SOURCES - Always highlight with specific benefits:
 - Meat/fish: Specify amino acid profile, B12, iron, omega-3 (if fish)
 
 VITAMINS & ANTIOXIDANTS:
-- Vitamin C (citrus, berries): "Immune function, collagen synthesis. Linus Pauling Institute research shows 200mg/day optimal."
+- Vitamin C (citrus, berries): "Immune function, collagen synthesis"
 - Vitamin A (carrots, sweet potato): "Vision, immune function, skin health"
 - Vitamin E (nuts, seeds): "Antioxidant, protects cell membranes"
-- Anthocyanins (berries, grapes): "Powerful antioxidants. 2019 meta-analysis: 12% reduced cardiovascular risk"
-- Lycopene (tomatoes): "Prostate health. Harvard study: 21% reduced prostate cancer risk"
 
 GUT HEALTH:
 - Fiber (whole grains, fruits, vegetables): "Feeds beneficial gut bacteria, promotes regularity"
 - Probiotics (yogurt, kefir, fermented foods): "Live cultures support microbiome diversity"
-- Prebiotics (garlic, onion, banana): "Feeds beneficial bacteria, improves gut barrier"
 
 HEALTHY FATS:
-- Omega-3 (fatty fish, flaxseed): "Anti-inflammatory. VITAL study: 28% reduced heart attack risk"
-- Olive oil: "Monounsaturated fats, polyphenols. Mediterranean diet research"
+- Omega-3 (fatty fish, flaxseed): "Anti-inflammatory"
+- Olive oil: "Monounsaturated fats, polyphenols"
 - Avocado: "Heart-healthy fats, potassium, fiber"
 
 === RESPONSE FORMAT (JSON) ===
@@ -527,19 +583,19 @@ HEALTHY FATS:
       "health_impact": "Clear explanation of harm to body. Consumer-friendly. 2-3 sentences.",
       "severity": "high/medium/low",
       "processing_level": "NOVA 4 - ultra-processed",
-      "research_summary": "DETAILED research summary (4-6 sentences). Must include: 1) Study type (meta-analysis, RCT, cohort), 2) Sample size, 3) Key finding with percentage/statistic, 4) Author and year.",
-      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
+      "research_summary": "DETAILED research summary (4-6 sentences). Must include study type, sample size, key finding with percentage/statistic, author and year.",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link"
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "DETAILED benefit explanation (3-4 sentences). Include: specific compounds, mechanism of action, daily value percentage if applicable.",
+      "health_benefit": "DETAILED benefit explanation (3-4 sentences).",
       "benefit_type": "protein/vitamin/antioxidant/fiber/probiotic/healthy-fat/mineral",
-      "key_nutrients": "List with amounts: Vitamin C (70mg, 92% DV), Fiber (3g), Potassium (237mg)",
+      "key_nutrients": "List with amounts",
       "processing_level": "NOVA 1 - whole/minimally processed",
       "research_summary": "DETAILED research (4-6 sentences). Must cite real studies.",
-      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link"
     }}
   ],
   "overall_score": 1-10,
@@ -549,42 +605,13 @@ HEALTHY FATS:
 }}
 
 CRITICAL REQUIREMENTS:
-1. research_summary MUST be 4-6 sentences with SPECIFIC statistics (percentages, hazard ratios, sample sizes)
+1. research_summary MUST be 4-6 sentences with SPECIFIC statistics
 2. ALWAYS cite real studies: author names, journal names, years, sample sizes
 3. Include study_link field with real PubMed or DOI links when possible
-4. For beneficial ingredients: specify exact nutrient amounts and daily value percentages
-5. Health benefits must explain the MECHANISM (how it works in the body)
-6. ALWAYS include beneficial_ingredients if ANY whole foods present
-7. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed
+4. For beneficial ingredients: specify exact nutrient amounts
+5. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed
 
 Respond ONLY with the JSON object, no other text."""
-        
-        response = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            response_format={"type": "json_object"}
-        )
-        
-        # Parse JSON from response
-        import json
-        response_text = response.choices[0].message.content.strip()
-        
-        analysis = json.loads(response_text)
-        return analysis
-    except Exception as e:
-        print(f"AI Analysis error: {e}")
-        return {
-            "harmful_ingredients": [],
-            "beneficial_ingredients": [],
-            "overall_score": 5,
-            "upf_score": "0%",
-            "processing_category": "Unknown",
-            "recommendation": "Unable to analyze ingredients at this time."
-        }
 
 # Routes
 @app.get("/api/download/icon")
