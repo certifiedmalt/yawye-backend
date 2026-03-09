@@ -457,41 +457,65 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)
-    Uses OpenAI GPT-4o if available, falls back to Google Gemini"""
-    
-    # Try OpenAI first
-    if OPENAI_API_KEY:
-        try:
-            client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-            
-            system_message = "You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
-            
-            prompt = create_analysis_prompt(product_name, ingredients)
-            
-            response = await client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                response_format={"type": "json_object"}
-            )
-            
-            import json
-            response_text = response.choices[0].message.content.strip()
-            return json.loads(response_text)
-        except Exception as e:
-            print(f"OpenAI error (falling back to Gemini): {e}")
-    
-    # Fallback to Gemini
+    """Analyze ingredients using Google Gemini AI with focus on ultra-processed foods (UPFs)"""
     try:
         client = genai.Client(api_key=GOOGLE_API_KEY)
         
-        system_message = "You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
-        
-        prompt = f"{system_message}\n\n{create_analysis_prompt(product_name, ingredients)}"
+        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry.
+
+Analyze these ingredients from {product_name}:
+
+{ingredients}
+
+FOCUS: Identify harmful UPF ingredients AND beneficial whole food nutrients.
+
+=== HARMFUL INGREDIENTS TO FLAG ===
+- Seed/vegetable oils: sunflower, rapeseed, soybean, corn oil (inflammatory omega-6)
+- Emulsifiers: E471, mono/diglycerides, lecithins, polysorbates (gut barrier damage)
+- Artificial sweeteners: aspartame, sucralose, acesulfame K
+- Preservatives: sodium benzoate, potassium sorbate, BHA, BHT
+- Artificial colors: tartrazine, sunset yellow, caramel color
+- Modified starches, maltodextrin, dextrose
+- Hydrogenated oils, palm oil
+- Added sugars: high fructose corn syrup, glucose syrup
+
+=== BENEFICIAL INGREDIENTS TO HIGHLIGHT ===
+- Protein sources (milk, eggs, meat, fish)
+- Vitamins & antioxidants
+- Fiber from whole grains, fruits, vegetables
+- Healthy fats (omega-3, olive oil)
+
+=== RESPONSE FORMAT (JSON) ===
+{{
+  "harmful_ingredients": [
+    {{
+      "name": "ingredient name",
+      "health_impact": "Clear explanation of harm. 2-3 sentences.",
+      "severity": "high/medium/low",
+      "processing_level": "NOVA 4 - ultra-processed",
+      "research_summary": "Research summary with study citations.",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ link if available"
+    }}
+  ],
+  "beneficial_ingredients": [
+    {{
+      "name": "ingredient name",
+      "health_benefit": "Benefit explanation. 2-3 sentences.",
+      "benefit_type": "protein/vitamin/antioxidant/fiber/healthy-fat/mineral",
+      "key_nutrients": "List nutrients",
+      "processing_level": "NOVA 1 - whole/minimally processed",
+      "research_summary": "Research summary.",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ link if available"
+    }}
+  ],
+  "overall_score": 1-10,
+  "upf_score": "percentage of ultra-processed ingredients",
+  "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
+  "recommendation": "Clear recommendation"
+}}
+
+Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed.
+Respond ONLY with JSON, no other text."""
         
         response = await client.aio.models.generate_content(
             model='gemini-2.0-flash',
@@ -519,99 +543,6 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
             "processing_category": "Unknown",
             "recommendation": "Unable to analyze ingredients at this time."
         }
-
-def create_analysis_prompt(product_name: str, ingredients: str) -> str:
-    """Create the analysis prompt for AI models"""
-    return f"""Analyze these ingredients from {product_name}:
-
-{ingredients}
-
-FOCUS: Identify harmful UPF ingredients AND beneficial whole food nutrients.
-
-=== HARMFUL INGREDIENTS TO FLAG (HIGH PRIORITY) ===
-- Seed/vegetable oils: sunflower, rapeseed, soybean, corn oil (inflammatory omega-6)
-- Emulsifiers: E471, mono/diglycerides, lecithins, polysorbates (gut barrier damage)
-- Artificial sweeteners: aspartame, sucralose, acesulfame K (metabolic disruption)
-- Preservatives: sodium benzoate, potassium sorbate, BHA, BHT
-- Artificial colors: tartrazine, sunset yellow, caramel color
-- Modified starches, maltodextrin, dextrose (blood sugar spikes)
-- Hydrogenated oils, palm oil, interesterified fats
-- Flavor enhancers: MSG, hydrolyzed proteins, yeast extract
-- Added sugars: high fructose corn syrup, glucose syrup, invert sugar
-
-=== DISEASE CONNECTIONS TO MENTION (when relevant) ===
-Always connect harmful ingredients to SPECIFIC DISEASES when research supports it:
-- TYPE 2 DIABETES: link to added sugars, refined carbs, UPFs (insulin resistance)
-- HEART DISEASE: link to trans fats, seed oils, sodium, UPFs (inflammation, arterial damage)
-- CANCER: link to processed meats, artificial colors, BHA/BHT, acrylamide
-- ALZHEIMER'S/DEMENTIA: link to UPFs, added sugars, trans fats (neuroinflammation)
-- OBESITY: link to UPFs, added sugars, emulsifiers (appetite dysregulation)
-- GUT DISORDERS (IBS, IBD): link to emulsifiers, artificial sweeteners, processed foods
-- AUTOIMMUNE DISEASES: link to seed oils, processed foods (chronic inflammation)
-
-For BENEFICIAL ingredients, mention disease PREVENTION:
-- Heart disease prevention: omega-3, fiber, antioxidants
-- Cancer prevention: cruciferous vegetables, berries, fiber
-- Diabetes prevention: fiber, whole grains, low glycemic foods
-- Cognitive protection: berries, omega-3, leafy greens
-
-=== BENEFICIAL INGREDIENTS TO HIGHLIGHT (EQUALLY IMPORTANT) ===
-PROTEIN SOURCES - Always highlight with specific benefits:
-- Milk/dairy: "Complete protein with all 9 essential amino acids, calcium for bone health"
-- Eggs: "High biological value protein, choline for brain function"
-- Meat/fish: Specify amino acid profile, B12, iron, omega-3 (if fish)
-
-VITAMINS & ANTIOXIDANTS:
-- Vitamin C (citrus, berries): "Immune function, collagen synthesis"
-- Vitamin A (carrots, sweet potato): "Vision, immune function, skin health"
-- Vitamin E (nuts, seeds): "Antioxidant, protects cell membranes"
-
-GUT HEALTH:
-- Fiber (whole grains, fruits, vegetables): "Feeds beneficial gut bacteria, promotes regularity"
-- Probiotics (yogurt, kefir, fermented foods): "Live cultures support microbiome diversity"
-
-HEALTHY FATS:
-- Omega-3 (fatty fish, flaxseed): "Anti-inflammatory"
-- Olive oil: "Monounsaturated fats, polyphenols"
-- Avocado: "Heart-healthy fats, potassium, fiber"
-
-=== RESPONSE FORMAT (JSON) ===
-{{
-  "harmful_ingredients": [
-    {{
-      "name": "ingredient name",
-      "health_impact": "Clear explanation of harm to body. Consumer-friendly. 2-3 sentences.",
-      "severity": "high/medium/low",
-      "processing_level": "NOVA 4 - ultra-processed",
-      "research_summary": "DETAILED research summary (4-6 sentences). Must include study type, sample size, key finding with percentage/statistic, author and year.",
-      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link"
-    }}
-  ],
-  "beneficial_ingredients": [
-    {{
-      "name": "ingredient name",
-      "health_benefit": "DETAILED benefit explanation (3-4 sentences).",
-      "benefit_type": "protein/vitamin/antioxidant/fiber/probiotic/healthy-fat/mineral",
-      "key_nutrients": "List with amounts",
-      "processing_level": "NOVA 1 - whole/minimally processed",
-      "research_summary": "DETAILED research (4-6 sentences). Must cite real studies.",
-      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link"
-    }}
-  ],
-  "overall_score": 1-10,
-  "upf_score": "percentage",
-  "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
-  "recommendation": "Clear recommendation with actionable advice"
-}}
-
-CRITICAL REQUIREMENTS:
-1. research_summary MUST be 4-6 sentences with SPECIFIC statistics
-2. ALWAYS cite real studies: author names, journal names, years, sample sizes
-3. Include study_link field with real PubMed or DOI links when possible
-4. For beneficial ingredients: specify exact nutrient amounts
-5. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed
-
-Respond ONLY with the JSON object, no other text."""
 
 # Routes
 @app.get("/api/download/icon")
