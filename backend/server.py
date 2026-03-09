@@ -479,6 +479,22 @@ FOCUS: Identify harmful UPF ingredients AND beneficial whole food nutrients.
 - Flavor enhancers: MSG, hydrolyzed proteins, yeast extract
 - Added sugars: high fructose corn syrup, glucose syrup, invert sugar
 
+=== DISEASE CONNECTIONS TO MENTION (when relevant) ===
+Always connect harmful ingredients to SPECIFIC DISEASES when research supports it:
+- TYPE 2 DIABETES: link to added sugars, refined carbs, UPFs (insulin resistance)
+- HEART DISEASE: link to trans fats, seed oils, sodium, UPFs (inflammation, arterial damage)
+- CANCER: link to processed meats, artificial colors, BHA/BHT, acrylamide
+- ALZHEIMER'S/DEMENTIA: link to UPFs, added sugars, trans fats (neuroinflammation)
+- OBESITY: link to UPFs, added sugars, emulsifiers (appetite dysregulation)
+- GUT DISORDERS (IBS, IBD): link to emulsifiers, artificial sweeteners, processed foods
+- AUTOIMMUNE DISEASES: link to seed oils, processed foods (chronic inflammation)
+
+For BENEFICIAL ingredients, mention disease PREVENTION:
+- Heart disease prevention: omega-3, fiber, antioxidants
+- Cancer prevention: cruciferous vegetables, berries, fiber
+- Diabetes prevention: fiber, whole grains, low glycemic foods
+- Cognitive protection: berries, omega-3, leafy greens
+
 === BENEFICIAL INGREDIENTS TO HIGHLIGHT (EQUALLY IMPORTANT) ===
 PROTEIN SOURCES - Always highlight with specific benefits:
 - Milk/dairy: "Complete protein with all 9 essential amino acids, calcium for bone health"
