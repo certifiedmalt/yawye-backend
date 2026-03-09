@@ -20,7 +20,7 @@ def get_backend_url():
                     return line.split('=', 1)[1].strip()
     except Exception as e:
         print(f"Error reading frontend .env: {e}")
-    return "https://ingredient-checker-10.preview.emergentagent.com"
+    return "https://food-health-scan-3.preview.emergentagent.com"
 
 BASE_URL = get_backend_url()
 API_BASE = f"{BASE_URL}/api"

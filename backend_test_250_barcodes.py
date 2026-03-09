@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple
 
 # Backend URL from frontend .env
-BACKEND_URL = "https://ingredient-checker-10.preview.emergentagent.com/api"
+BACKEND_URL = "https://food-health-scan-3.preview.emergentagent.com/api"
 
 # Test user credentials
 TEST_USER = {
