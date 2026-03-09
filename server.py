@@ -12,7 +12,7 @@ from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from google import genai
 import asyncio
 import time
 import logging
@@ -138,6 +138,7 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
@@ -454,15 +455,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using Google Gemini AI with focus on ultra-processed foods (UPFs)"""
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
-            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
-        ).with_model("openai", "gpt-5.2")
+        client = genai.Client(api_key=GOOGLE_API_KEY)
         
-        prompt = f"""Analyze these ingredients from {product_name}:
+        system_message = "You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
+        
+        prompt = f"""{system_message}
+
+Analyze these ingredients from {product_name}:
 
 {ingredients}
 
@@ -554,15 +555,19 @@ CRITICAL REQUIREMENTS:
 4. For beneficial ingredients: specify exact nutrient amounts and daily value percentages
 5. Health benefits must explain the MECHANISM (how it works in the body)
 6. ALWAYS include beneficial_ingredients if ANY whole foods present
-7. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed"""
+7. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed
+
+Respond ONLY with the JSON object, no other text."""
         
-        user_message = UserMessage(text=prompt)
-        response = await chat.send_message(user_message)
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=prompt
+        )
         
         # Parse JSON from response
         import json
         # Clean response to extract JSON
-        response_text = response.strip()
+        response_text = response.text.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         if response_text.startswith("```"):
