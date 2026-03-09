@@ -910,35 +910,43 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     
     # Update daily quest progress
     user_id = str(current_user["_id"])
+    logger.info(f"Updating quests for user {user_id}")
     gamification = await db["gamification"].find_one({"user_id": user_id})
+    logger.info(f"Found gamification: {gamification is not None}")
     if gamification:
         daily_quests = gamification.get("daily_quests", {})
         xp_earned = 0
         
         # Quest 1: Scan 3 products
-        if "scan_3_products" in daily_quests and not daily_quests["scan_3_products"]["completed"]:
-            current_progress = daily_quests["scan_3_products"].get("progress", 0) + 1
+        scan_quest = daily_quests.get("scan_3_products", {})
+        logger.info(f"Scan quest before: {scan_quest}")
+        if scan_quest and not scan_quest.get("completed", False):
+            current_progress = scan_quest.get("progress", 0) + 1
             daily_quests["scan_3_products"]["progress"] = current_progress
+            logger.info(f"Updated scan quest progress to {current_progress}")
             if current_progress >= 3:
                 daily_quests["scan_3_products"]["completed"] = True
-                xp_earned += daily_quests["scan_3_products"]["xp"]
+                xp_earned += scan_quest.get("xp", 10)
         
         # Quest 2: Find a healthy product (8+/10)
-        if "find_healthy_product" in daily_quests and not daily_quests["find_healthy_product"]["completed"]:
+        healthy_quest = daily_quests.get("find_healthy_product", {})
+        if healthy_quest and not healthy_quest.get("completed", False):
             overall_score = analysis.get("overall_score", 0)
+            logger.info(f"Health score: {overall_score}")
             if overall_score >= 8:
                 daily_quests["find_healthy_product"]["completed"] = True
                 daily_quests["find_healthy_product"]["progress"] = 1
-                xp_earned += daily_quests["find_healthy_product"]["xp"]
+                xp_earned += healthy_quest.get("xp", 25)
         
         # Update gamification data
-        await db["gamification"].update_one(
+        result = await db["gamification"].update_one(
             {"user_id": user_id},
             {
                 "$set": {"daily_quests": daily_quests},
                 "$inc": {"xp": xp_earned}
             }
         )
+        logger.info(f"Quest update result: modified={result.modified_count}")
     
     # Log analytics
     response_time = time.time() - start_time
