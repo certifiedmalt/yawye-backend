@@ -590,9 +590,38 @@ async def download_icon():
     icon_path = "/app/frontend/assets/images/icon.png"
     return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
 
+# Version tracking for deployment verification
+APP_VERSION = "1.0.3-quest-tracking"
+APP_BUILD_TIME = "2026-03-10T10:00:00Z"
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/version")
+async def get_version():
+    """Verify which code version is running on the server"""
+    import hashlib
+    import os
+    
+    # Calculate hash of server.py to verify exact code
+    try:
+        with open(__file__, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
+    except:
+        file_hash = "unknown"
+    
+    return {
+        "version": APP_VERSION,
+        "build_time": APP_BUILD_TIME,
+        "file_hash": file_hash,
+        "quest_tracking_enabled": True,
+        "features": [
+            "daily_quests_scan_tracking",
+            "daily_quests_assistant_tracking",
+            "daily_quests_healthy_product"
+        ]
+    }
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
