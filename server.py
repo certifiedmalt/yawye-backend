@@ -774,12 +774,22 @@ async def delete_account(current_user = Depends(get_current_user)):
 
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
+    total_scans = current_user.get("total_scans", 0)
+    subscription_tier = current_user.get("subscription_tier", "free")
+    
+    # Calculate scans remaining for free users (5 total lifetime scans)
+    if subscription_tier == "free":
+        scans_remaining = max(0, 5 - total_scans)
+    else:
+        scans_remaining = -1  # Unlimited for premium
+    
     return {
         "id": str(current_user["_id"]),
         "email": current_user["email"],
         "name": current_user["name"],
-        "subscription_tier": current_user.get("subscription_tier", "free"),
-        "total_scans": current_user.get("total_scans", 0)
+        "subscription_tier": subscription_tier,
+        "total_scans": total_scans,
+        "scans_remaining": scans_remaining
     }
 
 @app.post("/api/scan")
