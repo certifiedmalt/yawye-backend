@@ -11,8 +11,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
-import bcrypt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 import asyncio
 import time
 import logging
@@ -62,7 +62,7 @@ def check_rate_limit(key: str) -> bool:
 
 # MongoDB
 MONGO_URL = os.getenv("MONGO_URL")
-DB_NAME = os.getenv("DB_NAME") or "yawye_db"
+DB_NAME = os.getenv("DB_NAME")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
@@ -74,6 +74,7 @@ product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 
 # Security
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
@@ -106,7 +107,7 @@ async def send_reset_email(to_email: str, reset_code: str):
         """
 
         params = {
-            "from": "You Are What You Eat <noreply@yawye.app>",
+            "from": "You Are What You Eat <onboarding@resend.dev>",
             "to": [to_email],
             "subject": "Your Password Reset Code",
             "html": html_content,
@@ -137,7 +138,6 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
@@ -432,12 +432,10 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 def verify_password(plain_password, hashed_password):
-    if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return pwd_context.hash(password)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
@@ -456,59 +454,115 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using Gemini AI with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
-        from google import genai
-        
-        client = genai.Client(api_key=GOOGLE_API_KEY)
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
+        ).with_model("openai", "gpt-5.2")
         
         prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
-CRITICAL PRINCIPLE: Processing is ALWAYS negative. The more processed a food is, the LOWER the score MUST be. This is non-negotiable.
+FOCUS: Identify harmful UPF ingredients AND beneficial whole food nutrients.
 
-RULES:
-1. Ultra-processed foods (UPFs) should score 1-3 maximum
-2. Processed foods should score 3-5 maximum  
-3. Only minimally processed/whole foods can score 6-10
-4. Industrial seed/vegetable oils (canola/rapeseed, sunflower, soybean, corn oil, vegetable oil) are HARMFUL - they are inflammatory, highly processed, and should ALWAYS be flagged as concerning
-5. Any additive with an E-number is a processing marker and negative
-6. Emulsifiers, stabilizers, flavor enhancers = ultra-processed = low score
-7. Added sugars in any form (glucose syrup, fructose, dextrose, maltodextrin) = harmful
+=== HARMFUL INGREDIENTS TO FLAG (HIGH PRIORITY) ===
+- Seed/vegetable oils: sunflower, rapeseed, soybean, corn oil (inflammatory omega-6)
+- Emulsifiers: E471, mono/diglycerides, lecithins, polysorbates (gut barrier damage)
+- Artificial sweeteners: aspartame, sucralose, acesulfame K (metabolic disruption)
+- Preservatives: sodium benzoate, potassium sorbate, BHA, BHT
+- Artificial colors: tartrazine, sunset yellow, caramel color
+- Modified starches, maltodextrin, dextrose (blood sugar spikes)
+- Hydrogenated oils, palm oil, interesterified fats
+- Flavor enhancers: MSG, hydrolyzed proteins, yeast extract
+- Added sugars: high fructose corn syrup, glucose syrup, invert sugar
 
-Return JSON with this exact structure:
+=== DISEASE CONNECTIONS TO MENTION (when relevant) ===
+Always connect harmful ingredients to SPECIFIC DISEASES when research supports it:
+- TYPE 2 DIABETES: link to added sugars, refined carbs, UPFs (insulin resistance)
+- HEART DISEASE: link to trans fats, seed oils, sodium, UPFs (inflammation, arterial damage)
+- CANCER: link to processed meats, artificial colors, BHA/BHT, acrylamide
+- ALZHEIMER'S/DEMENTIA: link to UPFs, added sugars, trans fats (neuroinflammation)
+- OBESITY: link to UPFs, added sugars, emulsifiers (appetite dysregulation)
+- GUT DISORDERS (IBS, IBD): link to emulsifiers, artificial sweeteners, processed foods
+- AUTOIMMUNE DISEASES: link to seed oils, processed foods (chronic inflammation)
+
+For BENEFICIAL ingredients, mention disease PREVENTION:
+- Heart disease prevention: omega-3, fiber, antioxidants
+- Cancer prevention: cruciferous vegetables, berries, fiber
+- Diabetes prevention: fiber, whole grains, low glycemic foods
+- Cognitive protection: berries, omega-3, leafy greens
+
+=== BENEFICIAL INGREDIENTS TO HIGHLIGHT (EQUALLY IMPORTANT) ===
+PROTEIN SOURCES - Always highlight with specific benefits:
+- Milk/dairy: "Complete protein with all 9 essential amino acids, calcium for bone health"
+- Eggs: "High biological value protein, choline for brain function"
+- Meat/fish: Specify amino acid profile, B12, iron, omega-3 (if fish)
+
+VITAMINS & ANTIOXIDANTS:
+- Vitamin C (citrus, berries): "Immune function, collagen synthesis. Linus Pauling Institute research shows 200mg/day optimal."
+- Vitamin A (carrots, sweet potato): "Vision, immune function, skin health"
+- Vitamin E (nuts, seeds): "Antioxidant, protects cell membranes"
+- Anthocyanins (berries, grapes): "Powerful antioxidants. 2019 meta-analysis: 12% reduced cardiovascular risk"
+- Lycopene (tomatoes): "Prostate health. Harvard study: 21% reduced prostate cancer risk"
+
+GUT HEALTH:
+- Fiber (whole grains, fruits, vegetables): "Feeds beneficial gut bacteria, promotes regularity"
+- Probiotics (yogurt, kefir, fermented foods): "Live cultures support microbiome diversity"
+- Prebiotics (garlic, onion, banana): "Feeds beneficial bacteria, improves gut barrier"
+
+HEALTHY FATS:
+- Omega-3 (fatty fish, flaxseed): "Anti-inflammatory. VITAL study: 28% reduced heart attack risk"
+- Olive oil: "Monounsaturated fats, polyphenols. Mediterranean diet research"
+- Avocado: "Heart-healthy fats, potassium, fiber"
+
+=== RESPONSE FORMAT (JSON) ===
 {{
   "harmful_ingredients": [
-    {{"name": "ingredient name", "concern": "brief health concern", "severity": "high/medium/low"}}
+    {{
+      "name": "ingredient name",
+      "health_impact": "Clear explanation of harm to body. Consumer-friendly. 2-3 sentences.",
+      "severity": "high/medium/low",
+      "processing_level": "NOVA 4 - ultra-processed",
+      "research_summary": "DETAILED research summary (4-6 sentences). Must include: 1) Study type (meta-analysis, RCT, cohort), 2) Sample size, 3) Key finding with percentage/statistic, 4) Author and year. Example: 'A landmark 2024 BMJ meta-analysis by Srour et al. examined 45 prospective studies with over 10 million participants. They found that each 10% increase in ultra-processed food consumption was associated with a 12% higher risk of cardiovascular disease (HR 1.12, 95% CI 1.09-1.15). The NutriNet-Santé cohort study (n=105,159) specifically linked emulsifiers to inflammatory bowel disease risk. Multiple RCTs have demonstrated that eliminating these additives reduces inflammatory markers within 2-4 weeks.'",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
+    }}
   ],
   "beneficial_ingredients": [
-    {{"name": "ingredient name", "benefit": "brief health benefit"}}
+    {{
+      "name": "ingredient name",
+      "health_benefit": "DETAILED benefit explanation (3-4 sentences). Include: specific compounds, mechanism of action, daily value percentage if applicable. Example: 'Oranges are exceptionally rich in vitamin C (ascorbic acid), providing 92% of daily needs per fruit. Vitamin C acts as a powerful antioxidant, neutralizing free radicals and supporting collagen synthesis for skin and joint health. The flavonoids hesperidin and naringenin provide additional cardiovascular benefits by improving blood vessel function.'",
+      "benefit_type": "protein/vitamin/antioxidant/fiber/probiotic/healthy-fat/mineral",
+      "key_nutrients": "List with amounts: Vitamin C (70mg, 92% DV), Fiber (3g), Potassium (237mg)",
+      "processing_level": "NOVA 1 - whole/minimally processed",
+      "research_summary": "DETAILED research (4-6 sentences). Must cite real studies. Example: 'The Nurses Health Study (n=93,600 women, 18 years follow-up) found that women consuming 3+ servings of berries weekly had 32% slower rates of cognitive decline (Devore et al., Annals of Neurology, 2012). A 2019 Cochrane review of 29 RCTs confirmed vitamin C supplementation reduces cold duration by 8% in adults. The PREDIMED trial (n=7,447) demonstrated Mediterranean diet rich in fruits reduced cardiovascular events by 30% versus control diet.'",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
+    }}
   ],
-  "overall_score": 1-10 (10=healthiest, remember: processed = low score ALWAYS),
-  "upf_score": "X%" (percentage of ultra-processed ingredients),
-  "processing_category": "Minimally Processed/Processed/Ultra-Processed",
-  "recommendation": "1-2 sentence practical advice"
+  "overall_score": 1-10,
+  "upf_score": "percentage",
+  "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
+  "recommendation": "Clear recommendation with actionable advice"
 }}
 
-Scoring guide (STRICT):
-- 8-10: ONLY whole foods with zero processing (fresh fruit, vegetables, raw nuts, plain meat/fish)
-- 5-7: Minimally processed (cheese, plain yogurt, bread with simple ingredients)
-- 3-4: Processed foods (some additives, refined ingredients)
-- 1-2: Ultra-processed (multiple additives, industrial ingredients, seed oils)
-
-NEVER classify processed seed oils as beneficial. They are industrial products.
-
-Return ONLY valid JSON, no other text."""
-
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash-lite',
-            contents=prompt
-        )
-        response_text = response.text.strip()
+CRITICAL REQUIREMENTS:
+1. research_summary MUST be 4-6 sentences with SPECIFIC statistics (percentages, hazard ratios, sample sizes)
+2. ALWAYS cite real studies: author names, journal names, years, sample sizes
+3. Include study_link field with real PubMed or DOI links when possible (use format https://pubmed.ncbi.nlm.nih.gov/PMID/)
+4. For beneficial ingredients: specify exact nutrient amounts and daily value percentages
+5. Health benefits must explain the MECHANISM (how it works in the body)
+6. ALWAYS include beneficial_ingredients if ANY whole foods present
+7. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed"""
+        
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
         
         # Parse JSON from response
         import json
+        # Clean response to extract JSON
+        response_text = response.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         if response_text.startswith("```"):
@@ -533,34 +587,41 @@ Return ONLY valid JSON, no other text."""
 # Routes
 @app.get("/api/download/icon")
 async def download_icon():
-    icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
-    if not os.path.exists(icon_path):
-        raise HTTPException(status_code=404, detail="Icon not found")
+    icon_path = "/app/frontend/assets/images/icon.png"
     return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
+
+# Version tracking for deployment verification
+APP_VERSION = "1.0.3-quest-tracking"
+APP_BUILD_TIME = "2026-03-10T10:00:00Z"
 
 @app.get("/api/health")
 async def health_check():
-    try:
-        # Test MongoDB connection
-        await users_collection.find_one({})
-        return {"status": "healthy", "db": "connected"}
-    except Exception as e:
-        return {"status": "unhealthy", "db_error": str(e)}
+    return {"status": "healthy"}
 
-@app.get("/api/debug/test-register")
-async def debug_test_register():
+@app.get("/api/version")
+async def get_version():
+    """Verify which code version is running on the server"""
+    import hashlib
+    import os
+    
+    # Calculate hash of server.py to verify exact code
     try:
-        hashed = get_password_hash("test123")
-        result = await users_collection.insert_one({
-            "email": f"debug-{datetime.utcnow().timestamp()}@test.com",
-            "password": hashed,
-            "name": "Debug Test",
-            "subscription_tier": "free",
-            "daily_scans": 0,
-        })
-        return {"status": "ok", "id": str(result.inserted_id)}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "type": type(e).__name__}
+        with open(__file__, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
+    except:
+        file_hash = "unknown"
+    
+    return {
+        "version": APP_VERSION,
+        "build_time": APP_BUILD_TIME,
+        "file_hash": file_hash,
+        "quest_tracking_enabled": True,
+        "features": [
+            "daily_quests_scan_tracking",
+            "daily_quests_assistant_tracking",
+            "daily_quests_healthy_product"
+        ]
+    }
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
@@ -576,8 +637,7 @@ async def register(user: UserRegister):
         "name": user.name,
         "password": hashed_password,
         "subscription_tier": "free",
-        "daily_scans": 0,
-        "last_scan_reset": datetime.utcnow(),
+        "total_scans": 0,
         "created_at": datetime.utcnow()
     }
     result = await users_collection.insert_one(user_doc)
@@ -709,16 +769,12 @@ async def delete_account(current_user = Depends(get_current_user)):
 
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
-    # No daily reset - scans are lifetime limited for free users
-    total_scans = current_user.get("total_scans", 0)
-    
     return {
         "id": str(current_user["_id"]),
         "email": current_user["email"],
         "name": current_user["name"],
         "subscription_tier": current_user.get("subscription_tier", "free"),
-        "total_scans": total_scans,
-        "scans_remaining": max(0, 5 - total_scans) if current_user.get("subscription_tier", "free") == "free" else "unlimited"
+        "total_scans": current_user.get("total_scans", 0)
     }
 
 @app.post("/api/scan")
@@ -733,53 +789,20 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     start_time = time.time()
     barcode = scan_req.barcode.strip()
     
-    # Check subscription limits - 5 TOTAL scans for free users (no daily reset)
+    # Check subscription limits - 5 TOTAL lifetime scans for free users
     subscription_tier = current_user.get("subscription_tier", "free")
     total_scans = current_user.get("total_scans", 0)
     
     if subscription_tier == "free" and total_scans >= 5:
         raise HTTPException(
             status_code=403,
-            detail="Free scan limit reached. Upgrade to premium for unlimited scans."
+            detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
-    # STEP 1: Check cache first (instant results!)
-    cached_product = await get_cached_product(barcode)
-    if cached_product:
-        response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, "cache", response_time)
-        
-        # Save to user's scan history
-        scan_doc = {
-            "user_id": str(current_user["_id"]),
-            "barcode": barcode,
-            "product_name": cached_product.get("product_name"),
-            "brands": cached_product.get("brands"),
-            "ingredients_text": cached_product.get("ingredients_text"),
-            "image_url": cached_product.get("image_url"),
-            "analysis": cached_product.get("analysis"),
-            "scanned_at": datetime.utcnow(),
-            "from_cache": True
-        }
-        await scans_collection.insert_one(scan_doc)
-        
-        # Update user's total scan count (no daily reset)
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$inc": {"total_scans": 1}}
-        )
-        
-        return {
-            "product_name": cached_product.get("product_name"),
-            "brands": cached_product.get("brands"),
-            "ingredients_text": cached_product.get("ingredients_text"),
-            "image_url": cached_product.get("image_url"),
-            "analysis": cached_product.get("analysis"),
-            "from_cache": True,
-            "response_time_ms": int(response_time * 1000)
-        }
+    # CACHE DISABLED - Always fetch fresh results for accuracy
+    # Each scan will get the latest AI analysis
     
-    # STEP 2: Parallel API calls with smart routing based on barcode prefix
+    # STEP 1: Parallel API calls with smart routing based on barcode prefix
     # UK/EU barcodes start with 50/40-44, US barcodes start with 0
     barcode_prefix = barcode[:2] if len(barcode) >= 2 else ""
     
@@ -891,11 +914,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "additives": []
         }
     
-    # STEP 7: Cache the result for future fast lookups
+    # CACHE DISABLED - No longer caching results
     product_data["analysis"] = analysis
-    await cache_product(barcode, product_data)
     
-    # STEP 8: Save to user's scan history
+    # STEP 7: Save to user's scan history
     scan_doc = {
         "user_id": str(current_user["_id"]),
         "barcode": barcode,
@@ -909,11 +931,51 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     }
     await scans_collection.insert_one(scan_doc)
     
-    # Update user's total scan count (no daily reset)
+    # Update user's total scan count
     await users_collection.update_one(
         {"_id": current_user["_id"]},
         {"$inc": {"total_scans": 1}}
     )
+    
+    # Update daily quest progress
+    user_id = str(current_user["_id"])
+    logger.info(f"Updating quests for user {user_id}")
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    logger.info(f"Found gamification: {gamification is not None}")
+    if gamification:
+        daily_quests = gamification.get("daily_quests", {})
+        xp_earned = 0
+        
+        # Quest 1: Scan 3 products
+        scan_quest = daily_quests.get("scan_3_products", {})
+        logger.info(f"Scan quest before: {scan_quest}")
+        if scan_quest and not scan_quest.get("completed", False):
+            current_progress = scan_quest.get("progress", 0) + 1
+            daily_quests["scan_3_products"]["progress"] = current_progress
+            logger.info(f"Updated scan quest progress to {current_progress}")
+            if current_progress >= 3:
+                daily_quests["scan_3_products"]["completed"] = True
+                xp_earned += scan_quest.get("xp", 10)
+        
+        # Quest 2: Find a healthy product (8+/10)
+        healthy_quest = daily_quests.get("find_healthy_product", {})
+        if healthy_quest and not healthy_quest.get("completed", False):
+            overall_score = analysis.get("overall_score", 0)
+            logger.info(f"Health score: {overall_score}")
+            if overall_score >= 8:
+                daily_quests["find_healthy_product"]["completed"] = True
+                daily_quests["find_healthy_product"]["progress"] = 1
+                xp_earned += healthy_quest.get("xp", 25)
+        
+        # Update gamification data
+        result = await db["gamification"].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {"daily_quests": daily_quests},
+                "$inc": {"xp": xp_earned}
+            }
+        )
+        logger.info(f"Quest update result: modified={result.modified_count}")
     
     # Log analytics
     response_time = time.time() - start_time
@@ -1330,34 +1392,53 @@ async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_curre
         
         client = genai.Client(api_key=GOOGLE_API_KEY)
         
+        # Update daily quest progress for using assistant
+        user_id = str(current_user["_id"])
+        gamification = await db["gamification"].find_one({"user_id": user_id})
+        if gamification:
+            daily_quests = gamification.get("daily_quests", {})
+            if "use_assistant" in daily_quests and not daily_quests["use_assistant"]["completed"]:
+                daily_quests["use_assistant"]["completed"] = True
+                daily_quests["use_assistant"]["progress"] = 1
+                xp_earned = daily_quests["use_assistant"]["xp"]
+                await db["gamification"].update_one(
+                    {"user_id": user_id},
+                    {
+                        "$set": {"daily_quests": daily_quests},
+                        "$inc": {"xp": xp_earned}
+                    }
+                )
+        
         # Create system message with strong guardrails
         system_message = """You are a health education assistant for "You Are What You Eat" app. 
 
 CRITICAL RULES:
-1. You provide EDUCATIONAL information only, NOT medical advice
-2. ALWAYS remind users to consult healthcare professionals for personal health decisions
-3. Focus on: general nutrition, food ingredients, UPFs, healthy eating principles
-4. NEVER: diagnose, prescribe, recommend treatments, or give personalized medical advice
-5. If asked medical questions, redirect to healthcare professionals
-6. Keep responses concise (2-3 paragraphs max)
-7. Be friendly and helpful but maintain boundaries
+1. You provide EDUCATIONAL information, NOT personalized medical advice
+2. You CAN explain what medical conditions ARE and what causes them (educational)
+3. You CANNOT diagnose, prescribe treatments, or give personalized medical advice
+4. Always add a brief disclaimer: "This is educational information - consult a healthcare professional for personal medical advice"
+5. Keep responses informative but concise (2-3 paragraphs max)
+6. Be helpful and educational - don't refuse legitimate questions about health topics
 
-SAFE TOPICS:
-- General nutrition education
-- Understanding food labels and ingredients
-- What are UPFs and why they matter
-- General healthy eating tips
-- How to use the app
-- Food science basics
+WHAT YOU CAN DO (Educational):
+- Explain what conditions like diabetes, heart disease, Alzheimer's, cancer ARE
+- Explain what CAUSES these conditions (diet, lifestyle, genetics)
+- Explain how nutrition and diet relate to health conditions
+- Discuss research linking UPFs/ingredients to health outcomes
+- Explain what metabolic dysfunction, insulin resistance, inflammation ARE
+- Discuss how specific ingredients affect the body
+- General nutrition and food science education
 
-FORBIDDEN TOPICS:
-- Medical diagnosis or treatment
-- Personalized diet plans for medical conditions
-- Medication interactions
-- Specific health conditions
-- Weight loss advice beyond general principles
+WHAT YOU CANNOT DO (Medical Advice):
+- Diagnose someone with a condition
+- Prescribe treatments or medications
+- Create personalized diet plans for treating medical conditions
+- Tell someone to stop taking medications
+- Give specific dosage recommendations
 
-If user asks forbidden topics, politely say: "I can't provide medical advice. Please consult a healthcare professional for personalized guidance. I can help with general nutrition education instead - what would you like to know?"
+EXAMPLE GOOD RESPONSE:
+User: "What is metabolic dysfunction?"
+Assistant: "Metabolic dysfunction refers to when your body's metabolic processes don't work optimally. This includes issues like insulin resistance (where cells don't respond well to insulin), high blood sugar, abnormal cholesterol levels, and inflammation. Common causes include a diet high in ultra-processed foods, added sugars, and seed oils, combined with lack of physical activity. Research links regular UPF consumption to a 12% higher risk of metabolic syndrome per 10% increase in UPF intake (Srour et al., BMJ 2024). *This is educational information - consult a healthcare professional for personal medical advice.*"
 """
 
         # Build conversation context
@@ -1385,5 +1466,5 @@ If user asks forbidden topics, politely say: "I can't provide medical advice. Pl
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "8001"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
+# Last deployed: 2026-03-09T20:25:22Z
