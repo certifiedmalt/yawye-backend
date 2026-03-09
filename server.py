@@ -13,6 +13,7 @@ import jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google import genai
+from openai import AsyncOpenAI
 import asyncio
 import time
 import logging
@@ -139,6 +140,7 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
@@ -455,15 +457,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using Google Gemini AI with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using OpenAI GPT-5.2 with focus on ultra-processed foods (UPFs)"""
     try:
-        client = genai.Client(api_key=GOOGLE_API_KEY)
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         
         system_message = "You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
         
-        prompt = f"""{system_message}
-
-Analyze these ingredients from {product_name}:
+        prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
@@ -527,18 +527,18 @@ HEALTHY FATS:
       "health_impact": "Clear explanation of harm to body. Consumer-friendly. 2-3 sentences.",
       "severity": "high/medium/low",
       "processing_level": "NOVA 4 - ultra-processed",
-      "research_summary": "DETAILED research summary (4-6 sentences). Must include: 1) Study type (meta-analysis, RCT, cohort), 2) Sample size, 3) Key finding with percentage/statistic, 4) Author and year. Example: 'A landmark 2024 BMJ meta-analysis by Srour et al. examined 45 prospective studies with over 10 million participants. They found that each 10% increase in ultra-processed food consumption was associated with a 12% higher risk of cardiovascular disease (HR 1.12, 95% CI 1.09-1.15). The NutriNet-Santé cohort study (n=105,159) specifically linked emulsifiers to inflammatory bowel disease risk. Multiple RCTs have demonstrated that eliminating these additives reduces inflammatory markers within 2-4 weeks.'",
+      "research_summary": "DETAILED research summary (4-6 sentences). Must include: 1) Study type (meta-analysis, RCT, cohort), 2) Sample size, 3) Key finding with percentage/statistic, 4) Author and year.",
       "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "DETAILED benefit explanation (3-4 sentences). Include: specific compounds, mechanism of action, daily value percentage if applicable. Example: 'Oranges are exceptionally rich in vitamin C (ascorbic acid), providing 92% of daily needs per fruit. Vitamin C acts as a powerful antioxidant, neutralizing free radicals and supporting collagen synthesis for skin and joint health. The flavonoids hesperidin and naringenin provide additional cardiovascular benefits by improving blood vessel function.'",
+      "health_benefit": "DETAILED benefit explanation (3-4 sentences). Include: specific compounds, mechanism of action, daily value percentage if applicable.",
       "benefit_type": "protein/vitamin/antioxidant/fiber/probiotic/healthy-fat/mineral",
       "key_nutrients": "List with amounts: Vitamin C (70mg, 92% DV), Fiber (3g), Potassium (237mg)",
       "processing_level": "NOVA 1 - whole/minimally processed",
-      "research_summary": "DETAILED research (4-6 sentences). Must cite real studies. Example: 'The Nurses Health Study (n=93,600 women, 18 years follow-up) found that women consuming 3+ servings of berries weekly had 32% slower rates of cognitive decline (Devore et al., Annals of Neurology, 2012). A 2019 Cochrane review of 29 RCTs confirmed vitamin C supplementation reduces cold duration by 8% in adults. The PREDIMED trial (n=7,447) demonstrated Mediterranean diet rich in fruits reduced cardiovascular events by 30% versus control diet.'",
+      "research_summary": "DETAILED research (4-6 sentences). Must cite real studies.",
       "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
     }}
   ],
@@ -551,7 +551,7 @@ HEALTHY FATS:
 CRITICAL REQUIREMENTS:
 1. research_summary MUST be 4-6 sentences with SPECIFIC statistics (percentages, hazard ratios, sample sizes)
 2. ALWAYS cite real studies: author names, journal names, years, sample sizes
-3. Include study_link field with real PubMed or DOI links when possible (use format https://pubmed.ncbi.nlm.nih.gov/PMID/)
+3. Include study_link field with real PubMed or DOI links when possible
 4. For beneficial ingredients: specify exact nutrient amounts and daily value percentages
 5. Health benefits must explain the MECHANISM (how it works in the body)
 6. ALWAYS include beneficial_ingredients if ANY whole foods present
@@ -559,22 +559,19 @@ CRITICAL REQUIREMENTS:
 
 Respond ONLY with the JSON object, no other text."""
         
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash-lite',
-            contents=prompt
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
         )
         
         # Parse JSON from response
         import json
-        # Clean response to extract JSON
-        response_text = response.text.strip()
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
+        response_text = response.choices[0].message.content.strip()
         
         analysis = json.loads(response_text)
         return analysis
