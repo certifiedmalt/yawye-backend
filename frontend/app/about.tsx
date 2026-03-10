@@ -2,6 +2,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'r
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
+
+const APP_VERSION = Constants.expoConfig?.version || '1.0.25';
 
 export default function About() {
   const router = useRouter();
@@ -79,7 +82,7 @@ export default function About() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.version}>Version 1.0.15</Text>
+          <Text style={styles.version}>Version {APP_VERSION}</Text>
           <Text style={styles.copyright}>© 2026 You Are What You Eat</Text>
         </View>
       </ScrollView>
