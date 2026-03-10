@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
@@ -1002,31 +1002,44 @@ async def upgrade_subscription(current_user = Depends(get_current_user)):
     return {"message": "Upgraded to premium", "subscription_tier": "premium"}
 
 @app.post("/api/webhooks/revenuecat")
-async def revenuecat_webhook(request: dict):
+async def revenuecat_webhook(request: Request):
     """RevenueCat webhook to sync subscription status automatically"""
     try:
-        event = request.get("event", {})
+        # Verify authorization header
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header != "Jmaster1986!":
+            print(f"RevenueCat webhook: Invalid auth header")
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        body = await request.json()
+        event = body.get("event", {})
         event_type = event.get("type", "")
         app_user_id = event.get("app_user_id", "")
         
+        print(f"RevenueCat webhook: {event_type} for user {app_user_id}")
+        
         # Handle subscription events
-        if event_type in ["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE"]:
+        if event_type in ["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION"]:
             # User subscribed or renewed
-            await users_collection.update_one(
-                {"_id": ObjectId(app_user_id)},
-                {"$set": {"subscription_tier": "premium"}}
-            )
-            print(f"RevenueCat: Upgraded {app_user_id} to premium")
+            if ObjectId.is_valid(app_user_id):
+                await users_collection.update_one(
+                    {"_id": ObjectId(app_user_id)},
+                    {"$set": {"subscription_tier": "premium"}}
+                )
+                print(f"RevenueCat: Upgraded {app_user_id} to premium")
             
-        elif event_type in ["CANCELLATION", "EXPIRATION"]:
+        elif event_type in ["CANCELLATION", "EXPIRATION", "BILLING_ISSUE"]:
             # Subscription ended
-            await users_collection.update_one(
-                {"_id": ObjectId(app_user_id)},
-                {"$set": {"subscription_tier": "free"}}
-            )
-            print(f"RevenueCat: Downgraded {app_user_id} to free")
+            if ObjectId.is_valid(app_user_id):
+                await users_collection.update_one(
+                    {"_id": ObjectId(app_user_id)},
+                    {"$set": {"subscription_tier": "free"}}
+                )
+                print(f"RevenueCat: Downgraded {app_user_id} to free")
             
         return {"status": "ok"}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"RevenueCat webhook error: {e}")
         return {"status": "error", "message": str(e)}
