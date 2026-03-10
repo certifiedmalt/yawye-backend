@@ -1394,6 +1394,162 @@ Assistant: "Metabolic dysfunction refers to when your body's metabolic processes
         print(f"Assistant error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get response from assistant")
 
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import mimetypes
+
+@app.get("/api/marketing")
+async def marketing_catalog():
+    """Serve the full marketing assets viewer with videos and images"""
+    html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAWYE Marketing Assets</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 24px; }
+        h1 { font-size: 32px; color: #4CAF50; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #888; text-align: center; margin-bottom: 48px; }
+        h2 { font-size: 22px; color: #fff; margin-bottom: 8px; border-bottom: 2px solid #4CAF50; display: inline-block; padding-bottom: 6px; }
+        .section { margin-bottom: 48px; }
+        .desc { color: #888; font-size: 14px; margin: 8px 0 24px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+        .card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 1px solid #333; }
+        .card:hover { border-color: #4CAF50; }
+        .card img { width: 100%; height: auto; }
+        .card video { width: 100%; height: auto; background: #000; }
+        .card-info { padding: 16px; }
+        .card-info h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
+        .meta { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .badge { font-size: 12px; color: #4CAF50; background: rgba(76,175,80,0.1); padding: 4px 10px; border-radius: 8px; display: inline-block; margin-bottom: 8px; }
+        .badge-new { background: rgba(255,215,0,0.15); color: #FFD700; }
+        .dl-btn { display: inline-block; background: #4CAF50; color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+        .dl-btn:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <h1>You Are What You Eat</h1>
+    <p class="subtitle">Marketing Assets Library</p>
+
+    <div class="section">
+        <h2>Video Clips</h2>
+        <p class="desc">AI-generated video clips (Sora 2). Click play to watch, or right-click to save.</p>
+        <div class="grid">
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_score_reveal_unhealthy.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <span class="badge badge-new">NEW</span>
+                    <h3>Score Reveal: Unhealthy Product</h3>
+                    <div class="meta">1280x720 | 8s | Phone showing 3/10 red score</div>
+                    <a class="dl-btn" href="/api/marketing/video/app_score_reveal_unhealthy.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_dashboard_hero.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <span class="badge badge-new">NEW</span>
+                    <h3>App Dashboard Hero Shot</h3>
+                    <div class="meta">1280x720 | 8s | Phone on kitchen counter showing app</div>
+                    <a class="dl-btn" href="/api/marketing/video/app_dashboard_hero.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip1_problem.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <h3>The Problem: Confused at Labels</h3>
+                    <div class="meta">1280x720 | 8s | Person reading ingredient labels</div>
+                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip1_problem.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_solution.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <h3>The Solution: Scanning with App</h3>
+                    <div class="meta">1280x720 | 8s | Person confidently scanning product</div>
+                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_solution.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_couple.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <h3>Couple Shopping Together</h3>
+                    <div class="meta">1280x720 | 8s | Couple scanning a product</div>
+                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_couple.mp4" download>Download</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>App Screenshots (Phone Mockups)</h2>
+        <p class="desc">AI-generated phone mockups matching the real app UI. Right-click to save.</p>
+        <div class="grid">
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" alt="Dashboard">
+                <div class="card-info"><h3>Dashboard Screen</h3><div class="meta">Play Store / Social Posts</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" alt="Scan">
+                <div class="card-info"><h3>Barcode Scanning Screen</h3><div class="meta">Play Store / Social Posts</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" alt="Unhealthy">
+                <div class="card-info"><h3>Result: Unhealthy (3/10)</h3><div class="meta">Ad Creative - Problem</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" alt="Healthy">
+                <div class="card-info"><h3>Result: Healthy (9/10)</h3><div class="meta">Ad Creative - Solution</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Ad Banners & Creatives</h2>
+        <p class="desc">Ready-to-use promotional images for social media and ads.</p>
+        <div class="grid">
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" alt="Banner">
+                <div class="card-info"><h3>Promo Banner (Wide)</h3><div class="meta">Facebook / Google Ads</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" alt="Comparison">
+                <div class="card-info"><h3>Before vs After</h3><div class="meta">Social / Ad Creative</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" alt="Lifestyle">
+                <div class="card-info"><h3>Lifestyle Shopping</h3><div class="meta">Instagram Posts</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" alt="IG Story">
+                <div class="card-info"><h3>SCAN. SCORE. KNOW.</h3><div class="meta">Instagram / TikTok Stories</div></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+@app.get("/api/marketing/video/{filename}")
+async def serve_marketing_video(filename: str):
+    safe_name = os.path.basename(filename)
+    file_path = f"/app/marketing/{safe_name}"
+    if os.path.exists(file_path) and safe_name.endswith(".mp4"):
+        return FileResponse(file_path, media_type="video/mp4")
+    raise HTTPException(status_code=404, detail="Video not found")
+
+@app.get("/api/marketing/videos")
+async def list_marketing_videos():
+    marketing_dir = "/app/marketing"
+    videos = []
+    if os.path.exists(marketing_dir):
+        for f in sorted(os.listdir(marketing_dir)):
+            if f.endswith(".mp4"):
+                size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
+                videos.append({"filename": f, "size_mb": size_mb, "url": f"/api/marketing/video/{f}"})
+    return {"videos": videos}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
