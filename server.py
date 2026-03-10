@@ -994,13 +994,42 @@ async def get_favorites(current_user = Depends(get_current_user)):
 
 @app.post("/api/subscription/upgrade")
 async def upgrade_subscription(current_user = Depends(get_current_user)):
-    # Simple upgrade (in production, integrate with payment processor)
+    """Upgrade user to premium after successful RevenueCat purchase"""
     await users_collection.update_one(
         {"_id": current_user["_id"]},
         {"$set": {"subscription_tier": "premium"}}
     )
-    
     return {"message": "Upgraded to premium", "subscription_tier": "premium"}
+
+@app.post("/api/webhooks/revenuecat")
+async def revenuecat_webhook(request: dict):
+    """RevenueCat webhook to sync subscription status automatically"""
+    try:
+        event = request.get("event", {})
+        event_type = event.get("type", "")
+        app_user_id = event.get("app_user_id", "")
+        
+        # Handle subscription events
+        if event_type in ["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE"]:
+            # User subscribed or renewed
+            await users_collection.update_one(
+                {"_id": ObjectId(app_user_id)},
+                {"$set": {"subscription_tier": "premium"}}
+            )
+            print(f"RevenueCat: Upgraded {app_user_id} to premium")
+            
+        elif event_type in ["CANCELLATION", "EXPIRATION"]:
+            # Subscription ended
+            await users_collection.update_one(
+                {"_id": ObjectId(app_user_id)},
+                {"$set": {"subscription_tier": "free"}}
+            )
+            print(f"RevenueCat: Downgraded {app_user_id} to free")
+            
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"RevenueCat webhook error: {e}")
+        return {"status": "error", "message": str(e)}
 
 # Gamification Endpoints
 
