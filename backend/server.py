@@ -1318,9 +1318,7 @@ class ChatRequest(BaseModel):
 async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_current_user)):
     """AI Health Assistant - Educational information only"""
     try:
-        from google import genai
-        
-        client = genai.Client(api_key=GOOGLE_API_KEY)
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         
         # Update daily quest progress for using assistant
         user_id = str(current_user["_id"])
@@ -1339,7 +1337,6 @@ async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_curre
                     }
                 )
         
-        # Create system message with strong guardrails
         system_message = """You are a health education assistant for "You Are What You Eat" app. 
 
 CRITICAL RULES:
@@ -1364,31 +1361,25 @@ WHAT YOU CANNOT DO (Medical Advice):
 - Prescribe treatments or medications
 - Create personalized diet plans for treating medical conditions
 - Tell someone to stop taking medications
-- Give specific dosage recommendations
+- Give specific dosage recommendations"""
 
-EXAMPLE GOOD RESPONSE:
-User: "What is metabolic dysfunction?"
-Assistant: "Metabolic dysfunction refers to when your body's metabolic processes don't work optimally. This includes issues like insulin resistance (where cells don't respond well to insulin), high blood sugar, abnormal cholesterol levels, and inflammation. Common causes include a diet high in ultra-processed foods, added sugars, and seed oils, combined with lack of physical activity. Research links regular UPF consumption to a 12% higher risk of metabolic syndrome per 10% increase in UPF intake (Srour et al., BMJ 2024). *This is educational information - consult a healthcare professional for personal medical advice.*"
-"""
-
-        # Build conversation context
+        # Build conversation messages for OpenAI
+        messages = [{"role": "system", "content": system_message}]
+        
         recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
-        
-        # Format conversation for Gemini
-        conversation_text = f"System: {system_message}\n\n"
         for msg in recent_history:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            conversation_text += f"{role}: {msg['content']}\n\n"
+            messages.append({"role": msg["role"], "content": msg["content"]})
         
-        conversation_text += f"User: {chat_req.message}\n\nAssistant:"
+        messages.append({"role": "user", "content": chat_req.message})
         
-        # Generate response with Gemini
-        response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash-lite',
-            contents=conversation_text
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=500,
+            temperature=0.7
         )
         
-        return {"response": response.text.strip()}
+        return {"response": response.choices[0].message.content.strip()}
         
     except Exception as e:
         print(f"Assistant error: {e}")
