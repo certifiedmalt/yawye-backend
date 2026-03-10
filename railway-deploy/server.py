@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
@@ -11,9 +11,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
-import bcrypt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import openai
+from openai import AsyncOpenAI
 import asyncio
 import time
 import logging
@@ -63,7 +62,7 @@ def check_rate_limit(key: str) -> bool:
 
 # MongoDB
 MONGO_URL = os.getenv("MONGO_URL")
-DB_NAME = os.getenv("DB_NAME") or "yawye_db"
+DB_NAME = os.getenv("DB_NAME")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
@@ -75,6 +74,7 @@ product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 
 # Security
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
@@ -137,7 +137,7 @@ FATSECRET_CLIENT_ID = os.getenv("FATSECRET_CLIENT_ID", "")
 FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
-EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
@@ -432,12 +432,10 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 def verify_password(plain_password, hashed_password):
-    if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return pwd_context.hash(password)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
@@ -456,34 +454,50 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using OpenAI GPT-4o with focus on ultra-processed foods (UPFs)"""
     try:
-        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         
-        completion = await client.chat.completions.create(
+        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs).
+
+Analyze these ingredients from {product_name}:
+
+{ingredients}
+
+Identify harmful UPF ingredients AND beneficial whole food nutrients.
+
+HARMFUL: seed oils, emulsifiers, artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars.
+
+BENEFICIAL: proteins, vitamins, fiber, healthy fats, probiotics.
+
+Respond with JSON only:
+{{
+  "harmful_ingredients": [
+    {{"name": "ingredient", "health_impact": "2-3 sentences", "severity": "high/medium/low", "processing_level": "NOVA 4", "research_summary": "study citation", "study_link": "pubmed link"}}
+  ],
+  "beneficial_ingredients": [
+    {{"name": "ingredient", "health_benefit": "2-3 sentences", "benefit_type": "protein/vitamin/fiber", "key_nutrients": "list", "processing_level": "NOVA 1", "research_summary": "citation", "study_link": "link"}}
+  ],
+  "overall_score": 1-10,
+  "upf_score": "percentage",
+  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
+  "recommendation": "actionable advice"
+}}
+
+Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed."""
+
+        response = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a food science expert specializing in ultra-processed foods (UPFs) and the NOVA classification system. Your expertise is in identifying harmful industrial ingredients, additives, and processing markers. Provide clear, consumer-friendly explanations."},
+                {"role": "system", "content": "You are a food science expert. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.7,
+            response_format={"type": "json_object"}
         )
-        response = completion.choices[0].message.content
         
-        # Parse JSON from response
         import json
-        # Clean response to extract JSON
-        response_text = response.strip()
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
-        
-        analysis = json.loads(response_text)
-        return analysis
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         print(f"AI Analysis error: {e}")
         return {
@@ -498,34 +512,12 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
 # Routes
 @app.get("/api/download/icon")
 async def download_icon():
-    icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
-    if not os.path.exists(icon_path):
-        raise HTTPException(status_code=404, detail="Icon not found")
+    icon_path = "/app/frontend/assets/images/icon.png"
     return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
 
 @app.get("/api/health")
 async def health_check():
-    try:
-        # Test MongoDB connection
-        await users_collection.find_one({})
-        return {"status": "healthy", "db": "connected"}
-    except Exception as e:
-        return {"status": "unhealthy", "db_error": str(e)}
-
-@app.get("/api/debug/test-register")
-async def debug_test_register():
-    try:
-        hashed = get_password_hash("test123")
-        result = await users_collection.insert_one({
-            "email": f"debug-{datetime.utcnow().timestamp()}@test.com",
-            "password": hashed,
-            "name": "Debug Test",
-            "subscription_tier": "free",
-            "daily_scans": 0,
-        })
-        return {"status": "ok", "id": str(result.inserted_id)}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "type": type(e).__name__}
+    return {"status": "healthy"}
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
@@ -541,8 +533,7 @@ async def register(user: UserRegister):
         "name": user.name,
         "password": hashed_password,
         "subscription_tier": "free",
-        "daily_scans": 0,
-        "last_scan_reset": datetime.utcnow(),
+        "total_scans": 0,
         "created_at": datetime.utcnow()
     }
     result = await users_collection.insert_one(user_doc)
@@ -674,21 +665,12 @@ async def delete_account(current_user = Depends(get_current_user)):
 
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
-    # Reset daily scans if needed
-    last_reset = current_user.get("last_scan_reset", datetime.utcnow())
-    if datetime.utcnow() - last_reset > timedelta(days=1):
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$set": {"daily_scans": 0, "last_scan_reset": datetime.utcnow()}}
-        )
-        current_user["daily_scans"] = 0
-    
     return {
         "id": str(current_user["_id"]),
         "email": current_user["email"],
         "name": current_user["name"],
         "subscription_tier": current_user.get("subscription_tier", "free"),
-        "daily_scans": current_user.get("daily_scans", 0)
+        "total_scans": current_user.get("total_scans", 0)
     }
 
 @app.post("/api/scan")
@@ -703,53 +685,20 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     start_time = time.time()
     barcode = scan_req.barcode.strip()
     
-    # Check subscription limits
+    # Check subscription limits - 5 TOTAL lifetime scans for free users
     subscription_tier = current_user.get("subscription_tier", "free")
-    daily_scans = current_user.get("daily_scans", 0)
+    total_scans = current_user.get("total_scans", 0)
     
-    if subscription_tier == "free" and daily_scans >= 5:
+    if subscription_tier == "free" and total_scans >= 5:
         raise HTTPException(
             status_code=403,
-            detail="Daily scan limit reached. Upgrade to premium for unlimited scans."
+            detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
-    # STEP 1: Check cache first (instant results!)
-    cached_product = await get_cached_product(barcode)
-    if cached_product:
-        response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, "cache", response_time)
-        
-        # Save to user's scan history
-        scan_doc = {
-            "user_id": str(current_user["_id"]),
-            "barcode": barcode,
-            "product_name": cached_product.get("product_name"),
-            "brands": cached_product.get("brands"),
-            "ingredients_text": cached_product.get("ingredients_text"),
-            "image_url": cached_product.get("image_url"),
-            "analysis": cached_product.get("analysis"),
-            "scanned_at": datetime.utcnow(),
-            "from_cache": True
-        }
-        await scans_collection.insert_one(scan_doc)
-        
-        # Update user's daily scan count
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$inc": {"daily_scans": 1}}
-        )
-        
-        return {
-            "product_name": cached_product.get("product_name"),
-            "brands": cached_product.get("brands"),
-            "ingredients_text": cached_product.get("ingredients_text"),
-            "image_url": cached_product.get("image_url"),
-            "analysis": cached_product.get("analysis"),
-            "from_cache": True,
-            "response_time_ms": int(response_time * 1000)
-        }
+    # CACHE DISABLED - Always fetch fresh results for accuracy
+    # Each scan will get the latest AI analysis
     
-    # STEP 2: Parallel API calls with smart routing based on barcode prefix
+    # STEP 1: Parallel API calls with smart routing based on barcode prefix
     # UK/EU barcodes start with 50/40-44, US barcodes start with 0
     barcode_prefix = barcode[:2] if len(barcode) >= 2 else ""
     
@@ -783,20 +732,31 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
                 executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
             }
         
-        # Return the FIRST successful result
+        # Collect ALL results, prioritize ones WITH ingredients
+        results_with_ingredients = []
+        results_without_ingredients = []
+        
         for future in as_completed(futures, timeout=20):
             src = futures[future]
             try:
                 result = future.result()
                 if result:
-                    product_data = result
-                    source = src
-                    # Cancel remaining futures
-                    for f in futures:
-                        f.cancel()
-                    break
+                    if result.get("ingredients_text"):
+                        results_with_ingredients.append((result, src))
+                        logger.info(f"{src}: Found product WITH ingredients")
+                    else:
+                        results_without_ingredients.append((result, src))
+                        logger.info(f"{src}: Found product WITHOUT ingredients")
             except Exception as e:
                 logger.warning(f"{src} error: {e}")
+        
+        # Prefer results WITH ingredients
+        if results_with_ingredients:
+            product_data, source = results_with_ingredients[0]
+            logger.info(f"Using {source} (has ingredients)")
+        elif results_without_ingredients:
+            product_data, source = results_without_ingredients[0]
+            logger.info(f"Using {source} (no ingredients available)")
     
     # STEP 3: If parallel calls all failed, try FatSecret as last resort
     if not product_data:
@@ -850,11 +810,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "additives": []
         }
     
-    # STEP 7: Cache the result for future fast lookups
+    # CACHE DISABLED - No longer caching results
     product_data["analysis"] = analysis
-    await cache_product(barcode, product_data)
     
-    # STEP 8: Save to user's scan history
+    # STEP 7: Save to user's scan history
     scan_doc = {
         "user_id": str(current_user["_id"]),
         "barcode": barcode,
@@ -868,11 +827,43 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     }
     await scans_collection.insert_one(scan_doc)
     
-    # Update user's daily scan count
+    # Update user's total scan count
     await users_collection.update_one(
         {"_id": current_user["_id"]},
-        {"$inc": {"daily_scans": 1}}
+        {"$inc": {"total_scans": 1}}
     )
+    
+    # Update daily quest progress
+    user_id = str(current_user["_id"])
+    gamification = await db["gamification"].find_one({"user_id": user_id})
+    if gamification:
+        daily_quests = gamification.get("daily_quests", {})
+        xp_earned = 0
+        
+        # Quest 1: Scan 3 products
+        if "scan_3_products" in daily_quests and not daily_quests["scan_3_products"]["completed"]:
+            current_progress = daily_quests["scan_3_products"].get("progress", 0) + 1
+            daily_quests["scan_3_products"]["progress"] = current_progress
+            if current_progress >= 3:
+                daily_quests["scan_3_products"]["completed"] = True
+                xp_earned += daily_quests["scan_3_products"]["xp"]
+        
+        # Quest 2: Find a healthy product (8+/10)
+        if "find_healthy_product" in daily_quests and not daily_quests["find_healthy_product"]["completed"]:
+            overall_score = analysis.get("overall_score", 0)
+            if overall_score >= 8:
+                daily_quests["find_healthy_product"]["completed"] = True
+                daily_quests["find_healthy_product"]["progress"] = 1
+                xp_earned += daily_quests["find_healthy_product"]["xp"]
+        
+        # Update gamification data
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {"daily_quests": daily_quests},
+                "$inc": {"xp": xp_earned}
+            }
+        )
     
     # Log analytics
     response_time = time.time() - start_time
@@ -1003,13 +994,55 @@ async def get_favorites(current_user = Depends(get_current_user)):
 
 @app.post("/api/subscription/upgrade")
 async def upgrade_subscription(current_user = Depends(get_current_user)):
-    # Simple upgrade (in production, integrate with payment processor)
+    """Upgrade user to premium after successful RevenueCat purchase"""
     await users_collection.update_one(
         {"_id": current_user["_id"]},
         {"$set": {"subscription_tier": "premium"}}
     )
-    
     return {"message": "Upgraded to premium", "subscription_tier": "premium"}
+
+@app.post("/api/webhooks/revenuecat")
+async def revenuecat_webhook(request: Request):
+    """RevenueCat webhook to sync subscription status automatically"""
+    try:
+        # Verify authorization header
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header != "Jmaster1986!":
+            print(f"RevenueCat webhook: Invalid auth header")
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        body = await request.json()
+        event = body.get("event", {})
+        event_type = event.get("type", "")
+        app_user_id = event.get("app_user_id", "")
+        
+        print(f"RevenueCat webhook: {event_type} for user {app_user_id}")
+        
+        # Handle subscription events
+        if event_type in ["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION"]:
+            # User subscribed or renewed
+            if ObjectId.is_valid(app_user_id):
+                await users_collection.update_one(
+                    {"_id": ObjectId(app_user_id)},
+                    {"$set": {"subscription_tier": "premium"}}
+                )
+                print(f"RevenueCat: Upgraded {app_user_id} to premium")
+            
+        elif event_type in ["CANCELLATION", "EXPIRATION", "BILLING_ISSUE"]:
+            # Subscription ended
+            if ObjectId.is_valid(app_user_id):
+                await users_collection.update_one(
+                    {"_id": ObjectId(app_user_id)},
+                    {"$set": {"subscription_tier": "free"}}
+                )
+                print(f"RevenueCat: Downgraded {app_user_id} to free")
+            
+        return {"status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"RevenueCat webhook error: {e}")
+        return {"status": "error", "message": str(e)}
 
 # Gamification Endpoints
 
@@ -1285,60 +1318,229 @@ class ChatRequest(BaseModel):
 async def assistant_chat(chat_req: ChatRequest, current_user = Depends(get_current_user)):
     """AI Health Assistant - Educational information only"""
     try:
-        # Create system message with strong guardrails
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        
+        # Update daily quest progress for using assistant
+        user_id = str(current_user["_id"])
+        gamification = await db["gamification"].find_one({"user_id": user_id})
+        if gamification:
+            daily_quests = gamification.get("daily_quests", {})
+            if "use_assistant" in daily_quests and not daily_quests["use_assistant"]["completed"]:
+                daily_quests["use_assistant"]["completed"] = True
+                daily_quests["use_assistant"]["progress"] = 1
+                xp_earned = daily_quests["use_assistant"]["xp"]
+                await db["gamification"].update_one(
+                    {"user_id": user_id},
+                    {
+                        "$set": {"daily_quests": daily_quests},
+                        "$inc": {"xp": xp_earned}
+                    }
+                )
+        
         system_message = """You are a health education assistant for "You Are What You Eat" app. 
 
 CRITICAL RULES:
-1. You provide EDUCATIONAL information only, NOT medical advice
-2. ALWAYS remind users to consult healthcare professionals for personal health decisions
-3. Focus on: general nutrition, food ingredients, UPFs, healthy eating principles
-4. NEVER: diagnose, prescribe, recommend treatments, or give personalized medical advice
-5. If asked medical questions, redirect to healthcare professionals
-6. Keep responses concise (2-3 paragraphs max)
-7. Be friendly and helpful but maintain boundaries
+1. You provide EDUCATIONAL information, NOT personalized medical advice
+2. You CAN explain what medical conditions ARE and what causes them (educational)
+3. You CANNOT diagnose, prescribe treatments, or give personalized medical advice
+4. Always add a brief disclaimer: "This is educational information - consult a healthcare professional for personal medical advice"
+5. Keep responses informative but concise (2-3 paragraphs max)
+6. Be helpful and educational - don't refuse legitimate questions about health topics
 
-SAFE TOPICS:
-- General nutrition education
-- Understanding food labels and ingredients
-- What are UPFs and why they matter
-- General healthy eating tips
-- How to use the app
-- Food science basics
+WHAT YOU CAN DO (Educational):
+- Explain what conditions like diabetes, heart disease, Alzheimer's, cancer ARE
+- Explain what CAUSES these conditions (diet, lifestyle, genetics)
+- Explain how nutrition and diet relate to health conditions
+- Discuss research linking UPFs/ingredients to health outcomes
+- Explain what metabolic dysfunction, insulin resistance, inflammation ARE
+- Discuss how specific ingredients affect the body
+- General nutrition and food science education
 
-FORBIDDEN TOPICS:
-- Medical diagnosis or treatment
-- Personalized diet plans for medical conditions
-- Medication interactions
-- Specific health conditions
-- Weight loss advice beyond general principles
+WHAT YOU CANNOT DO (Medical Advice):
+- Diagnose someone with a condition
+- Prescribe treatments or medications
+- Create personalized diet plans for treating medical conditions
+- Tell someone to stop taking medications
+- Give specific dosage recommendations"""
 
-If user asks forbidden topics, politely say: "I can't provide medical advice. Please consult a healthcare professional for personalized guidance. I can help with general nutrition education instead - what would you like to know?"
-"""
-
-        # Limit conversation history to last 10 messages
-        recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
-        
-        # Build messages for OpenAI
+        # Build conversation messages for OpenAI
         messages = [{"role": "system", "content": system_message}]
+        
+        recent_history = chat_req.conversation_history[-10:] if chat_req.conversation_history else []
         for msg in recent_history:
             messages.append({"role": msg["role"], "content": msg["content"]})
+        
         messages.append({"role": "user", "content": chat_req.message})
         
-        client = openai.AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
-        completion = await client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
+            max_tokens=500,
             temperature=0.7
         )
-        response = completion.choices[0].message.content
         
-        return {"response": response}
+        return {"response": response.choices[0].message.content.strip()}
         
     except Exception as e:
         print(f"Assistant error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get response from assistant")
 
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import mimetypes
+
+@app.get("/api/marketing")
+async def marketing_catalog():
+    """Serve the full marketing assets viewer with videos and images"""
+    html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAWYE Marketing Assets</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 24px; }
+        h1 { font-size: 32px; color: #4CAF50; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #888; text-align: center; margin-bottom: 48px; }
+        h2 { font-size: 22px; color: #fff; margin-bottom: 8px; border-bottom: 2px solid #4CAF50; display: inline-block; padding-bottom: 6px; }
+        .section { margin-bottom: 48px; }
+        .desc { color: #888; font-size: 14px; margin: 8px 0 24px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+        .card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 1px solid #333; }
+        .card:hover { border-color: #4CAF50; }
+        .card img { width: 100%; height: auto; }
+        .card video { width: 100%; height: auto; background: #000; }
+        .card-info { padding: 16px; }
+        .card-info h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
+        .meta { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .badge { font-size: 12px; color: #4CAF50; background: rgba(76,175,80,0.1); padding: 4px 10px; border-radius: 8px; display: inline-block; margin-bottom: 8px; }
+        .badge-new { background: rgba(255,215,0,0.15); color: #FFD700; }
+        .dl-btn { display: inline-block; background: #4CAF50; color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+        .dl-btn:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <h1>You Are What You Eat</h1>
+    <p class="subtitle">Marketing Assets Library</p>
+
+    <div class="section">
+        <h2>Video Clips</h2>
+        <p class="desc">AI-generated video clips (Sora 2). Click play to watch, or right-click to save.</p>
+        <div class="grid">
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_score_reveal_unhealthy.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <span class="badge badge-new">NEW</span>
+                    <h3>Score Reveal: Unhealthy Product</h3>
+                    <div class="meta">1280x720 | 8s | Phone showing 3/10 red score</div>
+                    <a class="dl-btn" href="/api/marketing/video/app_score_reveal_unhealthy.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_dashboard_hero.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <span class="badge badge-new">NEW</span>
+                    <h3>App Dashboard Hero Shot</h3>
+                    <div class="meta">1280x720 | 8s | Phone on kitchen counter showing app</div>
+                    <a class="dl-btn" href="/api/marketing/video/app_dashboard_hero.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip1_problem.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <h3>The Problem: Confused at Labels</h3>
+                    <div class="meta">1280x720 | 8s | Person reading ingredient labels</div>
+                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip1_problem.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_solution.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <h3>The Solution: Scanning with App</h3>
+                    <div class="meta">1280x720 | 8s | Person confidently scanning product</div>
+                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_solution.mp4" download>Download</a>
+                </div>
+            </div>
+            <div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_couple.mp4" type="video/mp4"></video>
+                <div class="card-info">
+                    <h3>Couple Shopping Together</h3>
+                    <div class="meta">1280x720 | 8s | Couple scanning a product</div>
+                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_couple.mp4" download>Download</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>App Screenshots (Phone Mockups)</h2>
+        <p class="desc">AI-generated phone mockups matching the real app UI. Right-click to save.</p>
+        <div class="grid">
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" alt="Dashboard">
+                <div class="card-info"><h3>Dashboard Screen</h3><div class="meta">Play Store / Social Posts</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" alt="Scan">
+                <div class="card-info"><h3>Barcode Scanning Screen</h3><div class="meta">Play Store / Social Posts</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" alt="Unhealthy">
+                <div class="card-info"><h3>Result: Unhealthy (3/10)</h3><div class="meta">Ad Creative - Problem</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" alt="Healthy">
+                <div class="card-info"><h3>Result: Healthy (9/10)</h3><div class="meta">Ad Creative - Solution</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Ad Banners & Creatives</h2>
+        <p class="desc">Ready-to-use promotional images for social media and ads.</p>
+        <div class="grid">
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" alt="Banner">
+                <div class="card-info"><h3>Promo Banner (Wide)</h3><div class="meta">Facebook / Google Ads</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" alt="Comparison">
+                <div class="card-info"><h3>Before vs After</h3><div class="meta">Social / Ad Creative</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" alt="Lifestyle">
+                <div class="card-info"><h3>Lifestyle Shopping</h3><div class="meta">Instagram Posts</div></div>
+            </div>
+            <div class="card">
+                <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" alt="IG Story">
+                <div class="card-info"><h3>SCAN. SCORE. KNOW.</h3><div class="meta">Instagram / TikTok Stories</div></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+@app.get("/api/marketing/video/{filename}")
+async def serve_marketing_video(filename: str):
+    safe_name = os.path.basename(filename)
+    file_path = f"/app/marketing/{safe_name}"
+    if os.path.exists(file_path) and safe_name.endswith(".mp4"):
+        return FileResponse(file_path, media_type="video/mp4")
+    raise HTTPException(status_code=404, detail="Video not found")
+
+@app.get("/api/marketing/videos")
+async def list_marketing_videos():
+    marketing_dir = "/app/marketing"
+    videos = []
+    if os.path.exists(marketing_dir):
+        for f in sorted(os.listdir(marketing_dir)):
+            if f.endswith(".mp4"):
+                size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
+                videos.append({"filename": f, "size_mb": size_mb, "url": f"/api/marketing/video/{f}"})
+    return {"videos": videos}
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "8001"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
