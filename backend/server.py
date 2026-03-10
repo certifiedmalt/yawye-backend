@@ -590,38 +590,9 @@ async def download_icon():
     icon_path = "/app/frontend/assets/images/icon.png"
     return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
 
-# Version tracking for deployment verification
-APP_VERSION = "1.0.3-quest-tracking"
-APP_BUILD_TIME = "2026-03-10T10:00:00Z"
-
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
-
-@app.get("/api/version")
-async def get_version():
-    """Verify which code version is running on the server"""
-    import hashlib
-    import os
-    
-    # Calculate hash of server.py to verify exact code
-    try:
-        with open(__file__, 'rb') as f:
-            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
-    except:
-        file_hash = "unknown"
-    
-    return {
-        "version": APP_VERSION,
-        "build_time": APP_BUILD_TIME,
-        "file_hash": file_hash,
-        "quest_tracking_enabled": True,
-        "features": [
-            "daily_quests_scan_tracking",
-            "daily_quests_assistant_tracking",
-            "daily_quests_healthy_product"
-        ]
-    }
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
@@ -939,43 +910,35 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     
     # Update daily quest progress
     user_id = str(current_user["_id"])
-    logger.info(f"Updating quests for user {user_id}")
     gamification = await db["gamification"].find_one({"user_id": user_id})
-    logger.info(f"Found gamification: {gamification is not None}")
     if gamification:
         daily_quests = gamification.get("daily_quests", {})
         xp_earned = 0
         
         # Quest 1: Scan 3 products
-        scan_quest = daily_quests.get("scan_3_products", {})
-        logger.info(f"Scan quest before: {scan_quest}")
-        if scan_quest and not scan_quest.get("completed", False):
-            current_progress = scan_quest.get("progress", 0) + 1
+        if "scan_3_products" in daily_quests and not daily_quests["scan_3_products"]["completed"]:
+            current_progress = daily_quests["scan_3_products"].get("progress", 0) + 1
             daily_quests["scan_3_products"]["progress"] = current_progress
-            logger.info(f"Updated scan quest progress to {current_progress}")
             if current_progress >= 3:
                 daily_quests["scan_3_products"]["completed"] = True
-                xp_earned += scan_quest.get("xp", 10)
+                xp_earned += daily_quests["scan_3_products"]["xp"]
         
         # Quest 2: Find a healthy product (8+/10)
-        healthy_quest = daily_quests.get("find_healthy_product", {})
-        if healthy_quest and not healthy_quest.get("completed", False):
+        if "find_healthy_product" in daily_quests and not daily_quests["find_healthy_product"]["completed"]:
             overall_score = analysis.get("overall_score", 0)
-            logger.info(f"Health score: {overall_score}")
             if overall_score >= 8:
                 daily_quests["find_healthy_product"]["completed"] = True
                 daily_quests["find_healthy_product"]["progress"] = 1
-                xp_earned += healthy_quest.get("xp", 25)
+                xp_earned += daily_quests["find_healthy_product"]["xp"]
         
         # Update gamification data
-        result = await db["gamification"].update_one(
+        await db["gamification"].update_one(
             {"user_id": user_id},
             {
                 "$set": {"daily_quests": daily_quests},
                 "$inc": {"xp": xp_earned}
             }
         )
-        logger.info(f"Quest update result: modified={result.modified_count}")
     
     # Log analytics
     response_time = time.time() - start_time
@@ -1467,4 +1430,3 @@ Assistant: "Metabolic dysfunction refers to when your body's metabolic processes
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-# Last deployed: 2026-03-09T20:25:22Z
