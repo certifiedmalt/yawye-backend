@@ -12,8 +12,7 @@ from bson import ObjectId
 import jwt
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from google import genai
-from openai import AsyncOpenAI
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 import asyncio
 import time
 import logging
@@ -139,8 +138,6 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
@@ -457,73 +454,115 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
-    """Analyze ingredients using Google Gemini AI with focus on ultra-processed foods (UPFs)"""
+    """Analyze ingredients using AI with focus on ultra-processed foods (UPFs)"""
     try:
-        client = genai.Client(api_key=GOOGLE_API_KEY)
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"ingredient-analysis-{datetime.utcnow().timestamp()}",
+            system_message="You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry. You cite real scientific studies and explain health benefits/risks clearly. Focus on both harmful UPF ingredients AND beneficial whole food nutrients."
+        ).with_model("openai", "gpt-5.2")
         
-        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional biochemistry.
-
-Analyze these ingredients from {product_name}:
+        prompt = f"""Analyze these ingredients from {product_name}:
 
 {ingredients}
 
 FOCUS: Identify harmful UPF ingredients AND beneficial whole food nutrients.
 
-=== HARMFUL INGREDIENTS TO FLAG ===
+=== HARMFUL INGREDIENTS TO FLAG (HIGH PRIORITY) ===
 - Seed/vegetable oils: sunflower, rapeseed, soybean, corn oil (inflammatory omega-6)
 - Emulsifiers: E471, mono/diglycerides, lecithins, polysorbates (gut barrier damage)
-- Artificial sweeteners: aspartame, sucralose, acesulfame K
+- Artificial sweeteners: aspartame, sucralose, acesulfame K (metabolic disruption)
 - Preservatives: sodium benzoate, potassium sorbate, BHA, BHT
 - Artificial colors: tartrazine, sunset yellow, caramel color
-- Modified starches, maltodextrin, dextrose
-- Hydrogenated oils, palm oil
-- Added sugars: high fructose corn syrup, glucose syrup
+- Modified starches, maltodextrin, dextrose (blood sugar spikes)
+- Hydrogenated oils, palm oil, interesterified fats
+- Flavor enhancers: MSG, hydrolyzed proteins, yeast extract
+- Added sugars: high fructose corn syrup, glucose syrup, invert sugar
 
-=== BENEFICIAL INGREDIENTS TO HIGHLIGHT ===
-- Protein sources (milk, eggs, meat, fish)
-- Vitamins & antioxidants
-- Fiber from whole grains, fruits, vegetables
-- Healthy fats (omega-3, olive oil)
+=== DISEASE CONNECTIONS TO MENTION (when relevant) ===
+Always connect harmful ingredients to SPECIFIC DISEASES when research supports it:
+- TYPE 2 DIABETES: link to added sugars, refined carbs, UPFs (insulin resistance)
+- HEART DISEASE: link to trans fats, seed oils, sodium, UPFs (inflammation, arterial damage)
+- CANCER: link to processed meats, artificial colors, BHA/BHT, acrylamide
+- ALZHEIMER'S/DEMENTIA: link to UPFs, added sugars, trans fats (neuroinflammation)
+- OBESITY: link to UPFs, added sugars, emulsifiers (appetite dysregulation)
+- GUT DISORDERS (IBS, IBD): link to emulsifiers, artificial sweeteners, processed foods
+- AUTOIMMUNE DISEASES: link to seed oils, processed foods (chronic inflammation)
+
+For BENEFICIAL ingredients, mention disease PREVENTION:
+- Heart disease prevention: omega-3, fiber, antioxidants
+- Cancer prevention: cruciferous vegetables, berries, fiber
+- Diabetes prevention: fiber, whole grains, low glycemic foods
+- Cognitive protection: berries, omega-3, leafy greens
+
+=== BENEFICIAL INGREDIENTS TO HIGHLIGHT (EQUALLY IMPORTANT) ===
+PROTEIN SOURCES - Always highlight with specific benefits:
+- Milk/dairy: "Complete protein with all 9 essential amino acids, calcium for bone health"
+- Eggs: "High biological value protein, choline for brain function"
+- Meat/fish: Specify amino acid profile, B12, iron, omega-3 (if fish)
+
+VITAMINS & ANTIOXIDANTS:
+- Vitamin C (citrus, berries): "Immune function, collagen synthesis. Linus Pauling Institute research shows 200mg/day optimal."
+- Vitamin A (carrots, sweet potato): "Vision, immune function, skin health"
+- Vitamin E (nuts, seeds): "Antioxidant, protects cell membranes"
+- Anthocyanins (berries, grapes): "Powerful antioxidants. 2019 meta-analysis: 12% reduced cardiovascular risk"
+- Lycopene (tomatoes): "Prostate health. Harvard study: 21% reduced prostate cancer risk"
+
+GUT HEALTH:
+- Fiber (whole grains, fruits, vegetables): "Feeds beneficial gut bacteria, promotes regularity"
+- Probiotics (yogurt, kefir, fermented foods): "Live cultures support microbiome diversity"
+- Prebiotics (garlic, onion, banana): "Feeds beneficial bacteria, improves gut barrier"
+
+HEALTHY FATS:
+- Omega-3 (fatty fish, flaxseed): "Anti-inflammatory. VITAL study: 28% reduced heart attack risk"
+- Olive oil: "Monounsaturated fats, polyphenols. Mediterranean diet research"
+- Avocado: "Heart-healthy fats, potassium, fiber"
 
 === RESPONSE FORMAT (JSON) ===
 {{
   "harmful_ingredients": [
     {{
       "name": "ingredient name",
-      "health_impact": "Clear explanation of harm. 2-3 sentences.",
+      "health_impact": "Clear explanation of harm to body. Consumer-friendly. 2-3 sentences.",
       "severity": "high/medium/low",
       "processing_level": "NOVA 4 - ultra-processed",
-      "research_summary": "Research summary with study citations.",
-      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ link if available"
+      "research_summary": "DETAILED research summary (4-6 sentences). Must include: 1) Study type (meta-analysis, RCT, cohort), 2) Sample size, 3) Key finding with percentage/statistic, 4) Author and year. Example: 'A landmark 2024 BMJ meta-analysis by Srour et al. examined 45 prospective studies with over 10 million participants. They found that each 10% increase in ultra-processed food consumption was associated with a 12% higher risk of cardiovascular disease (HR 1.12, 95% CI 1.09-1.15). The NutriNet-Santé cohort study (n=105,159) specifically linked emulsifiers to inflammatory bowel disease risk. Multiple RCTs have demonstrated that eliminating these additives reduces inflammatory markers within 2-4 weeks.'",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
     }}
   ],
   "beneficial_ingredients": [
     {{
       "name": "ingredient name",
-      "health_benefit": "Benefit explanation. 2-3 sentences.",
-      "benefit_type": "protein/vitamin/antioxidant/fiber/healthy-fat/mineral",
-      "key_nutrients": "List nutrients",
+      "health_benefit": "DETAILED benefit explanation (3-4 sentences). Include: specific compounds, mechanism of action, daily value percentage if applicable. Example: 'Oranges are exceptionally rich in vitamin C (ascorbic acid), providing 92% of daily needs per fruit. Vitamin C acts as a powerful antioxidant, neutralizing free radicals and supporting collagen synthesis for skin and joint health. The flavonoids hesperidin and naringenin provide additional cardiovascular benefits by improving blood vessel function.'",
+      "benefit_type": "protein/vitamin/antioxidant/fiber/probiotic/healthy-fat/mineral",
+      "key_nutrients": "List with amounts: Vitamin C (70mg, 92% DV), Fiber (3g), Potassium (237mg)",
       "processing_level": "NOVA 1 - whole/minimally processed",
-      "research_summary": "Research summary.",
-      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ link if available"
+      "research_summary": "DETAILED research (4-6 sentences). Must cite real studies. Example: 'The Nurses Health Study (n=93,600 women, 18 years follow-up) found that women consuming 3+ servings of berries weekly had 32% slower rates of cognitive decline (Devore et al., Annals of Neurology, 2012). A 2019 Cochrane review of 29 RCTs confirmed vitamin C supplementation reduces cold duration by 8% in adults. The PREDIMED trial (n=7,447) demonstrated Mediterranean diet rich in fruits reduced cardiovascular events by 30% versus control diet.'",
+      "study_link": "https://pubmed.ncbi.nlm.nih.gov/ or https://doi.org/ link to primary study"
     }}
   ],
   "overall_score": 1-10,
-  "upf_score": "percentage of ultra-processed ingredients",
+  "upf_score": "percentage",
   "processing_category": "Whole Food / Minimally Processed / Processed / Ultra-Processed",
-  "recommendation": "Clear recommendation"
+  "recommendation": "Clear recommendation with actionable advice"
 }}
 
-Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed.
-Respond ONLY with JSON, no other text."""
+CRITICAL REQUIREMENTS:
+1. research_summary MUST be 4-6 sentences with SPECIFIC statistics (percentages, hazard ratios, sample sizes)
+2. ALWAYS cite real studies: author names, journal names, years, sample sizes
+3. Include study_link field with real PubMed or DOI links when possible (use format https://pubmed.ncbi.nlm.nih.gov/PMID/)
+4. For beneficial ingredients: specify exact nutrient amounts and daily value percentages
+5. Health benefits must explain the MECHANISM (how it works in the body)
+6. ALWAYS include beneficial_ingredients if ANY whole foods present
+7. Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed"""
         
-        response = await client.aio.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt
-        )
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
         
+        # Parse JSON from response
         import json
-        response_text = response.text.strip()
+        # Clean response to extract JSON
+        response_text = response.strip()
         if response_text.startswith("```json"):
             response_text = response_text[7:]
         if response_text.startswith("```"):
@@ -532,7 +571,8 @@ Respond ONLY with JSON, no other text."""
             response_text = response_text[:-3]
         response_text = response_text.strip()
         
-        return json.loads(response_text)
+        analysis = json.loads(response_text)
+        return analysis
     except Exception as e:
         print(f"AI Analysis error: {e}")
         return {
@@ -550,38 +590,9 @@ async def download_icon():
     icon_path = "/app/frontend/assets/images/icon.png"
     return FileResponse(icon_path, media_type="image/png", filename="you-are-what-you-eat-icon.png")
 
-# Version tracking for deployment verification
-APP_VERSION = "1.0.3-quest-tracking"
-APP_BUILD_TIME = "2026-03-10T10:00:00Z"
-
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
-
-@app.get("/api/version")
-async def get_version():
-    """Verify which code version is running on the server"""
-    import hashlib
-    import os
-    
-    # Calculate hash of server.py to verify exact code
-    try:
-        with open(__file__, 'rb') as f:
-            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
-    except:
-        file_hash = "unknown"
-    
-    return {
-        "version": APP_VERSION,
-        "build_time": APP_BUILD_TIME,
-        "file_hash": file_hash,
-        "quest_tracking_enabled": True,
-        "features": [
-            "daily_quests_scan_tracking",
-            "daily_quests_assistant_tracking",
-            "daily_quests_healthy_product"
-        ]
-    }
 
 @app.post("/api/auth/register")
 async def register(user: UserRegister):
@@ -729,22 +740,12 @@ async def delete_account(current_user = Depends(get_current_user)):
 
 @app.get("/api/auth/me")
 async def get_me(current_user = Depends(get_current_user)):
-    total_scans = current_user.get("total_scans", 0)
-    subscription_tier = current_user.get("subscription_tier", "free")
-    
-    # Calculate scans remaining for free users (5 total lifetime scans)
-    if subscription_tier == "free":
-        scans_remaining = max(0, 5 - total_scans)
-    else:
-        scans_remaining = -1  # Unlimited for premium
-    
     return {
         "id": str(current_user["_id"]),
         "email": current_user["email"],
         "name": current_user["name"],
-        "subscription_tier": subscription_tier,
-        "total_scans": total_scans,
-        "scans_remaining": scans_remaining
+        "subscription_tier": current_user.get("subscription_tier", "free"),
+        "total_scans": current_user.get("total_scans", 0)
     }
 
 @app.post("/api/scan")
@@ -909,43 +910,35 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     
     # Update daily quest progress
     user_id = str(current_user["_id"])
-    logger.info(f"Updating quests for user {user_id}")
     gamification = await db["gamification"].find_one({"user_id": user_id})
-    logger.info(f"Found gamification: {gamification is not None}")
     if gamification:
         daily_quests = gamification.get("daily_quests", {})
         xp_earned = 0
         
         # Quest 1: Scan 3 products
-        scan_quest = daily_quests.get("scan_3_products", {})
-        logger.info(f"Scan quest before: {scan_quest}")
-        if scan_quest and not scan_quest.get("completed", False):
-            current_progress = scan_quest.get("progress", 0) + 1
+        if "scan_3_products" in daily_quests and not daily_quests["scan_3_products"]["completed"]:
+            current_progress = daily_quests["scan_3_products"].get("progress", 0) + 1
             daily_quests["scan_3_products"]["progress"] = current_progress
-            logger.info(f"Updated scan quest progress to {current_progress}")
             if current_progress >= 3:
                 daily_quests["scan_3_products"]["completed"] = True
-                xp_earned += scan_quest.get("xp", 10)
+                xp_earned += daily_quests["scan_3_products"]["xp"]
         
         # Quest 2: Find a healthy product (8+/10)
-        healthy_quest = daily_quests.get("find_healthy_product", {})
-        if healthy_quest and not healthy_quest.get("completed", False):
+        if "find_healthy_product" in daily_quests and not daily_quests["find_healthy_product"]["completed"]:
             overall_score = analysis.get("overall_score", 0)
-            logger.info(f"Health score: {overall_score}")
             if overall_score >= 8:
                 daily_quests["find_healthy_product"]["completed"] = True
                 daily_quests["find_healthy_product"]["progress"] = 1
-                xp_earned += healthy_quest.get("xp", 25)
+                xp_earned += daily_quests["find_healthy_product"]["xp"]
         
         # Update gamification data
-        result = await db["gamification"].update_one(
+        await db["gamification"].update_one(
             {"user_id": user_id},
             {
                 "$set": {"daily_quests": daily_quests},
                 "$inc": {"xp": xp_earned}
             }
         )
-        logger.info(f"Quest update result: modified={result.modified_count}")
     
     # Log analytics
     response_time = time.time() - start_time
@@ -1437,4 +1430,3 @@ Assistant: "Metabolic dysfunction refers to when your body's metabolic processes
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-# Last deployed: 2026-03-09T20:25:22Z
