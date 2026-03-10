@@ -1392,6 +1392,25 @@ import mimetypes
 @app.get("/api/marketing")
 async def marketing_catalog():
     """Serve the full marketing assets viewer with videos and images"""
+    # Dynamically find all video files
+    marketing_dir = "/app/marketing"
+    video_cards = ""
+    if os.path.exists(marketing_dir):
+        for f in sorted(os.listdir(marketing_dir)):
+            if f.endswith(".mp4"):
+                size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
+                is_new = "ad_v2" in f
+                badge = '<span class="badge badge-new">NEW</span>' if is_new else ''
+                name = f.replace('.mp4','').replace('_',' ').title()
+                video_cards += f'''<div class="card">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/{f}" type="video/mp4"></video>
+                <div class="card-info">
+                    {badge}
+                    <h3>{name}</h3>
+                    <div class="meta">1280x720 | 8s | {size_mb}MB</div>
+                    <a class="dl-btn" href="/api/marketing/video/{f}" download>Download</a>
+                </div>
+            </div>'''
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1428,48 +1447,7 @@ async def marketing_catalog():
         <h2>Video Clips</h2>
         <p class="desc">AI-generated video clips (Sora 2). Click play to watch, or right-click to save.</p>
         <div class="grid">
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_score_reveal_unhealthy.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <span class="badge badge-new">NEW</span>
-                    <h3>Score Reveal: Unhealthy Product</h3>
-                    <div class="meta">1280x720 | 8s | Phone showing 3/10 red score</div>
-                    <a class="dl-btn" href="/api/marketing/video/app_score_reveal_unhealthy.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_dashboard_hero.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <span class="badge badge-new">NEW</span>
-                    <h3>App Dashboard Hero Shot</h3>
-                    <div class="meta">1280x720 | 8s | Phone on kitchen counter showing app</div>
-                    <a class="dl-btn" href="/api/marketing/video/app_dashboard_hero.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip1_problem.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <h3>The Problem: Confused at Labels</h3>
-                    <div class="meta">1280x720 | 8s | Person reading ingredient labels</div>
-                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip1_problem.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_solution.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <h3>The Solution: Scanning with App</h3>
-                    <div class="meta">1280x720 | 8s | Person confidently scanning product</div>
-                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_solution.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_couple.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <h3>Couple Shopping Together</h3>
-                    <div class="meta">1280x720 | 8s | Couple scanning a product</div>
-                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_couple.mp4" download>Download</a>
-                </div>
-            </div>
+            """ + video_cards + """
         </div>
     </div>
 
