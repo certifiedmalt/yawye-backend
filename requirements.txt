@@ -12,4 +12,3 @@ requests
 resend
 email-validator
 google-genai
-emergentintegrations
