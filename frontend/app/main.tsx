@@ -293,8 +293,18 @@ export default function Main() {
                   ) || packages[0];
                   
                   await purchasePackage(monthlyPackage.identifier);
+                  
+                  // Update backend to mark user as premium
+                  try {
+                    await axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                  } catch (e) {
+                    console.warn('Backend upgrade call failed:', e);
+                  }
+                  
                   Alert.alert('Success!', 'Welcome to Premium! Enjoy unlimited scans.');
-                  refreshUser();
+                  await refreshUser();
                 } catch (error: any) {
                   if (!error.userCancelled) {
                     Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
