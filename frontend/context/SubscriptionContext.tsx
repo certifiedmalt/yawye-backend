@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { Platform } from 'react-native';
-import { useAuth } from './AuthContext';
 
 // RevenueCat is ENABLED for production builds with real API keys.
 const REVENUECAT_ENABLED = true;
@@ -20,13 +19,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [offerings, setOfferings] = useState<any | null>(null);
   const [customerInfo, setCustomerInfo] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useAuth();
 
   useEffect(() => {
     if (REVENUECAT_ENABLED && Platform.OS !== 'web') {
       initializePurchases();
     }
-  }, [user]);
+  }, []);
 
   const initializePurchases = async () => {
     try {
@@ -38,11 +36,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         : 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx';
 
       await Purchases.configure({ apiKey });
-      
-      // Link RevenueCat to backend user ID so subscriptions are tracked correctly
-      if (user?.id) {
-        await Purchases.logIn(user.id);
-      }
       
       const offeringsResult = await Purchases.getOfferings();
       if (offeringsResult.current) {
