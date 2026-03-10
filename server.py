@@ -575,12 +575,6 @@ Respond ONLY with JSON, no other text."""
             "processing_category": "Unknown",
             "recommendation": "Unable to analyze ingredients at this time."
         }
-            "beneficial_ingredients": [],
-            "overall_score": 5,
-            "upf_score": "0%",
-            "processing_category": "Unknown",
-            "recommendation": "Unable to analyze ingredients at this time."
-        }
 
 # Routes
 @app.get("/api/download/icon")
