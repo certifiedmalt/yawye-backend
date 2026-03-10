@@ -8,7 +8,7 @@ import json
 import time
 from datetime import datetime
 
-BASE_URL = "https://food-health-scan-3.preview.emergentagent.com/api"
+BASE_URL = "https://food-health-scan-4.preview.emergentagent.com/api"
 FRESH_USER_EMAIL = f"freshuser{int(time.time())}@foodscan.com"
 TEST_USER_PASSWORD = "SecurePass123!"
 TEST_USER_NAME = "Fresh Test User"
