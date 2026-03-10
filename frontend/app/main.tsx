@@ -24,10 +24,13 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-producti
 
 export default function Main() {
   const { user, logout, refreshUser, token } = useAuth();
-  const { offerings, purchasePackage, isLoading: subscriptionLoading } = useSubscription();
+  const { offerings, purchasePackage, isLoading: subscriptionLoading, isPremium, customerInfo } = useSubscription();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [purchaseInProgress, setPurchaseInProgress] = useState(false);
+  
+  // Check premium status from both backend AND RevenueCat
+  const isUserPremium = user?.subscription_tier === 'premium' || isPremium;
   useEffect(() => {
     const setupNotifications = async () => {
       try {
@@ -121,7 +124,7 @@ export default function Main() {
     ]);
   };
 
-  const scansRemaining = user?.subscription_tier === 'premium' ? '∞' : Math.max(0, 5 - (user?.total_scans || 0));
+  const scansRemaining = isUserPremium ? '∞' : Math.max(0, 5 - (user?.total_scans || 0));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -148,12 +151,12 @@ export default function Main() {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Ionicons
-              name={user?.subscription_tier === 'premium' ? 'star' : 'star-outline'}
+              name={isUserPremium ? 'star' : 'star-outline'}
               size={32}
               color="#FFD700"
             />
             <Text style={styles.statValue}>
-              {user?.subscription_tier === 'premium' ? 'Premium' : 'Free'}
+              {isUserPremium ? 'Premium' : 'Free'}
             </Text>
             <Text style={styles.statLabel}>Subscription</Text>
           </View>
@@ -255,7 +258,7 @@ export default function Main() {
           </View>
         </View>
 
-        {user?.subscription_tier !== 'premium' && (
+        {!isUserPremium && (
           <View style={styles.upgradeCard}>
             <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
             <Text style={styles.upgradeText}>
