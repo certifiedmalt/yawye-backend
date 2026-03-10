@@ -7,7 +7,7 @@ import requests
 import time
 
 # Get backend URL
-BASE_URL = "https://food-health-scan-3.preview.emergentagent.com"
+BASE_URL = "https://food-health-scan-4.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 def test_multiple_scans_with_known_barcodes():
