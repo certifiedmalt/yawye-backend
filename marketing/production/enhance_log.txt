@@ -1,0 +1,19 @@
+=== Creating end-card video clip (3.5s) ===
+End-card clip ready (31K)
+
+=== Enhancing videos ===
+Processing FINAL_01.mp4... DONE (2.1M, 13.840000s)
+Processing FINAL_01_upf_shock_test.mp4... DONE (2.9M, 18.132000s)
+Processing FINAL_02.mp4... DONE (2.4M, 16.173000s)
+Processing FINAL_03.mp4... DONE (3.3M, 16.423000s)
+Processing FINAL_07.mp4... DONE (2.6M, 18.590000s)
+Processing FINAL_12.mp4... DONE (3.1M, 18.340000s)
+Processing FINAL_13.mp4... DONE (2.2M, 17.423000s)
+Processing FINAL_14.mp4... DONE (2.6M, 17.423000s)
+Processing FINAL_16.mp4... DONE (2.6M, 22.340000s)
+Processing FINAL_17.mp4... DONE (3.4M, 20.757000s)
+Processing FINAL_18.mp4... DONE (4.6M, 22.882000s)
+Processing FINAL_19.mp4... DONE (4.0M, 21.423000s)
+Processing FINAL_20.mp4... DONE (4.4M, 22.715000s)
+
+=== All videos enhanced ===
