@@ -1,0 +1,21 @@
+Generating clip 03b...
+Video generation initiated with ID: video_69b0b25ba5a48191ae67cd690a964ecc0b9a0eccec2df28b
+Waiting for video generation to complete (ID: video_69b0b25ba5a48191ae67cd690a964ecc0b9a0eccec2df28b)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (10s elapsed, status: queued, progress: 0%)
+Still processing... (23s elapsed, status: queued, progress: 0%)
+Still processing... (38s elapsed, status: in_progress, progress: 52%)
+Still processing... (55s elapsed, status: in_progress, progress: 75%)
+Still processing... (76s elapsed, status: in_progress, progress: 90%)
+Still processing... (102s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b25ba5a48191ae67cd690a964ecc0b9a0eccec2df28b/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b25ba5a48191ae67cd690a964ecc0b9a0eccec2df28b/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b25ba5a48191ae67cd690a964ecc0b9a0eccec2df28b/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b25ba5a48191ae67cd690a964ecc0b9a0eccec2df28b/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 5340990
+Downloaded 5340990 bytes
+Video saved to: /app/marketing/production/03b.mp4
+DONE: /app/marketing/production/03b.mp4 (5340990 bytes)
