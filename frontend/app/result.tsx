@@ -38,10 +38,36 @@ interface BeneficialIngredient {
 interface Analysis {
   harmful_ingredients: HarmfulIngredient[];
   beneficial_ingredients: BeneficialIngredient[];
+  carcinogens_found?: CarcinogenEntry[];
+  chemical_breakdown?: ChemicalEntry[];
+  healthier_alternatives?: AlternativeEntry[];
   overall_score: number;
   upf_score?: string;
   processing_category?: string;
   recommendation: string;
+}
+
+interface CarcinogenEntry {
+  name: string;
+  iarc_group: string;
+  cancer_types: string;
+  explanation: string;
+  source: string;
+}
+
+interface ChemicalEntry {
+  name: string;
+  common_name: string;
+  purpose: string;
+  health_concern: string;
+  banned_in: string;
+}
+
+interface AlternativeEntry {
+  product_type: string;
+  example_brands: string;
+  why_better: string;
+  score_estimate: string;
 }
 
 interface ProductData {
@@ -308,6 +334,80 @@ export default function Result() {
                     )}
                   </View>
                 )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Carcinogens Warning Section */}
+        {analysis.carcinogens_found && analysis.carcinogens_found.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="skull" size={24} color="#FF1744" />
+              <Text style={styles.sectionTitle}>Carcinogens Detected</Text>
+            </View>
+            {analysis.carcinogens_found.map((item, index) => (
+              <View key={index} style={styles.carcinogenCard}>
+                <View style={styles.ingredientHeader}>
+                  <Text style={styles.ingredientName}>{item.name}</Text>
+                  <View style={styles.iarcBadge}>
+                    <Text style={styles.iarcText}>{item.iarc_group}</Text>
+                  </View>
+                </View>
+                <Text style={styles.cancerTypes}>Linked to: {item.cancer_types}</Text>
+                <Text style={styles.healthImpact}>{item.explanation}</Text>
+                <Text style={styles.carcinogenSource}>{item.source}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Chemical Breakdown Section */}
+        {analysis.chemical_breakdown && analysis.chemical_breakdown.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="flask" size={24} color="#FF9100" />
+              <Text style={styles.sectionTitle}>Chemical Breakdown</Text>
+            </View>
+            {analysis.chemical_breakdown.map((chem, index) => (
+              <View key={index} style={styles.chemicalCard}>
+                <View style={styles.chemicalHeader}>
+                  <Text style={styles.chemicalName}>{chem.name}</Text>
+                  <Text style={styles.chemicalCommon}>{chem.common_name}</Text>
+                </View>
+                <Text style={styles.chemicalPurpose}>Used for: {chem.purpose}</Text>
+                <Text style={styles.chemicalConcern}>{chem.health_concern}</Text>
+                {chem.banned_in ? (
+                  <View style={styles.bannedBadge}>
+                    <Ionicons name="ban" size={14} color="#FF5252" />
+                    <Text style={styles.bannedText}>Banned in: {chem.banned_in}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Healthier Alternatives Section */}
+        {analysis.healthier_alternatives && analysis.healthier_alternatives.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="swap-horizontal" size={24} color="#00E676" />
+              <Text style={styles.sectionTitle}>Healthier Alternatives</Text>
+            </View>
+            {analysis.healthier_alternatives.map((alt, index) => (
+              <View key={index} style={styles.alternativeCard}>
+                <View style={styles.altHeader}>
+                  <Ionicons name="leaf" size={20} color="#00E676" />
+                  <Text style={styles.altTitle}>{alt.product_type}</Text>
+                  <View style={styles.altScoreBadge}>
+                    <Text style={styles.altScoreText}>{alt.score_estimate}</Text>
+                  </View>
+                </View>
+                {alt.example_brands ? (
+                  <Text style={styles.altBrands}>Try: {alt.example_brands}</Text>
+                ) : null}
+                <Text style={styles.altReason}>{alt.why_better}</Text>
               </View>
             ))}
           </View>
@@ -723,5 +823,125 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 10,
     fontWeight: '500',
+  },
+  carcinogenCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF1744',
+  },
+  iarcBadge: {
+    backgroundColor: '#FF1744',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  iarcText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  cancerTypes: {
+    fontSize: 13,
+    color: '#FF8A80',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  carcinogenSource: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  chemicalCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9100',
+  },
+  chemicalHeader: {
+    marginBottom: 8,
+  },
+  chemicalName: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#FF9100',
+  },
+  chemicalCommon: {
+    fontSize: 14,
+    color: '#aaa',
+    marginTop: 2,
+  },
+  chemicalPurpose: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 6,
+  },
+  chemicalConcern: {
+    fontSize: 14,
+    color: '#fff',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  bannedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 82, 82, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  bannedText: {
+    fontSize: 12,
+    color: '#FF5252',
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+  alternativeCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#00E676',
+  },
+  altHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  altTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 8,
+    flex: 1,
+  },
+  altScoreBadge: {
+    backgroundColor: 'rgba(0, 230, 118, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  altScoreText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#00E676',
+  },
+  altBrands: {
+    fontSize: 14,
+    color: '#00E676',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  altReason: {
+    fontSize: 14,
+    color: '#ccc',
+    lineHeight: 20,
   },
 });

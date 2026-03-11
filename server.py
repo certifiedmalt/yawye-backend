@@ -458,7 +458,7 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
     try:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         
-        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional health risks.
+        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs), carcinogens, and nutritional health risks.
 
 Analyze this product: {product_name}
 
@@ -468,26 +468,43 @@ CRITICAL RULES:
 - If the product contains ALCOHOL (beer, wine, spirits, cider, etc.), it MUST score 1-3/10. Alcohol is a Group 1 carcinogen (WHO/IARC). Always flag it as high severity with health impact covering liver damage, cancer risk, addiction, and empty calories.
 - If the product contains HIGH SUGAR (soft drinks, energy drinks, sweets), score 1-4/10.
 - If the product contains HIGH CAFFEINE (energy drinks), flag the caffeine content as a concern.
+- ALWAYS check for known carcinogens and flag them with their IARC classification.
 
-HARMFUL ingredients to flag: alcohol/ethanol, seed oils, emulsifiers, artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars, high fructose corn syrup, sodium nitrite, MSG.
+KNOWN CARCINOGENS & CHEMICALS TO FLAG:
+- Group 1 (confirmed): Alcohol/ethanol, processed meat (nitrites/nitrates), aflatoxins
+- Group 2A (probable): Acrylamide (in fried/baked goods), red meat, glyphosate residues, styrene (from polystyrene packaging)
+- Group 2B (possible): BHA (E320), titanium dioxide (E171), aspartame (E951), carbon black, lead, 4-MEI (in caramel coloring E150d)
+- Endocrine disruptors: BPA (from can linings), phthalates
+- Other chemicals of concern: Sodium nitrite (E250), Potassium bromate, Propylparaben, TBHQ (E319), BHT (E321), Sodium benzoate (E211) + Vitamin C = benzene, Phosphoric acid, Tartrazine (E102), Carrageenan (E407)
 
-BENEFICIAL: proteins, vitamins, fiber, healthy fats, probiotics, whole grains, antioxidants.
+HARMFUL UPF ingredients: seed oils, emulsifiers (E471/E472), artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars, high fructose corn syrup, MSG (E621), maltodextrin, palm oil.
+
+BENEFICIAL: proteins, vitamins, fiber, healthy fats, omega-3, probiotics, whole grains, antioxidants, polyphenols.
 
 Respond with JSON only:
 {{
   "harmful_ingredients": [
-    {{"name": "ingredient", "health_impact": "2-3 sentences", "severity": "high/medium/low", "processing_level": "NOVA 4", "research_summary": "study citation", "study_link": "pubmed link"}}
+    {{"name": "ingredient", "health_impact": "2-3 sentences explaining what this does to the body", "severity": "high/medium/low", "processing_level": "NOVA 4", "research_summary": "study citation", "study_link": "pubmed link"}}
   ],
   "beneficial_ingredients": [
     {{"name": "ingredient", "health_benefit": "2-3 sentences", "benefit_type": "protein/vitamin/fiber", "key_nutrients": "list", "processing_level": "NOVA 1", "research_summary": "citation", "study_link": "link"}}
   ],
+  "carcinogens_found": [
+    {{"name": "chemical/ingredient name", "iarc_group": "Group 1/2A/2B/Endocrine Disruptor", "cancer_types": "types of cancer linked", "explanation": "1-2 sentences on how it causes harm", "source": "WHO/IARC/EFSA reference"}}
+  ],
+  "chemical_breakdown": [
+    {{"name": "E-number or chemical name", "common_name": "what it actually is", "purpose": "why its in the product", "health_concern": "1 sentence risk summary", "banned_in": "list countries where banned, or empty"}}
+  ],
+  "healthier_alternatives": [
+    {{"product_type": "what to look for instead", "example_brands": "2-3 specific brand examples if possible", "why_better": "1 sentence explaining why this is healthier", "score_estimate": "estimated score out of 10"}}
+  ],
   "overall_score": 1-10,
-  "upf_score": "percentage",
+  "upf_score": "percentage of ingredients that are ultra-processed",
   "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
-  "recommendation": "actionable advice"
+  "recommendation": "actionable advice on whether to consume and what to switch to"
 }}
 
-Scoring: 8-10 whole foods, 5-7 mixed, 1-4 ultra-processed. Alcohol products ALWAYS 1-3."""
+Scoring: 8-10 whole foods, 5-7 mixed, 1-4 ultra-processed. Alcohol ALWAYS 1-3. Products with Group 1 carcinogens should score no higher than 4."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
