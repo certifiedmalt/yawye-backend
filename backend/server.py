@@ -510,6 +510,9 @@ Respond with JSON only:
   "healthier_alternatives": [
     {{"product_type": "what to buy instead", "example_brands": "brand examples", "why_better": "reason", "score_estimate": "X/10"}}
   ],
+  "shocking_facts": [
+    {{"fact": "A single alarming but TRUE fact about an ingredient in this product. Focus on contradictions, bans, industrial uses, or comparisons that shock consumers. E.g. 'Banned in cosmetics but still in your food', 'Same cancer classification as tobacco', 'Used in industrial paint removal'.", "ingredient": "which ingredient"}}
+  ],
   "overall_score": 1-10,
   "upf_score": "percentage estimate",
   "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
@@ -629,6 +632,9 @@ Respond with JSON only:
   ],
   "healthier_alternatives": [
     {{"product_type": "what to look for instead", "example_brands": "2-3 specific brand examples if possible", "why_better": "1 sentence explaining why this is healthier", "score_estimate": "estimated score out of 10"}}
+  ],
+  "shocking_facts": [
+    {{"fact": "A single alarming but TRUE fact about an ingredient in this product. Focus on contradictions, bans, industrial uses, or comparisons that would shock a consumer. Examples: 'This dye is banned in cosmetics but still allowed in your food', 'This preservative shares a cancer classification with tobacco', 'This ingredient is used in industrial paint removal', 'Banned in 30+ countries but legal in the US/UK'. Make each fact specific to THIS product's actual ingredients.", "ingredient": "which ingredient this fact is about"}}
   ],
   "overall_score": 1-10,
   "upf_score": "percentage of ingredients that are ultra-processed",
