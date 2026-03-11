@@ -458,17 +458,20 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
     try:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         
-        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs).
+        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional health risks.
 
-Analyze these ingredients from {product_name}:
+Analyze this product: {product_name}
 
-{ingredients}
+Ingredients: {ingredients}
 
-Identify harmful UPF ingredients AND beneficial whole food nutrients.
+CRITICAL RULES:
+- If the product contains ALCOHOL (beer, wine, spirits, cider, etc.), it MUST score 1-3/10. Alcohol is a Group 1 carcinogen (WHO/IARC). Always flag it as high severity with health impact covering liver damage, cancer risk, addiction, and empty calories.
+- If the product contains HIGH SUGAR (soft drinks, energy drinks, sweets), score 1-4/10.
+- If the product contains HIGH CAFFEINE (energy drinks), flag the caffeine content as a concern.
 
-HARMFUL: seed oils, emulsifiers, artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars.
+HARMFUL ingredients to flag: alcohol/ethanol, seed oils, emulsifiers, artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars, high fructose corn syrup, sodium nitrite, MSG.
 
-BENEFICIAL: proteins, vitamins, fiber, healthy fats, probiotics.
+BENEFICIAL: proteins, vitamins, fiber, healthy fats, probiotics, whole grains, antioxidants.
 
 Respond with JSON only:
 {{
@@ -484,7 +487,7 @@ Respond with JSON only:
   "recommendation": "actionable advice"
 }}
 
-Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed."""
+Scoring: 8-10 whole foods, 5-7 mixed, 1-4 ultra-processed. Alcohol products ALWAYS 1-3."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
@@ -1389,9 +1392,40 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import mimetypes
 
+@app.delete("/api/marketing/video/{filename}")
+async def delete_marketing_video(filename: str):
+    safe_name = os.path.basename(filename)
+    file_path = f"/app/marketing/{safe_name}"
+    if os.path.exists(file_path) and safe_name.endswith(".mp4"):
+        os.remove(file_path)
+        return {"message": f"Deleted {safe_name}"}
+    raise HTTPException(status_code=404, detail="Video not found")
+
 @app.get("/api/marketing")
 async def marketing_catalog():
     """Serve the full marketing assets viewer with videos and images"""
+    marketing_dir = "/app/marketing"
+    video_cards = ""
+    if os.path.exists(marketing_dir):
+        for f in sorted(os.listdir(marketing_dir)):
+            if f.endswith(".mp4"):
+                size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
+                is_new = "ad_v2" in f
+                badge = '<span class="badge badge-new">NEW</span>' if is_new else ''
+                name = f.replace('.mp4','').replace('_',' ').title()
+                video_cards += f'''<div class="card" id="card-{f}" data-testid="video-card-{f}">
+                <video controls playsinline preload="metadata"><source src="/api/marketing/video/{f}" type="video/mp4"></video>
+                <div class="card-info">
+                    {badge}
+                    <h3>{name}</h3>
+                    <div class="meta">1280x720 | 8s | {size_mb}MB</div>
+                    <div class="btn-row">
+                        <a class="btn save-btn" href="/api/marketing/video/{f}" download data-testid="save-{f}">Save</a>
+                        <button class="btn share-btn" onclick="shareAsset('/api/marketing/video/{f}', '{name}')" data-testid="share-{f}">Share</button>
+                        <button class="btn del-btn" onclick="deleteVideo('{f}')" data-testid="delete-{f}">Delete</button>
+                    </div>
+                </div>
+            </div>'''
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1407,91 +1441,67 @@ async def marketing_catalog():
         .section { margin-bottom: 48px; }
         .desc { color: #888; font-size: 14px; margin: 8px 0 24px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
-        .card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 1px solid #333; }
+        .card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 1px solid #333; transition: opacity 0.4s, transform 0.4s; }
         .card:hover { border-color: #4CAF50; }
+        .card.removing { opacity: 0; transform: scale(0.9); }
         .card img { width: 100%; height: auto; }
         .card video { width: 100%; height: auto; background: #000; }
         .card-info { padding: 16px; }
         .card-info h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
-        .meta { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .meta { font-size: 12px; color: #888; margin-bottom: 10px; }
         .badge { font-size: 12px; color: #4CAF50; background: rgba(76,175,80,0.1); padding: 4px 10px; border-radius: 8px; display: inline-block; margin-bottom: 8px; }
         .badge-new { background: rgba(255,215,0,0.15); color: #FFD700; }
-        .dl-btn { display: inline-block; background: #4CAF50; color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }
-        .dl-btn:hover { background: #45a049; }
+        .btn-row { display: flex; gap: 8px; margin-top: 4px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
+        .save-btn { background: #4CAF50; color: #fff; }
+        .save-btn:hover { background: #45a049; transform: translateY(-1px); }
+        .share-btn { background: transparent; color: #2196F3; border: 1px solid #2196F3; }
+        .share-btn:hover { background: #2196F3; color: #fff; transform: translateY(-1px); }
+        .del-btn { background: transparent; color: #FF5252; border: 1px solid #FF5252; }
+        .del-btn:hover { background: #FF5252; color: #fff; transform: translateY(-1px); }
+        .img-btn-row { display: flex; gap: 8px; margin-top: 8px; }
+        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #1a1a1a; color: #fff; padding: 12px 24px; border-radius: 12px; border: 1px solid #333; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.3s; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { border-color: #4CAF50; }
+        .toast.error { border-color: #FF5252; }
     </style>
 </head>
 <body>
     <h1>You Are What You Eat</h1>
     <p class="subtitle">Marketing Assets Library</p>
+    <div id="toast" class="toast"></div>
 
     <div class="section">
         <h2>Video Clips</h2>
-        <p class="desc">AI-generated video clips (Sora 2). Click play to watch, or right-click to save.</p>
-        <div class="grid">
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_score_reveal_unhealthy.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <span class="badge badge-new">NEW</span>
-                    <h3>Score Reveal: Unhealthy Product</h3>
-                    <div class="meta">1280x720 | 8s | Phone showing 3/10 red score</div>
-                    <a class="dl-btn" href="/api/marketing/video/app_score_reveal_unhealthy.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/app_dashboard_hero.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <span class="badge badge-new">NEW</span>
-                    <h3>App Dashboard Hero Shot</h3>
-                    <div class="meta">1280x720 | 8s | Phone on kitchen counter showing app</div>
-                    <a class="dl-btn" href="/api/marketing/video/app_dashboard_hero.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip1_problem.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <h3>The Problem: Confused at Labels</h3>
-                    <div class="meta">1280x720 | 8s | Person reading ingredient labels</div>
-                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip1_problem.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_solution.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <h3>The Solution: Scanning with App</h3>
-                    <div class="meta">1280x720 | 8s | Person confidently scanning product</div>
-                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_solution.mp4" download>Download</a>
-                </div>
-            </div>
-            <div class="card">
-                <video controls playsinline preload="metadata"><source src="/api/marketing/video/yawye_ad_clip2_couple.mp4" type="video/mp4"></video>
-                <div class="card-info">
-                    <h3>Couple Shopping Together</h3>
-                    <div class="meta">1280x720 | 8s | Couple scanning a product</div>
-                    <a class="dl-btn" href="/api/marketing/video/yawye_ad_clip2_couple.mp4" download>Download</a>
-                </div>
-            </div>
+        <p class="desc">AI-generated video clips (Sora 2). Save to download or delete to remove.</p>
+        <div class="grid" id="video-grid">
+            """ + video_cards + """
         </div>
     </div>
 
     <div class="section">
         <h2>App Screenshots (Phone Mockups)</h2>
-        <p class="desc">AI-generated phone mockups matching the real app UI. Right-click to save.</p>
+        <p class="desc">AI-generated phone mockups matching the real app UI.</p>
         <div class="grid">
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" alt="Dashboard">
-                <div class="card-info"><h3>Dashboard Screen</h3><div class="meta">Play Store / Social Posts</div></div>
+                <div class="card-info"><h3>Dashboard Screen</h3><div class="meta">Play Store / Social Posts</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" download="dashboard.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png', 'Dashboard Screen')" data-testid="share-dashboard">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" alt="Scan">
-                <div class="card-info"><h3>Barcode Scanning Screen</h3><div class="meta">Play Store / Social Posts</div></div>
+                <div class="card-info"><h3>Barcode Scanning Screen</h3><div class="meta">Play Store / Social Posts</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" download="scan.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png', 'Barcode Scanning')" data-testid="share-scan">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" alt="Unhealthy">
-                <div class="card-info"><h3>Result: Unhealthy (3/10)</h3><div class="meta">Ad Creative - Problem</div></div>
+                <div class="card-info"><h3>Result: Unhealthy (3/10)</h3><div class="meta">Ad Creative - Problem</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" download="unhealthy_result.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png', 'Unhealthy Result')" data-testid="share-unhealthy">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" alt="Healthy">
-                <div class="card-info"><h3>Result: Healthy (9/10)</h3><div class="meta">Ad Creative - Solution</div></div>
+                <div class="card-info"><h3>Result: Healthy (9/10)</h3><div class="meta">Ad Creative - Solution</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" download="healthy_result.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png', 'Healthy Result')" data-testid="share-healthy">Share</button></div></div>
             </div>
         </div>
     </div>
@@ -1502,22 +1512,90 @@ async def marketing_catalog():
         <div class="grid">
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" alt="Banner">
-                <div class="card-info"><h3>Promo Banner (Wide)</h3><div class="meta">Facebook / Google Ads</div></div>
+                <div class="card-info"><h3>Promo Banner (Wide)</h3><div class="meta">Facebook / Google Ads</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" download="promo_banner.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png', 'Promo Banner')" data-testid="share-banner">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" alt="Comparison">
-                <div class="card-info"><h3>Before vs After</h3><div class="meta">Social / Ad Creative</div></div>
+                <div class="card-info"><h3>Before vs After</h3><div class="meta">Social / Ad Creative</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" download="comparison.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png', 'Before vs After')" data-testid="share-comparison">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" alt="Lifestyle">
-                <div class="card-info"><h3>Lifestyle Shopping</h3><div class="meta">Instagram Posts</div></div>
+                <div class="card-info"><h3>Lifestyle Shopping</h3><div class="meta">Instagram Posts</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" download="lifestyle.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png', 'Lifestyle Shopping')" data-testid="share-lifestyle">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" alt="IG Story">
-                <div class="card-info"><h3>SCAN. SCORE. KNOW.</h3><div class="meta">Instagram / TikTok Stories</div></div>
+                <div class="card-info"><h3>SCAN. SCORE. KNOW.</h3><div class="meta">Instagram / TikTok Stories</div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" download="ig_story.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png', 'SCAN SCORE KNOW')" data-testid="share-igstory">Share</button></div></div>
             </div>
         </div>
     </div>
+
+    <script>
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show ' + type;
+            setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        async function shareAsset(url, title) {
+            const fullUrl = window.location.origin + url;
+            if (url.startsWith('http')) {
+                // External URL (images), use as-is
+                var shareUrl = url;
+            } else {
+                var shareUrl = fullUrl;
+            }
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'You Are What You Eat - ' + title,
+                        text: 'Check out this marketing asset for YAWYE',
+                        url: shareUrl
+                    });
+                } catch(e) {
+                    if (e.name !== 'AbortError') copyToClipboard(shareUrl);
+                }
+            } else {
+                copyToClipboard(shareUrl);
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Link copied to clipboard', 'success');
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('Link copied to clipboard', 'success');
+            });
+        }
+
+        async function deleteVideo(filename) {
+            if (!confirm('Delete "' + filename.replace(/_/g,' ') + '"? This cannot be undone.')) return;
+            const card = document.getElementById('card-' + filename);
+            try {
+                const res = await fetch('/api/marketing/video/' + filename, { method: 'DELETE' });
+                if (res.ok) {
+                    card.classList.add('removing');
+                    setTimeout(() => card.remove(), 400);
+                    showToast('Deleted ' + filename, 'success');
+                } else {
+                    showToast('Failed to delete', 'error');
+                }
+            } catch(e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        }
+    </script>
 </body>
 </html>"""
     return HTMLResponse(content=html)

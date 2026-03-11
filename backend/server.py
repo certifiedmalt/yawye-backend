@@ -458,17 +458,20 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
     try:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         
-        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs).
+        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs) and nutritional health risks.
 
-Analyze these ingredients from {product_name}:
+Analyze this product: {product_name}
 
-{ingredients}
+Ingredients: {ingredients}
 
-Identify harmful UPF ingredients AND beneficial whole food nutrients.
+CRITICAL RULES:
+- If the product contains ALCOHOL (beer, wine, spirits, cider, etc.), it MUST score 1-3/10. Alcohol is a Group 1 carcinogen (WHO/IARC). Always flag it as high severity with health impact covering liver damage, cancer risk, addiction, and empty calories.
+- If the product contains HIGH SUGAR (soft drinks, energy drinks, sweets), score 1-4/10.
+- If the product contains HIGH CAFFEINE (energy drinks), flag the caffeine content as a concern.
 
-HARMFUL: seed oils, emulsifiers, artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars.
+HARMFUL ingredients to flag: alcohol/ethanol, seed oils, emulsifiers, artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars, high fructose corn syrup, sodium nitrite, MSG.
 
-BENEFICIAL: proteins, vitamins, fiber, healthy fats, probiotics.
+BENEFICIAL: proteins, vitamins, fiber, healthy fats, probiotics, whole grains, antioxidants.
 
 Respond with JSON only:
 {{
@@ -484,7 +487,7 @@ Respond with JSON only:
   "recommendation": "actionable advice"
 }}
 
-Score 8-10 for whole foods, 5-7 for mixed, 1-4 for ultra-processed."""
+Scoring: 8-10 whole foods, 5-7 mixed, 1-4 ultra-processed. Alcohol products ALWAYS 1-3."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
