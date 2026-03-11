@@ -1,0 +1,26 @@
+Generating clip 01c...
+Video generation initiated with ID: video_69b0b14dfd84819186fdf747ea48f9d3054e40ad719fae04
+Waiting for video generation to complete (ID: video_69b0b14dfd84819186fdf747ea48f9d3054e40ad719fae04)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (10s elapsed, status: queued, progress: 0%)
+Still processing... (23s elapsed, status: in_progress, progress: 40%)
+Still processing... (38s elapsed, status: in_progress, progress: 52%)
+Still processing... (56s elapsed, status: in_progress, progress: 76%)
+Still processing... (77s elapsed, status: in_progress, progress: 90%)
+Still processing... (138s elapsed, status: in_progress, progress: 90%)
+Still processing... (168s elapsed, status: in_progress, progress: 90%)
+Still processing... (199s elapsed, status: in_progress, progress: 90%)
+Still processing... (230s elapsed, status: in_progress, progress: 90%)
+Still processing... (260s elapsed, status: in_progress, progress: 90%)
+Still processing... (290s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b14dfd84819186fdf747ea48f9d3054e40ad719fae04/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b14dfd84819186fdf747ea48f9d3054e40ad719fae04/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b14dfd84819186fdf747ea48f9d3054e40ad719fae04/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0b14dfd84819186fdf747ea48f9d3054e40ad719fae04/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 4156705
+Downloaded 4156705 bytes
+Video saved to: /app/marketing/production/01c.mp4
+DONE: /app/marketing/production/01c.mp4 (4156705 bytes)
