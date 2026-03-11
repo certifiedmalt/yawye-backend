@@ -41,6 +41,7 @@ interface Analysis {
   carcinogens_found?: CarcinogenEntry[];
   chemical_breakdown?: ChemicalEntry[];
   healthier_alternatives?: AlternativeEntry[];
+  shocking_facts?: ShockingFact[];
   overall_score: number;
   upf_score?: string;
   processing_category?: string;
@@ -68,6 +69,11 @@ interface AlternativeEntry {
   example_brands: string;
   why_better: string;
   score_estimate: string;
+}
+
+interface ShockingFact {
+  fact: string;
+  ingredient: string;
 }
 
 interface ProductData {
@@ -212,6 +218,22 @@ export default function Result() {
           )}
           <Text style={styles.recommendation}>{analysis.recommendation}</Text>
         </View>
+
+        {/* Shocking Facts - "Did You Know?" Section */}
+        {analysis.shocking_facts && analysis.shocking_facts.length > 0 && (
+          <View style={styles.shockingSection}>
+            <View style={styles.shockingHeader}>
+              <Ionicons name="alert-circle" size={22} color="#FFD600" />
+              <Text style={styles.shockingTitle}>Did You Know?</Text>
+            </View>
+            {analysis.shocking_facts.map((item, index) => (
+              <View key={index} style={styles.shockingCard}>
+                <Text style={styles.shockingFact}>{item.fact}</Text>
+                <Text style={styles.shockingIngredient}>{item.ingredient}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {analysis.harmful_ingredients && analysis.harmful_ingredients.length > 0 && (
           <View style={styles.section}>
@@ -943,5 +965,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ccc',
     lineHeight: 20,
+  },
+  shockingSection: {
+    marginBottom: 20,
+    backgroundColor: 'rgba(255, 214, 0, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 214, 0, 0.25)',
+  },
+  shockingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  shockingTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFD600',
+    marginLeft: 8,
+  },
+  shockingCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFD600',
+  },
+  shockingFact: {
+    fontSize: 15,
+    color: '#fff',
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  shockingIngredient: {
+    fontSize: 12,
+    color: '#FFD600',
+    marginTop: 8,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
