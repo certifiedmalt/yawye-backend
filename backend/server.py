@@ -395,6 +395,32 @@ def fetch_from_upcitemdb(barcode: str) -> Optional[Dict[str, Any]]:
     
     return None
 
+def fetch_from_off_search(barcode: str) -> Optional[Dict[str, Any]]:
+    """Search Open Food Facts by barcode using their search API as a fallback"""
+    start_time = time.time()
+    try:
+        # Try the v2 search endpoint which sometimes finds products the direct lookup misses
+        search_url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={barcode}&search_simple=1&action=process&json=1&page_size=1"
+        response = requests.get(search_url, timeout=10)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            products = data.get("products", [])
+            if products:
+                product = products[0]
+                return {
+                    "product_name": product.get("product_name", "Unknown Product"),
+                    "brands": product.get("brands", "Unknown Brand"),
+                    "ingredients_text": product.get("ingredients_text", ""),
+                    "image_url": product.get("image_url", ""),
+                    "source": "openfoodfacts_search",
+                    "fetch_time": time.time() - start_time
+                }
+    except Exception as e:
+        logger.error(f"OFF Search error: {e}")
+    
+    return None
+
 # Models
 class UserRegister(BaseModel):
     email: EmailStr
@@ -453,10 +479,79 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+async def analyze_product_by_name(client, product_name: str) -> dict:
+    """When no ingredients list is available, use AI knowledge to analyze the product by name"""
+    try:
+        prompt = f"""You are a food science expert. The product "{product_name}" was scanned but no ingredient list was found in the database.
+
+Based on your knowledge of this product (or similar products with this name), provide your best analysis. If you recognize the product, analyze its typical ingredients. If not, indicate that clearly.
+
+CRITICAL: Do NOT default to 5/10. Analyze the product honestly:
+- Alcohol products: 1-3/10
+- Sugary drinks, crisps, sweets: 1-4/10
+- Processed ready meals: 3-5/10
+- Mixed items with some wholesome ingredients: 5-7/10
+- Whole/natural foods: 7-10/10
+
+Respond with JSON only:
+{{
+  "harmful_ingredients": [
+    {{"name": "ingredient", "health_impact": "explanation", "severity": "high/medium/low", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "pubmed link"}}
+  ],
+  "beneficial_ingredients": [
+    {{"name": "ingredient", "health_benefit": "explanation", "benefit_type": "type", "key_nutrients": "list", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "link"}}
+  ],
+  "carcinogens_found": [
+    {{"name": "chemical", "iarc_group": "Group classification", "cancer_types": "linked cancers", "explanation": "how it causes harm", "source": "reference"}}
+  ],
+  "chemical_breakdown": [
+    {{"name": "E-number or chemical", "common_name": "actual name", "purpose": "why used", "health_concern": "risk summary", "banned_in": "countries or empty"}}
+  ],
+  "healthier_alternatives": [
+    {{"product_type": "what to buy instead", "example_brands": "brand examples", "why_better": "reason", "score_estimate": "X/10"}}
+  ],
+  "overall_score": 1-10,
+  "upf_score": "percentage estimate",
+  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
+  "recommendation": "actionable advice",
+  "ingredients_estimated": true,
+  "confidence": "high/medium/low"
+}}"""
+
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a food science expert with encyclopedic knowledge of commercial food products worldwide. When you recognize a product, provide detailed analysis based on its typical formulation. Be honest about uncertainty. Respond only with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5,
+            response_format={"type": "json_object"}
+        )
+        
+        import json
+        result = json.loads(response.choices[0].message.content)
+        result["analysis_note"] = "Based on AI knowledge - no ingredient list was available from the database"
+        return result
+    except Exception as e:
+        logger.error(f"AI product-by-name analysis error: {e}")
+        return {
+            "harmful_ingredients": [],
+            "beneficial_ingredients": [],
+            "overall_score": 0,
+            "upf_score": "Unknown",
+            "processing_category": "Unknown",
+            "recommendation": f"Could not analyze '{product_name}'. No ingredient data available. Check the packaging directly.",
+            "analysis_note": "Analysis failed - no ingredient data available"
+        }
+
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
     """Analyze ingredients using OpenAI GPT-4o with focus on ultra-processed foods (UPFs)"""
     try:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        
+        # If no ingredients provided, use product-name-based analysis
+        if not ingredients or ingredients.strip() == "":
+            return await analyze_product_by_name(client, product_name)
         
         prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs), carcinogens, and nutritional health risks.
 
@@ -778,11 +873,16 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             product_data, source = results_without_ingredients[0]
             logger.info(f"Using {source} (no ingredients available)")
     
-    # STEP 3: If parallel calls all failed, try FatSecret as last resort
+    # STEP 3: If parallel calls all failed, try additional fallbacks
     if not product_data:
-        logger.info(f"All parallel sources failed for {barcode}, trying FatSecret")
-        product_data = fetch_from_fatsecret(barcode)
-        source = "fatsecret"
+        logger.info(f"All parallel sources failed for {barcode}, trying OFF search + FatSecret")
+        # Try OFF search API (different endpoint, sometimes finds products the direct lookup misses)
+        product_data = fetch_from_off_search(barcode)
+        if product_data:
+            source = "openfoodfacts_search"
+        else:
+            product_data = fetch_from_fatsecret(barcode)
+            source = "fatsecret"
     
     # STEP 4: If all sources fail, return 404
     if not product_data:
@@ -793,24 +893,53 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     # STEP 5: Check if we have ingredients (required for analysis)
     ingredients_text = product_data.get("ingredients_text", "")
     if not ingredients_text:
-        # Still return basic info even without ingredients
+        # No ingredients from database - use AI to analyze by product name
+        logger.info(f"No ingredients for {barcode}, using AI product-name analysis")
+        try:
+            analysis = await analyze_ingredients_with_ai(
+                product_data.get("product_name", "Unknown"),
+                ""  # Empty ingredients triggers product-by-name analysis
+            )
+        except Exception as e:
+            logger.error(f"AI name-based analysis failed: {e}")
+            analysis = {
+                "harmful_ingredients": [],
+                "beneficial_ingredients": [],
+                "overall_score": 0,
+                "recommendation": "No ingredient information available. Check the packaging for details.",
+                "analysis_note": "No ingredient data available from any source"
+            }
+        
         response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, source, response_time, "No ingredients")
+        await log_scan_analytics(barcode, True, source, response_time, "No ingredients - AI name analysis")
+        
+        product_data["analysis"] = analysis
+        
+        # Save scan
+        scan_doc = {
+            "user_id": str(current_user["_id"]),
+            "barcode": barcode,
+            "product_name": product_data.get("product_name"),
+            "brands": product_data.get("brands"),
+            "ingredients_text": "",
+            "image_url": product_data.get("image_url"),
+            "analysis": analysis,
+            "scanned_at": datetime.utcnow(),
+            "source": source
+        }
+        await scans_collection.insert_one(scan_doc)
+        await users_collection.update_one(
+            {"_id": current_user["_id"]},
+            {"$inc": {"total_scans": 1}}
+        )
         
         return {
             "product_name": product_data.get("product_name"),
             "brands": product_data.get("brands"),
             "ingredients_text": "",
             "image_url": product_data.get("image_url"),
-            "analysis": {
-                "harmful_ingredients": [],
-                "beneficial_ingredients": [],
-                "overall_score": 5,
-                "recommendation": "No ingredient information available for this product. Check the packaging for details.",
-                "nova_group": None,
-                "additives": []
-            },
-            "warning": "No ingredients found - limited analysis available"
+            "analysis": analysis,
+            "warning": "Ingredients not found in database - analysis based on AI product knowledge"
         }
     
     # STEP 6: Analyze ingredients with AI
