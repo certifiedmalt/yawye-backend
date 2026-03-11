@@ -559,22 +559,59 @@ Analyze this product: {product_name}
 
 Ingredients: {ingredients}
 
-CRITICAL RULES:
-- If the product contains ALCOHOL (beer, wine, spirits, cider, etc.), it MUST score 1-3/10. Alcohol is a Group 1 carcinogen (WHO/IARC). Always flag it as high severity with health impact covering liver damage, cancer risk, addiction, and empty calories.
-- If the product contains HIGH SUGAR (soft drinks, energy drinks, sweets), score 1-4/10.
-- If the product contains HIGH CAFFEINE (energy drinks), flag the caffeine content as a concern.
-- ALWAYS check for known carcinogens and flag them with their IARC classification.
+MANDATORY SCORE CAPS (override all other scoring):
+- ALCOHOL (beer, wine, spirits, cider, cocktails, alcopops): ALWAYS 1-3/10. Group 1 carcinogen. Flag liver damage, cancer risk, addiction, empty calories.
+- PROCESSED MEAT (bacon, sausages, ham, salami, hot dogs, pepperoni, chorizo, deli meat, corned beef, pate, meat pies with nitrites): ALWAYS 1-4/10. Group 1 carcinogen — same classification as tobacco and asbestos. Flag colorectal cancer, stomach cancer.
+- RED MEAT (beef, lamb, pork — unprocessed): Max 5/10. Group 2A probable carcinogen. Flag colorectal cancer risk.
+- HIGH SUGAR products (soft drinks, energy drinks, sweets, candy): ALWAYS 1-4/10.
+- HIGH CAFFEINE (energy drinks with >150mg caffeine): Flag cardiac risk.
+- Any product with 3+ carcinogens from the list below: Max 3/10.
 
-KNOWN CARCINOGENS & CHEMICALS TO FLAG:
-- Group 1 (confirmed): Alcohol/ethanol, processed meat (nitrites/nitrates), aflatoxins
-- Group 2A (probable): Acrylamide (in fried/baked goods), red meat, glyphosate residues, styrene (from polystyrene packaging)
-- Group 2B (possible): BHA (E320), titanium dioxide (E171), aspartame (E951), carbon black, lead, 4-MEI (in caramel coloring E150d)
-- Endocrine disruptors: BPA (from can linings), phthalates
-- Other chemicals of concern: Sodium nitrite (E250), Potassium bromate, Propylparaben, TBHQ (E319), BHT (E321), Sodium benzoate (E211) + Vitamin C = benzene, Phosphoric acid, Tartrazine (E102), Carrageenan (E407)
+CARCINOGENS & CHEMICALS TO FLAG:
+Group 1 (CONFIRMED carcinogens — same certainty as tobacco):
+- Alcohol/ethanol
+- Processed meat (via nitrites/nitrates forming nitrosamines)
+- Aflatoxins (found in improperly stored grains/nuts)
 
-HARMFUL UPF ingredients: seed oils, emulsifiers (E471/E472), artificial sweeteners, preservatives, artificial colors, modified starches, hydrogenated oils, added sugars, high fructose corn syrup, MSG (E621), maltodextrin, palm oil.
+Group 2A (PROBABLE carcinogens):
+- Acrylamide (formed in fried/baked starchy foods — crisps, chips, toast, biscuits)
+- Red meat (beef, lamb, pork)
+- Glyphosate residues (pesticide traces in non-organic grains)
+- Glycidyl esters / glycidol (formed when palm oil is refined at high temperatures)
+- Very hot beverages (>65C)
 
-BENEFICIAL: proteins, vitamins, fiber, healthy fats, omega-3, probiotics, whole grains, antioxidants, polyphenols.
+Group 2B (POSSIBLE carcinogens):
+- BHA / butylated hydroxyanisole (E320) — preservative in cereals, snacks
+- Titanium dioxide (E171) — whitening agent, BANNED in EU since 2022
+- Aspartame (E951) — artificial sweetener
+- 4-MEI / 4-methylimidazole (in caramel coloring E150d) — found in cola, soy sauce, dark beers
+- Carbon black (E153)
+- Lead (trace contamination)
+- Styrene (from polystyrene packaging leaching)
+- Red 3 / Erythrosine (E127) — banned in cosmetics, still in food
+- Allura Red / Red 40 (E129)
+- Sunset Yellow / Yellow 6 (E110)
+
+Endocrine disruptors:
+- BPA / Bisphenol A (from can linings, plastic packaging)
+- Phthalates (from plastic food packaging)
+- PFAS / forever chemicals (from microwave popcorn bags, fast food wrappers)
+
+Other dangerous chemicals:
+- Sodium nitrite (E250) — forms nitrosamines, colorectal cancer
+- Potassium bromate (E924) — flour treatment, BANNED in EU/UK/Canada/Brazil
+- Propylparaben (E217) — preservative, endocrine disruptor
+- TBHQ (E319) — preservative linked to tumors in animal studies
+- BHT / butylated hydroxytoluene (E321) — preservative
+- Sodium benzoate (E211) — when combined with vitamin C/citric acid forms BENZENE (known carcinogen)
+- Phosphoric acid (E338) — in cola, erodes bones and teeth
+- Brominated vegetable oil / BVO — BANNED in EU, still in some US drinks
+- Tartrazine / Yellow 5 (E102) — linked to hyperactivity, banned for children in EU
+- Carrageenan (E407) — intestinal inflammation
+
+HARMFUL UPF ingredients: seed oils (sunflower, rapeseed, soybean), emulsifiers (E471/E472/polysorbate 80), artificial sweeteners (sucralose, acesulfame K), preservatives, artificial colors, modified starches, hydrogenated/partially hydrogenated oils, added sugars, high fructose corn syrup, MSG (E621), maltodextrin, palm oil, dextrose, invert sugar syrup.
+
+BENEFICIAL: proteins, vitamins, minerals, fiber, healthy fats (olive oil, avocado, nuts), omega-3, probiotics, whole grains, antioxidants, polyphenols, iron, calcium, zinc.
 
 Respond with JSON only:
 {{
@@ -599,7 +636,7 @@ Respond with JSON only:
   "recommendation": "actionable advice on whether to consume and what to switch to"
 }}
 
-Scoring: 8-10 whole foods, 5-7 mixed, 1-4 ultra-processed. Alcohol ALWAYS 1-3. Products with Group 1 carcinogens should score no higher than 4."""
+STRICT SCORING: 8-10 whole/minimally processed foods only. 5-7 mixed. 1-4 ultra-processed. Alcohol ALWAYS 1-3. Processed meat ALWAYS 1-4. Products with ANY Group 1 carcinogen MUST score no higher than 4."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
