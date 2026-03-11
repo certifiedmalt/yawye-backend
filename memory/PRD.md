@@ -16,29 +16,31 @@ Build a mobile food scanning app that analyzes food products via barcode, provid
 - **AI**: OpenAI GPT-4o (via openai SDK, user API key)
 - **Monetization**: RevenueCat SDK, Google Play Billing, RevenueCat Webhooks
 - **Email**: Resend (domain verification pending)
+- **Video Gen**: Sora 2 (via Emergent LLM Key)
+- **Voiceover**: OpenAI TTS (via Emergent LLM Key)
+- **Video Assembly**: FFmpeg
 
 ## Architecture
 ```
 /
 ├── backend/
-│   ├── server.py       # FastAPI backend
+│   ├── server.py       # FastAPI backend (serves marketing library too)
 │   └── requirements.txt
 ├── frontend/
 │   ├── app/            # Expo Router pages
 │   ├── context/        # Auth + Subscription contexts
 │   └── utils/          # Subscription utilities
-├── marketing/          # Generated marketing assets
+├── marketing/
+│   ├── gen_clip.py             # Sora 2 clip generation script
+│   ├── gen_split_voiceovers.py # OpenAI TTS voiceover generation
+│   ├── assemble_v4.sh          # FFmpeg 4-part video assembly (logo + text + VO)
+│   ├── production/             # Generated clips and voiceovers
+│   ├── voiceovers/split/       # Per-clip voiceover audio files
+│   ├── real_icon_watermark.png # App logo for video watermarking
+│   └── FINAL_*.mp4             # Finished assembled ad videos
 ├── server.py           # Railway deployment copy
 └── requirements.txt    # Railway deployment copy
 ```
-
-## Key Screens
-1. Login/Register (dark theme, green accents)
-2. Main Dashboard (greeting, stats, scan button, health streak, assistant)
-3. Barcode Scanner (camera with green corner brackets)
-4. Result Screen (circular health score ring, harmful/beneficial ingredients)
-5. Health Assistant (AI chat with disclaimer)
-6. Daily Quiz & Achievements (gamification)
 
 ## Key API Endpoints
 - `POST /api/scan` - Scan barcode, analyze with GPT-4o
@@ -46,50 +48,59 @@ Build a mobile food scanning app that analyzes food products via barcode, provid
 - `POST /api/subscription/upgrade` - Manual subscription upgrade fallback
 - `POST /api/assistant/chat` - AI health assistant
 - `GET /api/gamification/stats` - Streak & XP data
-- `POST /api/gamification/update-streak` - Update streak after scan
+- `GET /api/marketing` - Marketing asset library page
+- `GET /api/marketing/video/{filename}` - Serve individual video
+- `DELETE /api/marketing/video/{filename}` - Delete marketing asset
 
 ## What's Been Implemented
 - Full barcode scanning with OpenFood Facts API + GPT-4o analysis
 - User auth (register, login, forgot password)
-- Subscription system (RevenueCat + Google Play Billing + webhook)
+- Subscription system (RevenueCat + Google Play Billing + webhook) - VERIFIED WORKING
 - Gamification (streaks, XP, daily quests, achievements)
-- Health Assistant AI chat
+- Health Assistant AI chat (GPT-4o) - FIXED and deployed
 - Push notifications
 - App version v1.0.26 live on Google Play
+- Full automated video ad pipeline (Sora 2 + TTS + FFmpeg)
+- Marketing asset library with Save/Delete
 
 ## Pending Issues
-1. **P0**: End-to-end subscription flow needs real user validation
-2. **P1**: Password reset emails blocked (Resend domain not verified)
-3. **P2**: Health Assistant keyboard may hide text input
-4. **P2**: Splash screen may show generic logo
+1. **P1**: Password reset emails blocked (Resend domain not verified by user)
+2. **P2**: Health Assistant keyboard may hide text input (user verification pending)
+3. **P2**: Splash screen may show generic logo (user verification pending)
 
-## Completed Tasks (This Session - March 10, 2026)
-- Generated 8 AI marketing images (phone mockups, banners, lifestyle, comparison, IG story)
-- Generated 2 new Sora 2 video clips (app score reveal, dashboard hero)
-- Created marketing assets catalog (assets-catalog.html)
+## Completed Marketing Videos (13 total)
+
+### Original 8 Videos (Scripts 01-14, 3-clip format)
+- FINAL_01.mp4 - Fridge Score Expose
+- FINAL_01_upf_shock_test.mp4 - UPF Shock Test
+- FINAL_02.mp4 - Gym Bro Protein Shake
+- FINAL_03.mp4 - Date Night Dinner
+- FINAL_07.mp4 - Breakfast Betrayal
+- FINAL_09.mp4 - Influencer Fraud
+- FINAL_12.mp4 - Parents Snack Check
+- FINAL_13.mp4 - Meal Deal Lunch
+- FINAL_14.mp4 - PT Protein Bar
+
+### New 5 Videos (Scripts 16-20, 4-clip format, ~18-19s each)
+- FINAL_16.mp4 (2.7MB, 19s) - First Scan Discovery
+- FINAL_17.mp4 (3.5MB, 17s) - Teaching Mum
+- FINAL_18.mp4 (4.8MB, 19s) - 7-Day Challenge
+- FINAL_19.mp4 (4.2MB, 18s) - The Mate Challenge
+- FINAL_20.mp4 (4.8MB, 19s) - Supermarket Warrior
+
+All videos feature: real app logo watermark, synced male voiceover, text overlays, brand green (#00E676) CTA.
 
 ## Upcoming Tasks
-1. **P0**: Submit latest build to Google Play
+1. **P1**: Submit latest build to Google Play
 2. **P1**: iOS App Store Connect setup
-3. **P1**: RevenueCat for Amazon IAP
-4. **P2**: Deploy static website to GitHub Pages
+3. **P2**: UPF-focused landing page for ad campaigns
+4. **P2**: Deploy static website (privacy/terms) to GitHub Pages
 
 ## Future/Backlog
 - Multi-language support (i18n)
 - Samsung Galaxy Store publishing
-- Fix Railway deployment duplication (root directory config)
-
-## Marketing Assets Generated
-### Images (8 total)
-- Dashboard mockup, Scan screen mockup, Unhealthy result (3/10), Healthy result (9/10)
-- Wide promo banner, Before/After comparison, Lifestyle shopping photo, Instagram story ad
-
-### Videos (5 total)
-- app_score_reveal_unhealthy.mp4 (NEW - phone showing 3/10 score)
-- app_dashboard_hero.mp4 (NEW - phone on kitchen counter)
-- yawye_ad_clip1_problem.mp4 (person confused at labels)
-- yawye_ad_clip2_solution.mp4 (person scanning with app)
-- yawye_ad_clip2_couple.mp4 (couple shopping together)
+- Fix Railway deployment duplication (rootDirectory config)
+- RevenueCat for Amazon IAP
 
 ## Credentials
 - Admin: jpsaila1986@gmail.com / hello123
