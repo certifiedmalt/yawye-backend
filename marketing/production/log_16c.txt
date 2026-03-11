@@ -1,4 +1,20 @@
-  File "/app/marketing/gen_clip.py", line 48
-    print(f"FAILED: {e,
-          ^
-SyntaxError: unterminated string literal (detected at line 48)
+Generating clip 16c...
+Video generation initiated with ID: video_69b0bdd872ec8191a85f92c42f02f8440ea9aadaa604b942
+Waiting for video generation to complete (ID: video_69b0bdd872ec8191a85f92c42f02f8440ea9aadaa604b942)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (10s elapsed, status: queued, progress: 0%)
+Still processing... (23s elapsed, status: in_progress, progress: 10%)
+Still processing... (38s elapsed, status: in_progress, progress: 52%)
+Still processing... (83s elapsed, status: in_progress, progress: 99%)
+Still processing... (104s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0bdd872ec8191a85f92c42f02f8440ea9aadaa604b942/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0bdd872ec8191a85f92c42f02f8440ea9aadaa604b942/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0bdd872ec8191a85f92c42f02f8440ea9aadaa604b942/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0bdd872ec8191a85f92c42f02f8440ea9aadaa604b942/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 3099001
+Downloaded 3099001 bytes
+Video saved to: /app/marketing/production/16c.mp4
+DONE: /app/marketing/production/16c.mp4 (3099001 bytes)
