@@ -1418,6 +1418,7 @@ async def marketing_catalog():
                     <div class="meta">1280x720 | 8s | {size_mb}MB</div>
                     <div class="btn-row">
                         <a class="btn save-btn" href="/api/marketing/video/{f}" download data-testid="save-{f}">Save</a>
+                        <button class="btn share-btn" onclick="shareAsset('/api/marketing/video/{f}', '{name}')" data-testid="share-{f}">Share</button>
                         <button class="btn del-btn" onclick="deleteVideo('{f}')" data-testid="delete-{f}">Delete</button>
                     </div>
                 </div>
@@ -1451,6 +1452,8 @@ async def marketing_catalog():
         .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; }
         .save-btn { background: #4CAF50; color: #fff; }
         .save-btn:hover { background: #45a049; transform: translateY(-1px); }
+        .share-btn { background: transparent; color: #2196F3; border: 1px solid #2196F3; }
+        .share-btn:hover { background: #2196F3; color: #fff; transform: translateY(-1px); }
         .del-btn { background: transparent; color: #FF5252; border: 1px solid #FF5252; }
         .del-btn:hover { background: #FF5252; color: #fff; transform: translateY(-1px); }
         .img-btn-row { display: flex; gap: 8px; margin-top: 8px; }
@@ -1480,22 +1483,22 @@ async def marketing_catalog():
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" alt="Dashboard">
                 <div class="card-info"><h3>Dashboard Screen</h3><div class="meta">Play Store / Social Posts</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" download="dashboard.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png" download="dashboard.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bfa301dc173e39940ba3dc39168891b7a822285cbe7db660e9c91b838f839688.png', 'Dashboard Screen')" data-testid="share-dashboard">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" alt="Scan">
                 <div class="card-info"><h3>Barcode Scanning Screen</h3><div class="meta">Play Store / Social Posts</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" download="scan.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png" download="scan.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/c00f5806aaf51dec2d3dbd443d45b030eca647ff35ba31bea0ba3783865a64f1.png', 'Barcode Scanning')" data-testid="share-scan">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" alt="Unhealthy">
                 <div class="card-info"><h3>Result: Unhealthy (3/10)</h3><div class="meta">Ad Creative - Problem</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" download="unhealthy_result.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png" download="unhealthy_result.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/291b690b2118fbd86a99e1f474e1914e815596d5cdfe3e4b688cc4e919410dbb.png', 'Unhealthy Result')" data-testid="share-unhealthy">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" alt="Healthy">
                 <div class="card-info"><h3>Result: Healthy (9/10)</h3><div class="meta">Ad Creative - Solution</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" download="healthy_result.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png" download="healthy_result.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/1614e64b0d3a205d014c507c591f8a87356cb7eeae9eb1888176d7c35dc95e38.png', 'Healthy Result')" data-testid="share-healthy">Share</button></div></div>
             </div>
         </div>
     </div>
@@ -1507,22 +1510,22 @@ async def marketing_catalog():
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" alt="Banner">
                 <div class="card-info"><h3>Promo Banner (Wide)</h3><div class="meta">Facebook / Google Ads</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" download="promo_banner.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png" download="promo_banner.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/4b4486bd747f67380d17b2b87913c12b5c83e9bd24072e205eb822648772b0f1.png', 'Promo Banner')" data-testid="share-banner">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" alt="Comparison">
                 <div class="card-info"><h3>Before vs After</h3><div class="meta">Social / Ad Creative</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" download="comparison.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png" download="comparison.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/a6dd97679a6afd03ba228468a49be2754d2adbc4df3bb27c7a8a57ac97ad7bb7.png', 'Before vs After')" data-testid="share-comparison">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" alt="Lifestyle">
                 <div class="card-info"><h3>Lifestyle Shopping</h3><div class="meta">Instagram Posts</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" download="lifestyle.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png" download="lifestyle.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/bd83b3e39253e9ff29ec2d57986e544cb6b8df2c3df7174eefc5b02c9a64f2dd.png', 'Lifestyle Shopping')" data-testid="share-lifestyle">Share</button></div></div>
             </div>
             <div class="card">
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" alt="IG Story">
                 <div class="card-info"><h3>SCAN. SCORE. KNOW.</h3><div class="meta">Instagram / TikTok Stories</div>
-                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" download="ig_story.png">Save</a></div></div>
+                <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" download="ig_story.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png', 'SCAN SCORE KNOW')" data-testid="share-igstory">Share</button></div></div>
             </div>
         </div>
     </div>
@@ -1533,6 +1536,44 @@ async def marketing_catalog():
             t.textContent = msg;
             t.className = 'toast show ' + type;
             setTimeout(() => t.className = 'toast', 3000);
+        }
+
+        async function shareAsset(url, title) {
+            const fullUrl = window.location.origin + url;
+            if (url.startsWith('http')) {
+                // External URL (images), use as-is
+                var shareUrl = url;
+            } else {
+                var shareUrl = fullUrl;
+            }
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'You Are What You Eat - ' + title,
+                        text: 'Check out this marketing asset for YAWYE',
+                        url: shareUrl
+                    });
+                } catch(e) {
+                    if (e.name !== 'AbortError') copyToClipboard(shareUrl);
+                }
+            } else {
+                copyToClipboard(shareUrl);
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Link copied to clipboard', 'success');
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('Link copied to clipboard', 'success');
+            });
         }
 
         async function deleteVideo(filename) {
