@@ -1,0 +1,4 @@
+  File "/app/marketing/gen_clip.py", line 48
+    print(f"FAILED: {e,
+          ^
+SyntaxError: unterminated string literal (detected at line 48)
