@@ -1,0 +1,22 @@
+Generating clip 21d...
+Video generation initiated with ID: video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3
+Waiting for video generation to complete (ID: video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3)...
+Error checking status: 400 Client Error: Bad Request for url: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3
+Error checking status: 400 Client Error: Bad Request for url: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3
+Still processing... (22s elapsed, status: in_progress, progress: 10%)
+Still processing... (34s elapsed, status: in_progress, progress: 52%)
+Still processing... (46s elapsed, status: in_progress, progress: 64%)
+Still processing... (61s elapsed, status: in_progress, progress: 84%)
+Still processing... (79s elapsed, status: in_progress, progress: 90%)
+Still processing... (100s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b25470f5a08190afac7c1e60102d440e41590d3a0d1bb3/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 3190701
+Downloaded 3190701 bytes
+Video saved to: /app/marketing/production/21d.mp4
+DONE: /app/marketing/production/21d.mp4 (3190701 bytes)
