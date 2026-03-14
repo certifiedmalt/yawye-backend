@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -1585,16 +1585,26 @@ import mimetypes
 async def delete_marketing_video(filename: str):
     safe_name = os.path.basename(filename)
     file_path = f"/app/marketing/{safe_name}"
-    if os.path.exists(file_path) and safe_name.endswith(".mp4"):
+    if os.path.exists(file_path) and (safe_name.endswith(".mp4") or safe_name.endswith(".png")):
         os.remove(file_path)
         return {"message": f"Deleted {safe_name}"}
-    raise HTTPException(status_code=404, detail="Video not found")
+    raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/api/marketing/file/{filename}")
+async def serve_marketing_file(filename: str):
+    safe_name = os.path.basename(filename)
+    file_path = f"/app/marketing/{safe_name}"
+    if os.path.exists(file_path):
+        media_type = "image/png" if safe_name.endswith(".png") else "video/mp4"
+        return FileResponse(file_path, media_type=media_type, filename=safe_name)
+    raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/api/marketing")
 async def marketing_catalog():
     """Serve the full marketing assets viewer with videos and images"""
     marketing_dir = "/app/marketing"
     video_cards = ""
+    appstore_cards = ""
     if os.path.exists(marketing_dir):
         for f in sorted(os.listdir(marketing_dir)):
             if f.endswith(".mp4"):
@@ -1612,6 +1622,20 @@ async def marketing_catalog():
                         <a class="btn save-btn" href="/api/marketing/video/{f}" download data-testid="save-{f}">Save</a>
                         <button class="btn share-btn" onclick="shareAsset('/api/marketing/video/{f}', '{name}')" data-testid="share-{f}">Share</button>
                         <button class="btn del-btn" onclick="deleteVideo('{f}')" data-testid="delete-{f}">Delete</button>
+                    </div>
+                </div>
+            </div>'''
+            elif f.startswith("APPSTORE_") and f.endswith(".png"):
+                size_kb = round(os.path.getsize(os.path.join(marketing_dir, f)) / 1024)
+                name = f.replace('.png','').replace('_',' ').replace('APPSTORE ', '').title()
+                appstore_cards += f'''<div class="card" id="card-{f}" data-testid="screenshot-card-{f}">
+                <img src="/api/marketing/file/{f}" style="width:100%;border-radius:8px;" loading="lazy" />
+                <div class="card-info">
+                    <h3>{name}</h3>
+                    <div class="meta">1284x2778 | {size_kb}KB | App Store Ready</div>
+                    <div class="btn-row">
+                        <a class="btn save-btn" href="/api/marketing/file/{f}" download="{f}" data-testid="save-{f}">Save</a>
+                        <button class="btn share-btn" onclick="shareAsset('/api/marketing/file/{f}', '{name}')" data-testid="share-{f}">Share</button>
                     </div>
                 </div>
             </div>'''
@@ -1665,6 +1689,14 @@ async def marketing_catalog():
         <p class="desc">AI-generated video clips (Sora 2). Save to download or delete to remove.</p>
         <div class="grid" id="video-grid">
             """ + video_cards + """
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>App Store Screenshots (1284x2778)</h2>
+        <p class="desc">Real app screenshots resized for Apple App Store. Save and upload directly to App Store Connect.</p>
+        <div class="grid">
+            """ + appstore_cards + """
         </div>
     </div>
 
@@ -1807,6 +1839,27 @@ async def list_marketing_videos():
                 size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
                 videos.append({"filename": f, "size_mb": size_mb, "url": f"/api/marketing/video/{f}"})
     return {"videos": videos}
+
+# ============ WEBSITE PAGES ============
+@app.get("/", response_class=HTMLResponse)
+async def website_home():
+    with open("/app/website-public/index.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/privacy-policy", response_class=HTMLResponse)
+async def website_privacy():
+    with open("/app/website-public/privacy-policy.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/terms-of-service", response_class=HTMLResponse)
+async def website_terms():
+    with open("/app/website-public/terms-of-service.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/support", response_class=HTMLResponse)
+async def website_support():
+    with open("/app/website-public/index.html", "r") as f:
+        return HTMLResponse(content=f.read())
 
 if __name__ == "__main__":
     import uvicorn
