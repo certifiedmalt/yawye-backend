@@ -1612,7 +1612,8 @@ async def marketing_catalog():
                 is_new = "ad_v2" in f
                 badge = '<span class="badge badge-new">NEW</span>' if is_new else ''
                 name = f.replace('.mp4','').replace('_',' ').title()
-                video_cards += f'''<div class="card" id="card-{f}" data-testid="video-card-{f}">
+                video_cards += f'''<div class="card" id="card-{f}" data-testid="video-card-{f}" data-url="/api/marketing/video/{f}" data-name="{name}" data-type="video">
+                <div class="select-check" onclick="toggleSelect(this)" data-testid="select-{f}"></div>
                 <video controls playsinline preload="metadata"><source src="/api/marketing/video/{f}" type="video/mp4"></video>
                 <div class="card-info">
                     {badge}
@@ -1628,7 +1629,8 @@ async def marketing_catalog():
             elif f.startswith("APPSTORE_") and f.endswith(".png"):
                 size_kb = round(os.path.getsize(os.path.join(marketing_dir, f)) / 1024)
                 name = f.replace('.png','').replace('_',' ').replace('APPSTORE ', '').title()
-                appstore_cards += f'''<div class="card" id="card-{f}" data-testid="screenshot-card-{f}">
+                appstore_cards += f'''<div class="card" id="card-{f}" data-testid="screenshot-card-{f}" data-url="/api/marketing/file/{f}" data-name="{name}" data-type="image">
+                <div class="select-check" onclick="toggleSelect(this)" data-testid="select-{f}"></div>
                 <img src="/api/marketing/file/{f}" style="width:100%;border-radius:8px;" loading="lazy" />
                 <div class="card-info">
                     <h3>{name}</h3>
@@ -1642,7 +1644,8 @@ async def marketing_catalog():
             elif f.startswith("IPAD_APPSTORE_") and f.endswith(".png"):
                 size_kb = round(os.path.getsize(os.path.join(marketing_dir, f)) / 1024)
                 name = f.replace('.png','').replace('_',' ').replace('IPAD APPSTORE ', 'iPad: ').title()
-                appstore_cards += f'''<div class="card" id="card-{f}" data-testid="screenshot-card-{f}">
+                appstore_cards += f'''<div class="card" id="card-{f}" data-testid="screenshot-card-{f}" data-url="/api/marketing/file/{f}" data-name="{name}" data-type="image">
+                <div class="select-check" onclick="toggleSelect(this)" data-testid="select-{f}"></div>
                 <img src="/api/marketing/file/{f}" style="width:100%;border-radius:8px;" loading="lazy" />
                 <div class="card-info">
                     <span class="badge badge-new">iPAD</span>
@@ -1662,15 +1665,16 @@ async def marketing_catalog():
     <title>YAWYE Marketing Assets</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 24px; }
+        body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 24px; padding-bottom: 120px; }
         h1 { font-size: 32px; color: #4CAF50; text-align: center; margin-bottom: 8px; }
         .subtitle { color: #888; text-align: center; margin-bottom: 48px; }
         h2 { font-size: 22px; color: #fff; margin-bottom: 8px; border-bottom: 2px solid #4CAF50; display: inline-block; padding-bottom: 6px; }
         .section { margin-bottom: 48px; }
         .desc { color: #888; font-size: 14px; margin: 8px 0 24px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
-        .card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 1px solid #333; transition: opacity 0.4s, transform 0.4s; }
+        .card { background: #1a1a1a; border-radius: 16px; overflow: hidden; border: 1px solid #333; transition: opacity 0.4s, transform 0.4s, border-color 0.2s; position: relative; }
         .card:hover { border-color: #4CAF50; }
+        .card.selected { border-color: #2196F3; box-shadow: 0 0 0 2px rgba(33,150,243,0.3); }
         .card.removing { opacity: 0; transform: scale(0.9); }
         .card img { width: 100%; height: auto; }
         .card video { width: 100%; height: auto; background: #000; }
@@ -1692,6 +1696,18 @@ async def marketing_catalog():
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.success { border-color: #4CAF50; }
         .toast.error { border-color: #FF5252; }
+        .select-check { position: absolute; top: 12px; left: 12px; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.5); cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 14px; color: transparent; }
+        .select-check:hover { border-color: #2196F3; background: rgba(33,150,243,0.2); }
+        .select-check.checked { background: #2196F3; border-color: #2196F3; color: #fff; }
+        .bulk-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-top: 2px solid #2196F3; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 1000; transform: translateY(100%); transition: transform 0.3s; }
+        .bulk-bar.visible { transform: translateY(0); }
+        .bulk-bar .bulk-info { font-size: 15px; font-weight: 600; color: #fff; }
+        .bulk-bar .bulk-info span { color: #2196F3; }
+        .bulk-bar .bulk-actions { display: flex; gap: 10px; align-items: center; }
+        .bulk-bar .bulk-actions .btn { padding: 10px 22px; font-size: 14px; }
+        .select-all-btn { background: transparent; color: #aaa; border: 1px solid #555; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; margin-left: 12px; }
+        .select-all-btn:hover { color: #fff; border-color: #2196F3; }
+        .section-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -1700,7 +1716,10 @@ async def marketing_catalog():
     <div id="toast" class="toast"></div>
 
     <div class="section">
-        <h2>Video Clips</h2>
+        <div class="section-header">
+            <h2>Video Clips</h2>
+            <button class="select-all-btn" onclick="selectAllInSection('video-grid')" data-testid="select-all-videos">Select All</button>
+        </div>
         <p class="desc">AI-generated video clips (Sora 2). Save to download or delete to remove.</p>
         <div class="grid" id="video-grid">
             """ + video_cards + """
@@ -1708,9 +1727,12 @@ async def marketing_catalog():
     </div>
 
     <div class="section">
-        <h2>App Store Screenshots</h2>
+        <div class="section-header">
+            <h2>App Store Screenshots</h2>
+            <button class="select-all-btn" onclick="selectAllInSection('screenshot-grid')" data-testid="select-all-screenshots">Select All</button>
+        </div>
         <p class="desc">Real app screenshots for iPhone (1284x2778) and iPad (2048x2732). Save and upload directly to App Store Connect.</p>
-        <div class="grid">
+        <div class="grid" id="screenshot-grid">
             """ + appstore_cards + """
         </div>
     </div>
@@ -1769,7 +1791,110 @@ async def marketing_catalog():
         </div>
     </div>
 
+    <div class="bulk-bar" id="bulk-bar" data-testid="bulk-action-bar">
+        <div class="bulk-info"><span id="select-count">0</span> items selected</div>
+        <div class="bulk-actions">
+            <button class="btn" style="background:transparent;color:#aaa;border:1px solid #555;" onclick="clearSelection()" data-testid="clear-selection-btn">Clear</button>
+            <button class="btn save-btn" onclick="downloadSelected()" data-testid="download-selected-btn">Download All</button>
+            <button class="btn share-btn" onclick="shareSelected()" data-testid="share-selected-btn">Share All</button>
+        </div>
+    </div>
+
     <script>
+        const selected = new Set();
+
+        function toggleSelect(el) {
+            const card = el.closest('.card');
+            const url = card.dataset.url;
+            if (el.classList.contains('checked')) {
+                el.classList.remove('checked');
+                el.textContent = '';
+                card.classList.remove('selected');
+                selected.delete(card);
+            } else {
+                el.classList.add('checked');
+                el.textContent = '\\u2713';
+                card.classList.add('selected');
+                selected.add(card);
+            }
+            updateBulkBar();
+        }
+
+        function updateBulkBar() {
+            const bar = document.getElementById('bulk-bar');
+            const count = document.getElementById('select-count');
+            count.textContent = selected.size;
+            bar.classList.toggle('visible', selected.size > 0);
+        }
+
+        function selectAllInSection(gridId) {
+            const grid = document.getElementById(gridId);
+            const checks = grid.querySelectorAll('.select-check');
+            const allSelected = Array.from(checks).every(c => c.classList.contains('checked'));
+            checks.forEach(el => {
+                const card = el.closest('.card');
+                if (allSelected) {
+                    el.classList.remove('checked');
+                    el.textContent = '';
+                    card.classList.remove('selected');
+                    selected.delete(card);
+                } else {
+                    el.classList.add('checked');
+                    el.textContent = '\\u2713';
+                    card.classList.add('selected');
+                    selected.add(card);
+                }
+            });
+            updateBulkBar();
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.select-check.checked').forEach(el => {
+                el.classList.remove('checked');
+                el.textContent = '';
+                el.closest('.card').classList.remove('selected');
+            });
+            selected.clear();
+            updateBulkBar();
+        }
+
+        async function downloadSelected() {
+            if (selected.size === 0) return;
+            showToast('Starting download of ' + selected.size + ' items...', 'success');
+            let delay = 0;
+            selected.forEach(card => {
+                const url = card.dataset.url;
+                const name = card.dataset.name || 'asset';
+                setTimeout(() => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = url.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }, delay);
+                delay += 300;
+            });
+        }
+
+        async function shareSelected() {
+            if (selected.size === 0) return;
+            const urls = [];
+            selected.forEach(card => {
+                const url = card.dataset.url;
+                if (url.startsWith('http')) urls.push(url);
+                else urls.push(window.location.origin + url);
+            });
+            const text = 'YAWYE Marketing Assets:\\n' + urls.join('\\n');
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: 'YAWYE Assets (' + selected.size + ' items)', text: text });
+                } catch(e) { if (e.name !== 'AbortError') copyToClipboard(text); }
+            } else {
+                copyToClipboard(text);
+            }
+        }
+
         function showToast(msg, type) {
             const t = document.getElementById('toast');
             t.textContent = msg;
@@ -1780,22 +1905,14 @@ async def marketing_catalog():
         async function shareAsset(url, title) {
             const fullUrl = window.location.origin + url;
             if (url.startsWith('http')) {
-                // External URL (images), use as-is
                 var shareUrl = url;
             } else {
                 var shareUrl = fullUrl;
             }
-            
             if (navigator.share) {
                 try {
-                    await navigator.share({
-                        title: 'You Are What You Eat - ' + title,
-                        text: 'Check out this marketing asset for YAWYE',
-                        url: shareUrl
-                    });
-                } catch(e) {
-                    if (e.name !== 'AbortError') copyToClipboard(shareUrl);
-                }
+                    await navigator.share({ title: 'You Are What You Eat - ' + title, text: 'Check out this marketing asset for YAWYE', url: shareUrl });
+                } catch(e) { if (e.name !== 'AbortError') copyToClipboard(shareUrl); }
             } else {
                 copyToClipboard(shareUrl);
             }
@@ -1821,6 +1938,8 @@ async def marketing_catalog():
             try {
                 const res = await fetch('/api/marketing/video/' + filename, { method: 'DELETE' });
                 if (res.ok) {
+                    selected.delete(card);
+                    updateBulkBar();
                     card.classList.add('removing');
                     setTimeout(() => card.remove(), 400);
                     showToast('Deleted ' + filename, 'success');
