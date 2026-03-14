@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -1839,6 +1839,27 @@ async def list_marketing_videos():
                 size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
                 videos.append({"filename": f, "size_mb": size_mb, "url": f"/api/marketing/video/{f}"})
     return {"videos": videos}
+
+# ============ WEBSITE PAGES ============
+@app.get("/", response_class=HTMLResponse)
+async def website_home():
+    with open("/app/website-public/index.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/privacy-policy", response_class=HTMLResponse)
+async def website_privacy():
+    with open("/app/website-public/privacy-policy.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/terms-of-service", response_class=HTMLResponse)
+async def website_terms():
+    with open("/app/website-public/terms-of-service.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/support", response_class=HTMLResponse)
+async def website_support():
+    with open("/app/website-public/index.html", "r") as f:
+        return HTMLResponse(content=f.read())
 
 if __name__ == "__main__":
     import uvicorn
