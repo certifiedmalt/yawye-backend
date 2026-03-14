@@ -1639,6 +1639,21 @@ async def marketing_catalog():
                     </div>
                 </div>
             </div>'''
+            elif f.startswith("IPAD_APPSTORE_") and f.endswith(".png"):
+                size_kb = round(os.path.getsize(os.path.join(marketing_dir, f)) / 1024)
+                name = f.replace('.png','').replace('_',' ').replace('IPAD APPSTORE ', 'iPad: ').title()
+                appstore_cards += f'''<div class="card" id="card-{f}" data-testid="screenshot-card-{f}">
+                <img src="/api/marketing/file/{f}" style="width:100%;border-radius:8px;" loading="lazy" />
+                <div class="card-info">
+                    <span class="badge badge-new">iPAD</span>
+                    <h3>{name}</h3>
+                    <div class="meta">2048x2732 | {size_kb}KB | iPad 13" Ready</div>
+                    <div class="btn-row">
+                        <a class="btn save-btn" href="/api/marketing/file/{f}" download="{f}" data-testid="save-{f}">Save</a>
+                        <button class="btn share-btn" onclick="shareAsset('/api/marketing/file/{f}', '{name}')" data-testid="share-{f}">Share</button>
+                    </div>
+                </div>
+            </div>'''
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1693,8 +1708,8 @@ async def marketing_catalog():
     </div>
 
     <div class="section">
-        <h2>App Store Screenshots (1284x2778)</h2>
-        <p class="desc">Real app screenshots resized for Apple App Store. Save and upload directly to App Store Connect.</p>
+        <h2>App Store Screenshots</h2>
+        <p class="desc">Real app screenshots for iPhone (1284x2778) and iPad (2048x2732). Save and upload directly to App Store Connect.</p>
         <div class="grid">
             """ + appstore_cards + """
         </div>
