@@ -885,25 +885,31 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     from concurrent.futures import ThreadPoolExecutor, as_completed
     product_data = None
     
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {
-            executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
-            executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
-            executor.submit(fetch_from_usda, barcode): "usda",
-            executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
-            executor.submit(fetch_from_brocade, barcode): "brocade",
-        }
-        
-        for future in as_completed(futures, timeout=8):
+    try:
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {
+                executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+                executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
+                executor.submit(fetch_from_usda, barcode): "usda",
+                executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+                executor.submit(fetch_from_brocade, barcode): "brocade",
+            }
+            
             try:
-                result = future.result()
-                if result:
-                    if result.get("ingredients_text") or not product_data:
-                        product_data = result
-                    if result.get("ingredients_text"):
-                        break  # Got ingredients, no need to wait
-            except:
-                pass
+                for future in as_completed(futures, timeout=8):
+                    try:
+                        result = future.result(timeout=1)
+                        if result:
+                            if result.get("ingredients_text") or not product_data:
+                                product_data = result
+                            if result.get("ingredients_text"):
+                                break  # Got ingredients, no need to wait
+                    except Exception:
+                        pass
+            except TimeoutError:
+                logger.info(f"Quick scan: database lookup timed out for {barcode}")
+    except Exception as e:
+        logger.error(f"Quick scan executor error: {e}")
     
     if not product_data:
         raise HTTPException(status_code=404, detail={
