@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, EmailStr
@@ -141,51 +141,9 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = "gpt-4o-mini"  # Faster model for scan analysis
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
-
-# In-memory cache for instant responses (top products)
-from collections import OrderedDict
-import threading
-
-class MemoryCache:
-    """Thread-safe in-memory LRU cache for instant product lookups"""
-    def __init__(self, max_size=500):
-        self._cache = OrderedDict()
-        self._max_size = max_size
-        self._lock = threading.Lock()
-    
-    def get(self, barcode: str) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            if barcode in self._cache:
-                self._cache.move_to_end(barcode)
-                logger.info(f"MEMORY CACHE HIT: {barcode}")
-                return self._cache[barcode]
-        return None
-    
-    def put(self, barcode: str, data: Dict[str, Any]):
-        with self._lock:
-            if barcode in self._cache:
-                self._cache.move_to_end(barcode)
-            self._cache[barcode] = data
-            if len(self._cache) > self._max_size:
-                self._cache.popitem(last=False)
-    
-    def clear(self):
-        with self._lock:
-            count = len(self._cache)
-            self._cache.clear()
-            return count
-    
-    def size(self):
-        return len(self._cache)
-
-memory_cache = MemoryCache(max_size=500)
-
-# Background analysis tracking
-pending_analyses: Dict[str, Dict[str, Any]] = {}
 
 # Analytics tracking
 async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None):
@@ -270,7 +228,7 @@ def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from Open Food Facts API"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=2, timeout=7)
+        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=2, timeout=10)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -419,7 +377,7 @@ def fetch_from_upcitemdb(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from UPC Item DB as backup"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{UPC_API_URL}?upc={barcode}", max_retries=2, timeout=7)
+        response = fetch_with_retry(f"{UPC_API_URL}?upc={barcode}", max_retries=2, timeout=10)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -470,7 +428,7 @@ def fetch_from_off_uk(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from UK-specific Open Food Facts database"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{OFF_UK_API_URL}/{barcode}.json", max_retries=2, timeout=7)
+        response = fetch_with_retry(f"{OFF_UK_API_URL}/{barcode}.json", max_retries=2, timeout=10)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -496,7 +454,7 @@ def fetch_from_brocade(barcode: str) -> Optional[Dict[str, Any]]:
     try:
         # Pad barcode to 14 digits (GTIN format)
         gtin = barcode.zfill(14)
-        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=6)
+        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=8)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -578,21 +536,47 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_product_by_name(client, product_name: str) -> dict:
     """When no ingredients list is available, use AI knowledge to analyze the product by name"""
     try:
-        prompt = f"""Product "{product_name}" scanned, no ingredient list found. Analyze based on your knowledge of this product's typical formulation.
+        prompt = f"""You are a food science expert. The product "{product_name}" was scanned but no ingredient list was found in the database.
 
-SCORE CAPS: Alcohol=1-3, Sugary drinks/crisps/sweets=1-4, Processed ready meals=3-5, Mixed wholesome=5-7, Whole/natural=7-10. Do NOT default to 5.
+Based on your knowledge of this product (or similar products with this name), provide your best analysis. If you recognize the product, analyze its typical ingredients. If not, indicate that clearly.
 
-JSON response:
-{{"harmful_ingredients":[{{"name":"x","health_impact":"explanation","severity":"high/medium/low","processing_level":"NOVA level","research_summary":"cite"}}],
-"beneficial_ingredients":[{{"name":"x","health_benefit":"explanation","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA level","research_summary":"cite"}}],
-"carcinogens_found":[{{"name":"x","iarc_group":"Group X","cancer_types":"types","explanation":"how it harms","source":"ref"}}],
-"chemical_breakdown":[{{"name":"E-number","common_name":"x","purpose":"why","health_concern":"1 sentence","banned_in":"countries or empty"}}],
-"healthier_alternatives":[{{"product_type":"x","example_brands":"2-3 brands","why_better":"reason","score_estimate":"X/10"}}],
-"shocking_facts":[{{"fact":"1 alarming TRUE fact about an ingredient - bans, industrial uses, contradictions. Specific to THIS product.","ingredient":"x"}}],
-"overall_score":1-10,"upf_score":"% estimate","processing_category":"Whole Food/Minimally Processed/Processed/Ultra-Processed","recommendation":"actionable advice","ingredients_estimated":true,"confidence":"high/medium/low"}}"""
+CRITICAL: Do NOT default to 5/10. Analyze the product honestly:
+- Alcohol products: 1-3/10
+- Sugary drinks, crisps, sweets: 1-4/10
+- Processed ready meals: 3-5/10
+- Mixed items with some wholesome ingredients: 5-7/10
+- Whole/natural foods: 7-10/10
+
+Respond with JSON only:
+{{
+  "harmful_ingredients": [
+    {{"name": "ingredient", "health_impact": "explanation", "severity": "high/medium/low", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "pubmed link"}}
+  ],
+  "beneficial_ingredients": [
+    {{"name": "ingredient", "health_benefit": "explanation", "benefit_type": "type", "key_nutrients": "list", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "link"}}
+  ],
+  "carcinogens_found": [
+    {{"name": "chemical", "iarc_group": "Group classification", "cancer_types": "linked cancers", "explanation": "how it causes harm", "source": "reference"}}
+  ],
+  "chemical_breakdown": [
+    {{"name": "E-number or chemical", "common_name": "actual name", "purpose": "why used", "health_concern": "risk summary", "banned_in": "countries or empty"}}
+  ],
+  "healthier_alternatives": [
+    {{"product_type": "what to buy instead", "example_brands": "brand examples", "why_better": "reason", "score_estimate": "X/10"}}
+  ],
+  "shocking_facts": [
+    {{"fact": "A single alarming but TRUE fact about an ingredient in this product. Focus on contradictions, bans, industrial uses, or comparisons that shock consumers. E.g. 'Banned in cosmetics but still in your food', 'Same cancer classification as tobacco', 'Used in industrial paint removal'.", "ingredient": "which ingredient"}}
+  ],
+  "overall_score": 1-10,
+  "upf_score": "percentage estimate",
+  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
+  "recommendation": "actionable advice",
+  "ingredients_estimated": true,
+  "confidence": "high/medium/low"
+}}"""
 
         response = await client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a food science expert with encyclopedic knowledge of commercial food products worldwide. When you recognize a product, provide detailed analysis based on its typical formulation. Be honest about uncertainty. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -626,32 +610,96 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
         if not ingredients or ingredients.strip() == "":
             return await analyze_product_by_name(client, product_name)
         
-        prompt = f"""Analyze: {product_name}
+        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs), carcinogens, and nutritional health risks.
+
+Analyze this product: {product_name}
+
 Ingredients: {ingredients}
 
-SCORE CAPS: Alcohol=1-3, Processed meat=1-4, Red meat≤5, Sugary drinks=1-4, High caffeine=flag cardiac, 3+ carcinogens≤3, Group 1 carcinogen≤4.
-SCORING: 8-10=whole food, 5-7=mixed, 1-4=UPF.
+MANDATORY SCORE CAPS (override all other scoring):
+- ALCOHOL (beer, wine, spirits, cider, cocktails, alcopops): ALWAYS 1-3/10. Group 1 carcinogen. Flag liver damage, cancer risk, addiction, empty calories.
+- PROCESSED MEAT (bacon, sausages, ham, salami, hot dogs, pepperoni, chorizo, deli meat, corned beef, pate, meat pies with nitrites): ALWAYS 1-4/10. Group 1 carcinogen — same classification as tobacco and asbestos. Flag colorectal cancer, stomach cancer.
+- RED MEAT (beef, lamb, pork — unprocessed): Max 5/10. Group 2A probable carcinogen. Flag colorectal cancer risk.
+- HIGH SUGAR products (soft drinks, energy drinks, sweets, candy): ALWAYS 1-4/10.
+- HIGH CAFFEINE (energy drinks with >150mg caffeine): Flag cardiac risk.
+- Any product with 3+ carcinogens from the list below: Max 3/10.
 
-FLAG THESE:
-G1 carcinogens: ethanol, nitrites/nitrosamines(processed meat), aflatoxins
-G2A: acrylamide, red meat, glyphosate, glycidol/glycidyl esters
-G2B: BHA/E320, TiO2/E171(banned EU), aspartame/E951, 4-MEI/E150d, E153, Red3/E127, Red40/E129, Yellow6/E110
-Endocrine: BPA, phthalates, PFAS
-Dangerous: E250(nitrite→nitrosamines), E924(bromate,banned EU/UK), E217(propylparaben), E319(TBHQ), E321(BHT), E211+vitC→benzene, E338(phosphoric acid), BVO(banned EU), E102/tartrazine, E407/carrageenan
-UPF: seed oils, emulsifiers(E471/E472/polysorbate80), sucralose, acesulfame K, modified starch, hydrogenated oils, HFCS, MSG/E621, maltodextrin, palm oil, dextrose, invert sugar
-BENEFICIAL: protein, vitamins, minerals, fiber, olive oil, omega-3, probiotics, whole grains, antioxidants, polyphenols
+CARCINOGENS & CHEMICALS TO FLAG:
+Group 1 (CONFIRMED carcinogens — same certainty as tobacco):
+- Alcohol/ethanol
+- Processed meat (via nitrites/nitrates forming nitrosamines)
+- Aflatoxins (found in improperly stored grains/nuts)
 
-JSON response:
-{{"harmful_ingredients":[{{"name":"x","health_impact":"2-3 sentences","severity":"high/medium/low","processing_level":"NOVA 4","research_summary":"cite"}}],
-"beneficial_ingredients":[{{"name":"x","health_benefit":"2-3 sentences","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA 1","research_summary":"cite"}}],
-"carcinogens_found":[{{"name":"x","iarc_group":"Group X","cancer_types":"types","explanation":"1-2 sentences","source":"WHO/IARC ref"}}],
-"chemical_breakdown":[{{"name":"E-number","common_name":"x","purpose":"why","health_concern":"1 sentence","banned_in":"countries or empty"}}],
-"healthier_alternatives":[{{"product_type":"x","example_brands":"2-3 brands","why_better":"1 sentence","score_estimate":"X/10"}}],
-"shocking_facts":[{{"fact":"1 alarming TRUE fact about an ingredient - bans, industrial uses, contradictions, comparisons to tobacco etc. Specific to THIS product.","ingredient":"x"}}],
-"overall_score":1-10,"upf_score":"% UPF","processing_category":"Whole Food/Minimally Processed/Processed/Ultra-Processed","recommendation":"actionable advice"}}"""
+Group 2A (PROBABLE carcinogens):
+- Acrylamide (formed in fried/baked starchy foods — crisps, chips, toast, biscuits)
+- Red meat (beef, lamb, pork)
+- Glyphosate residues (pesticide traces in non-organic grains)
+- Glycidyl esters / glycidol (formed when palm oil is refined at high temperatures)
+- Very hot beverages (>65C)
+
+Group 2B (POSSIBLE carcinogens):
+- BHA / butylated hydroxyanisole (E320) — preservative in cereals, snacks
+- Titanium dioxide (E171) — whitening agent, BANNED in EU since 2022
+- Aspartame (E951) — artificial sweetener
+- 4-MEI / 4-methylimidazole (in caramel coloring E150d) — found in cola, soy sauce, dark beers
+- Carbon black (E153)
+- Lead (trace contamination)
+- Styrene (from polystyrene packaging leaching)
+- Red 3 / Erythrosine (E127) — banned in cosmetics, still in food
+- Allura Red / Red 40 (E129)
+- Sunset Yellow / Yellow 6 (E110)
+
+Endocrine disruptors:
+- BPA / Bisphenol A (from can linings, plastic packaging)
+- Phthalates (from plastic food packaging)
+- PFAS / forever chemicals (from microwave popcorn bags, fast food wrappers)
+
+Other dangerous chemicals:
+- Sodium nitrite (E250) — forms nitrosamines, colorectal cancer
+- Potassium bromate (E924) — flour treatment, BANNED in EU/UK/Canada/Brazil
+- Propylparaben (E217) — preservative, endocrine disruptor
+- TBHQ (E319) — preservative linked to tumors in animal studies
+- BHT / butylated hydroxytoluene (E321) — preservative
+- Sodium benzoate (E211) — when combined with vitamin C/citric acid forms BENZENE (known carcinogen)
+- Phosphoric acid (E338) — in cola, erodes bones and teeth
+- Brominated vegetable oil / BVO — BANNED in EU, still in some US drinks
+- Tartrazine / Yellow 5 (E102) — linked to hyperactivity, banned for children in EU
+- Carrageenan (E407) — intestinal inflammation
+
+HARMFUL UPF ingredients: seed oils (sunflower, rapeseed, soybean), emulsifiers (E471/E472/polysorbate 80), artificial sweeteners (sucralose, acesulfame K), preservatives, artificial colors, modified starches, hydrogenated/partially hydrogenated oils, added sugars, high fructose corn syrup, MSG (E621), maltodextrin, palm oil, dextrose, invert sugar syrup.
+
+BENEFICIAL: proteins, vitamins, minerals, fiber, healthy fats (olive oil, avocado, nuts), omega-3, probiotics, whole grains, antioxidants, polyphenols, iron, calcium, zinc.
+
+Respond with JSON only:
+{{
+  "harmful_ingredients": [
+    {{"name": "ingredient", "health_impact": "2-3 sentences explaining what this does to the body", "severity": "high/medium/low", "processing_level": "NOVA 4", "research_summary": "study citation", "study_link": "pubmed link"}}
+  ],
+  "beneficial_ingredients": [
+    {{"name": "ingredient", "health_benefit": "2-3 sentences", "benefit_type": "protein/vitamin/fiber", "key_nutrients": "list", "processing_level": "NOVA 1", "research_summary": "citation", "study_link": "link"}}
+  ],
+  "carcinogens_found": [
+    {{"name": "chemical/ingredient name", "iarc_group": "Group 1/2A/2B/Endocrine Disruptor", "cancer_types": "types of cancer linked", "explanation": "1-2 sentences on how it causes harm", "source": "WHO/IARC/EFSA reference"}}
+  ],
+  "chemical_breakdown": [
+    {{"name": "E-number or chemical name", "common_name": "what it actually is", "purpose": "why its in the product", "health_concern": "1 sentence risk summary", "banned_in": "list countries where banned, or empty"}}
+  ],
+  "healthier_alternatives": [
+    {{"product_type": "what to look for instead", "example_brands": "2-3 specific brand examples if possible", "why_better": "1 sentence explaining why this is healthier", "score_estimate": "estimated score out of 10"}}
+  ],
+  "shocking_facts": [
+    {{"fact": "A single alarming but TRUE fact about an ingredient in this product. Focus on contradictions, bans, industrial uses, or comparisons that would shock a consumer. Examples: 'This dye is banned in cosmetics but still allowed in your food', 'This preservative shares a cancer classification with tobacco', 'This ingredient is used in industrial paint removal', 'Banned in 30+ countries but legal in the US/UK'. Make each fact specific to THIS product's actual ingredients.", "ingredient": "which ingredient this fact is about"}}
+  ],
+  "overall_score": 1-10,
+  "upf_score": "percentage of ingredients that are ultra-processed",
+  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
+  "recommendation": "actionable advice on whether to consume and what to switch to"
+}}
+
+STRICT SCORING: 8-10 whole/minimally processed foods only. 5-7 mixed. 1-4 ultra-processed. Alcohol ALWAYS 1-3. Processed meat ALWAYS 1-4. Products with ANY Group 1 carcinogen MUST score no higher than 4."""
 
         response = await client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a food science expert. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -837,129 +885,6 @@ async def get_me(current_user = Depends(get_current_user)):
         "total_scans": current_user.get("total_scans", 0)
     }
 
-
-@app.post("/api/scan/quick")
-async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user)):
-    """
-    Two-stage scan: Returns product info instantly, analysis may be pending.
-    """
-    try:
-        barcode = scan_req.barcode.strip()
-        start_time = time.time()
-        
-        # Check memory cache first
-        mem_cached = memory_cache.get(barcode)
-        if mem_cached and mem_cached.get("analysis"):
-            return {
-                "product_name": mem_cached.get("product_name", "Unknown"),
-                "brands": mem_cached.get("brands", ""),
-                "image_url": mem_cached.get("image_url", ""),
-                "analysis": mem_cached["analysis"],
-                "analysis_status": "complete",
-                "source": "memory_cache",
-                "response_time_ms": int((time.time() - start_time) * 1000)
-            }
-        
-        # Check MongoDB cache
-        cached = await get_cached_product(barcode)
-        if cached and cached.get("analysis"):
-            memory_cache.put(barcode, {
-                "product_name": cached.get("product_name"),
-                "brands": cached.get("brands"),
-                "ingredients_text": cached.get("ingredients_text"),
-                "image_url": cached.get("image_url"),
-                "analysis": cached["analysis"],
-            })
-            return {
-                "product_name": cached.get("product_name", "Unknown"),
-                "brands": cached.get("brands", ""),
-                "image_url": cached.get("image_url", ""),
-                "analysis": cached["analysis"],
-                "analysis_status": "complete",
-                "source": "cache",
-                "response_time_ms": int((time.time() - start_time) * 1000)
-            }
-        
-        # Not cached — fetch product info from databases using asyncio
-        product_data = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: _quick_fetch_product(barcode)
-        )
-        
-        if not product_data:
-            raise HTTPException(status_code=404, detail={
-                "error_code": "PRODUCT_NOT_FOUND",
-                "message": "Product not found in any database",
-                "suggestion": "Make sure the barcode is clear and well-lit."
-            })
-        
-        return {
-            "product_name": product_data.get("product_name", "Unknown"),
-            "brands": product_data.get("brands", ""),
-            "image_url": product_data.get("image_url", ""),
-            "ingredients_text": product_data.get("ingredients_text", ""),
-            "analysis": None,
-            "analysis_status": "pending",
-            "source": product_data.get("source", "unknown"),
-            "response_time_ms": int((time.time() - start_time) * 1000)
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Quick scan error: {e}")
-        return {"error": str(e), "analysis_status": "error"}
-
-def _quick_fetch_product(barcode: str) -> Optional[Dict[str, Any]]:
-    """Synchronous helper to fetch product data from databases"""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    product_data = None
-    
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {
-            executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
-            executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
-            executor.submit(fetch_from_usda, barcode): "usda",
-            executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
-            executor.submit(fetch_from_brocade, barcode): "brocade",
-        }
-        
-        try:
-            for future in as_completed(futures, timeout=8):
-                try:
-                    result = future.result(timeout=1)
-                    if result:
-                        if result.get("ingredients_text") or not product_data:
-                            product_data = result
-                        if result.get("ingredients_text"):
-                            break
-                except Exception:
-                    pass
-        except TimeoutError:
-            pass
-    
-    return product_data
-
-@app.get("/api/scan/status/{barcode}")
-async def scan_status(barcode: str, current_user = Depends(get_current_user)):
-    """Check if a scan analysis is ready (for two-stage scan flow)"""
-    mem_cached = memory_cache.get(barcode)
-    if mem_cached and mem_cached.get("analysis"):
-        return {
-            "analysis_status": "complete",
-            "analysis": mem_cached["analysis"],
-            "product_name": mem_cached.get("product_name", ""),
-        }
-    
-    cached = await get_cached_product(barcode)
-    if cached and cached.get("analysis"):
-        return {
-            "analysis_status": "complete",
-            "analysis": cached["analysis"],
-            "product_name": cached.get("product_name", ""),
-        }
-    
-    return {"analysis_status": "pending"}
-
-
 @app.post("/api/scan")
 async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
@@ -982,39 +907,12 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
-    # STEP 1: Check MEMORY cache first (instant, ~0ms)
-    mem_cached = memory_cache.get(barcode)
-    if mem_cached and mem_cached.get("analysis"):
-        response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, "memory_cache", response_time)
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$inc": {"total_scans": 1}}
-        )
-        result = {
-            "product_name": mem_cached.get("product_name", "Unknown"),
-            "brands": mem_cached.get("brands", ""),
-            "ingredients_text": mem_cached.get("ingredients_text", ""),
-            "image_url": mem_cached.get("image_url", ""),
-            "analysis": mem_cached["analysis"],
-            "source": "memory_cache",
-            "response_time_ms": int(response_time * 1000)
-        }
-        return result
-    
-    # STEP 1b: Check MongoDB cache (fast, ~50-100ms)
+    # STEP 1: Check cache first for instant results
     cached = await get_cached_product(barcode)
     if cached and cached.get("analysis"):
-        # Promote to memory cache for next time
-        memory_cache.put(barcode, {
-            "product_name": cached.get("product_name"),
-            "brands": cached.get("brands"),
-            "ingredients_text": cached.get("ingredients_text"),
-            "image_url": cached.get("image_url"),
-            "analysis": cached["analysis"],
-        })
         response_time = time.time() - start_time
         await log_scan_analytics(barcode, True, "cache", response_time)
+        # Increment scan count
         await users_collection.update_one(
             {"_id": current_user["_id"]},
             {"$inc": {"total_scans": 1}}
@@ -1070,22 +968,17 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             }
         
         # Collect ALL results, prioritize ones WITH ingredients
-        # EARLY TERMINATION: stop as soon as we get a result with ingredients
         results_with_ingredients = []
         results_without_ingredients = []
         
-        for future in as_completed(futures, timeout=9):
+        for future in as_completed(futures, timeout=12):
             src = futures[future]
             try:
                 result = future.result()
                 if result:
                     if result.get("ingredients_text"):
                         results_with_ingredients.append((result, src))
-                        logger.info(f"{src}: Found product WITH ingredients - stopping early")
-                        # Cancel remaining futures
-                        for f in futures:
-                            f.cancel()
-                        break
+                        logger.info(f"{src}: Found product WITH ingredients")
                     else:
                         results_without_ingredients.append((result, src))
                         logger.info(f"{src}: Found product WITHOUT ingredients")
@@ -1111,21 +1004,11 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             product_data = fetch_from_fatsecret(barcode)
             source = "fatsecret"
     
-    # STEP 4: If all sources fail, return with specific error
+    # STEP 4: If all sources fail, return 404
     if not product_data:
         response_time = time.time() - start_time
         await log_scan_analytics(barcode, False, "none", response_time, "Product not found in any database")
-        raise HTTPException(
-            status_code=404, 
-            detail={
-                "error_code": "PRODUCT_NOT_FOUND",
-                "message": "Product not found in any database",
-                "suggestion": "Make sure the barcode is clear and well-lit. Try holding your camera steadier or typing the number manually.",
-                "barcode": barcode,
-                "databases_checked": 7,
-                "response_time_ms": int(response_time * 1000)
-            }
-        )
+        raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
     
     # STEP 5: Check if we have ingredients (required for analysis)
     ingredients_text = product_data.get("ingredients_text", "")
@@ -1143,9 +1026,8 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
                 "harmful_ingredients": [],
                 "beneficial_ingredients": [],
                 "overall_score": 0,
-                "recommendation": "Our AI couldn't analyse this product right now. This is usually temporary — please try again in a moment.",
-                "analysis_note": "AI analysis failed - try again shortly",
-                "error_type": "AI_ANALYSIS_FAILED"
+                "recommendation": "No ingredient information available. Check the packaging for details.",
+                "analysis_note": "No ingredient data available from any source"
             }
         
         response_time = time.time() - start_time
@@ -1153,13 +1035,6 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         
         product_data["analysis"] = analysis
         await cache_product(barcode, product_data)
-        memory_cache.put(barcode, {
-            "product_name": product_data.get("product_name"),
-            "brands": product_data.get("brands"),
-            "ingredients_text": "",
-            "image_url": product_data.get("image_url"),
-            "analysis": analysis,
-        })
         
         # Save scan
         scan_doc = {
@@ -1199,23 +1074,15 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         analysis = {
             "harmful_ingredients": [],
             "beneficial_ingredients": [],
-            "overall_score": 0,
-            "recommendation": "Our AI analysis is temporarily unavailable. Your internet connection may be slow, or our servers are busy. Please try again.",
-            "analysis_note": "AI analysis failed - temporary issue",
-            "error_type": "AI_ANALYSIS_FAILED"
+            "overall_score": 5,
+            "recommendation": "Analysis temporarily unavailable. Please try again.",
+            "nova_group": None,
+            "additives": []
         }
     
     # STEP 6.5: Cache the result for future lookups
     product_data["analysis"] = analysis
     await cache_product(barcode, product_data)
-    # Also save to memory cache
-    memory_cache.put(barcode, {
-        "product_name": product_data.get("product_name"),
-        "brands": product_data.get("brands"),
-        "ingredients_text": ingredients_text,
-        "image_url": product_data.get("image_url"),
-        "analysis": analysis,
-    })
     
     # STEP 7: Save to user's scan history
     scan_doc = {
@@ -1340,8 +1207,7 @@ async def clear_product_cache(current_user = Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     result = await product_cache_collection.delete_many({})
-    mem_cleared = memory_cache.clear()
-    return {"message": f"Cleared {result.deleted_count} cached products from DB + {mem_cleared} from memory"}
+    return {"message": f"Cleared {result.deleted_count} cached products"}
 
 @app.delete("/api/cache/clear")
 async def clear_cache_with_key(key: str = ""):
@@ -1349,8 +1215,7 @@ async def clear_cache_with_key(key: str = ""):
     if key != "yawye2024clear":
         raise HTTPException(status_code=403, detail="Invalid key")
     result = await product_cache_collection.delete_many({})
-    mem_cleared = memory_cache.clear()
-    return {"message": f"Cleared {result.deleted_count} cached products from DB + {mem_cleared} from memory"}
+    return {"message": f"Cleared {result.deleted_count} cached products"}
 
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
@@ -1795,7 +1660,7 @@ WHAT YOU CANNOT DO (Medical Advice):
         messages.append({"role": "user", "content": chat_req.message})
         
         response = await client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model="gpt-4o",
             messages=messages,
             max_tokens=500,
             temperature=0.7
