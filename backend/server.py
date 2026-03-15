@@ -583,8 +583,8 @@ async def analyze_product_by_name(client, product_name: str) -> dict:
 SCORE CAPS: Alcohol=1-3, Sugary drinks/crisps/sweets=1-4, Processed ready meals=3-5, Mixed wholesome=5-7, Whole/natural=7-10. Do NOT default to 5.
 
 JSON response:
-{{"harmful_ingredients":[{{"name":"x","health_impact":"explanation","severity":"high/medium/low","processing_level":"NOVA level","research_summary":"cite","study_link":"pubmed"}}],
-"beneficial_ingredients":[{{"name":"x","health_benefit":"explanation","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA level","research_summary":"cite","study_link":"link"}}],
+{{"harmful_ingredients":[{{"name":"x","health_impact":"explanation","severity":"high/medium/low","processing_level":"NOVA level","research_summary":"cite"}}],
+"beneficial_ingredients":[{{"name":"x","health_benefit":"explanation","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA level","research_summary":"cite"}}],
 "carcinogens_found":[{{"name":"x","iarc_group":"Group X","cancer_types":"types","explanation":"how it harms","source":"ref"}}],
 "chemical_breakdown":[{{"name":"E-number","common_name":"x","purpose":"why","health_concern":"1 sentence","banned_in":"countries or empty"}}],
 "healthier_alternatives":[{{"product_type":"x","example_brands":"2-3 brands","why_better":"reason","score_estimate":"X/10"}}],
@@ -642,8 +642,8 @@ UPF: seed oils, emulsifiers(E471/E472/polysorbate80), sucralose, acesulfame K, m
 BENEFICIAL: protein, vitamins, minerals, fiber, olive oil, omega-3, probiotics, whole grains, antioxidants, polyphenols
 
 JSON response:
-{{"harmful_ingredients":[{{"name":"x","health_impact":"2-3 sentences","severity":"high/medium/low","processing_level":"NOVA 4","research_summary":"cite","study_link":"pubmed"}}],
-"beneficial_ingredients":[{{"name":"x","health_benefit":"2-3 sentences","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA 1","research_summary":"cite","study_link":"link"}}],
+{{"harmful_ingredients":[{{"name":"x","health_impact":"2-3 sentences","severity":"high/medium/low","processing_level":"NOVA 4","research_summary":"cite"}}],
+"beneficial_ingredients":[{{"name":"x","health_benefit":"2-3 sentences","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA 1","research_summary":"cite"}}],
 "carcinogens_found":[{{"name":"x","iarc_group":"Group X","cancer_types":"types","explanation":"1-2 sentences","source":"WHO/IARC ref"}}],
 "chemical_breakdown":[{{"name":"E-number","common_name":"x","purpose":"why","health_concern":"1 sentence","banned_in":"countries or empty"}}],
 "healthier_alternatives":[{{"product_type":"x","example_brands":"2-3 brands","why_better":"1 sentence","score_estimate":"X/10"}}],
