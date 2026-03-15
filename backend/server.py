@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, EmailStr
@@ -141,9 +141,51 @@ FATSECRET_CLIENT_SECRET = os.getenv("FATSECRET_CLIENT_SECRET", "")
 
 # LLM Setup
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = "gpt-4o-mini"  # Faster model for scan analysis
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
+
+# In-memory cache for instant responses (top products)
+from collections import OrderedDict
+import threading
+
+class MemoryCache:
+    """Thread-safe in-memory LRU cache for instant product lookups"""
+    def __init__(self, max_size=500):
+        self._cache = OrderedDict()
+        self._max_size = max_size
+        self._lock = threading.Lock()
+    
+    def get(self, barcode: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            if barcode in self._cache:
+                self._cache.move_to_end(barcode)
+                logger.info(f"MEMORY CACHE HIT: {barcode}")
+                return self._cache[barcode]
+        return None
+    
+    def put(self, barcode: str, data: Dict[str, Any]):
+        with self._lock:
+            if barcode in self._cache:
+                self._cache.move_to_end(barcode)
+            self._cache[barcode] = data
+            if len(self._cache) > self._max_size:
+                self._cache.popitem(last=False)
+    
+    def clear(self):
+        with self._lock:
+            count = len(self._cache)
+            self._cache.clear()
+            return count
+    
+    def size(self):
+        return len(self._cache)
+
+memory_cache = MemoryCache(max_size=500)
+
+# Background analysis tracking
+pending_analyses: Dict[str, Dict[str, Any]] = {}
 
 # Analytics tracking
 async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None):
@@ -576,7 +618,7 @@ Respond with JSON only:
 }}"""
 
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "You are a food science expert with encyclopedic knowledge of commercial food products worldwide. When you recognize a product, provide detailed analysis based on its typical formulation. Be honest about uncertainty. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -699,7 +741,7 @@ Respond with JSON only:
 STRICT SCORING: 8-10 whole/minimally processed foods only. 5-7 mixed. 1-4 ultra-processed. Alcohol ALWAYS 1-3. Processed meat ALWAYS 1-4. Products with ANY Group 1 carcinogen MUST score no higher than 4."""
 
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "You are a food science expert. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -885,6 +927,115 @@ async def get_me(current_user = Depends(get_current_user)):
         "total_scans": current_user.get("total_scans", 0)
     }
 
+
+@app.post("/api/scan/quick")
+async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user), background_tasks: BackgroundTasks = None):
+    """
+    Two-stage scan: Returns product info instantly, analysis may be pending.
+    If cached, returns full result. If not, returns product info + analysis_status: 'processing'.
+    Frontend can then poll /api/scan/status/{barcode} for the analysis.
+    """
+    barcode = scan_req.barcode.strip()
+    start_time = time.time()
+    
+    # Check memory cache first
+    mem_cached = memory_cache.get(barcode)
+    if mem_cached and mem_cached.get("analysis"):
+        return {
+            "product_name": mem_cached.get("product_name", "Unknown"),
+            "brands": mem_cached.get("brands", ""),
+            "image_url": mem_cached.get("image_url", ""),
+            "analysis": mem_cached["analysis"],
+            "analysis_status": "complete",
+            "source": "memory_cache",
+            "response_time_ms": int((time.time() - start_time) * 1000)
+        }
+    
+    # Check MongoDB cache
+    cached = await get_cached_product(barcode)
+    if cached and cached.get("analysis"):
+        memory_cache.put(barcode, {
+            "product_name": cached.get("product_name"),
+            "brands": cached.get("brands"),
+            "ingredients_text": cached.get("ingredients_text"),
+            "image_url": cached.get("image_url"),
+            "analysis": cached["analysis"],
+        })
+        return {
+            "product_name": cached.get("product_name", "Unknown"),
+            "brands": cached.get("brands", ""),
+            "image_url": cached.get("image_url", ""),
+            "analysis": cached["analysis"],
+            "analysis_status": "complete",
+            "source": "cache",
+            "response_time_ms": int((time.time() - start_time) * 1000)
+        }
+    
+    # Not cached — fetch product info from databases (fast part)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    product_data = None
+    
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+            executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
+            executor.submit(fetch_from_usda, barcode): "usda",
+            executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+            executor.submit(fetch_from_brocade, barcode): "brocade",
+        }
+        
+        for future in as_completed(futures, timeout=8):
+            try:
+                result = future.result()
+                if result:
+                    if result.get("ingredients_text") or not product_data:
+                        product_data = result
+                    if result.get("ingredients_text"):
+                        break  # Got ingredients, no need to wait
+            except:
+                pass
+    
+    if not product_data:
+        raise HTTPException(status_code=404, detail={
+            "error_code": "PRODUCT_NOT_FOUND",
+            "message": "Product not found in any database",
+            "suggestion": "Make sure the barcode is clear and well-lit."
+        })
+    
+    # Return product info immediately — analysis will be done by main /api/scan endpoint
+    return {
+        "product_name": product_data.get("product_name", "Unknown"),
+        "brands": product_data.get("brands", ""),
+        "image_url": product_data.get("image_url", ""),
+        "ingredients_text": product_data.get("ingredients_text", ""),
+        "analysis": None,
+        "analysis_status": "pending",
+        "source": product_data.get("source", "unknown"),
+        "response_time_ms": int((time.time() - start_time) * 1000)
+    }
+
+@app.get("/api/scan/status/{barcode}")
+async def scan_status(barcode: str, current_user = Depends(get_current_user)):
+    """Check if a scan analysis is ready (for two-stage scan flow)"""
+    mem_cached = memory_cache.get(barcode)
+    if mem_cached and mem_cached.get("analysis"):
+        return {
+            "analysis_status": "complete",
+            "analysis": mem_cached["analysis"],
+            "product_name": mem_cached.get("product_name", ""),
+        }
+    
+    cached = await get_cached_product(barcode)
+    if cached and cached.get("analysis"):
+        return {
+            "analysis_status": "complete",
+            "analysis": cached["analysis"],
+            "product_name": cached.get("product_name", ""),
+        }
+    
+    return {"analysis_status": "pending"}
+
+
 @app.post("/api/scan")
 async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
@@ -907,12 +1058,39 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
-    # STEP 1: Check cache first for instant results
+    # STEP 1: Check MEMORY cache first (instant, ~0ms)
+    mem_cached = memory_cache.get(barcode)
+    if mem_cached and mem_cached.get("analysis"):
+        response_time = time.time() - start_time
+        await log_scan_analytics(barcode, True, "memory_cache", response_time)
+        await users_collection.update_one(
+            {"_id": current_user["_id"]},
+            {"$inc": {"total_scans": 1}}
+        )
+        result = {
+            "product_name": mem_cached.get("product_name", "Unknown"),
+            "brands": mem_cached.get("brands", ""),
+            "ingredients_text": mem_cached.get("ingredients_text", ""),
+            "image_url": mem_cached.get("image_url", ""),
+            "analysis": mem_cached["analysis"],
+            "source": "memory_cache",
+            "response_time_ms": int(response_time * 1000)
+        }
+        return result
+    
+    # STEP 1b: Check MongoDB cache (fast, ~50-100ms)
     cached = await get_cached_product(barcode)
     if cached and cached.get("analysis"):
+        # Promote to memory cache for next time
+        memory_cache.put(barcode, {
+            "product_name": cached.get("product_name"),
+            "brands": cached.get("brands"),
+            "ingredients_text": cached.get("ingredients_text"),
+            "image_url": cached.get("image_url"),
+            "analysis": cached["analysis"],
+        })
         response_time = time.time() - start_time
         await log_scan_analytics(barcode, True, "cache", response_time)
-        # Increment scan count
         await users_collection.update_one(
             {"_id": current_user["_id"]},
             {"$inc": {"total_scans": 1}}
@@ -1046,6 +1224,13 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         
         product_data["analysis"] = analysis
         await cache_product(barcode, product_data)
+        memory_cache.put(barcode, {
+            "product_name": product_data.get("product_name"),
+            "brands": product_data.get("brands"),
+            "ingredients_text": "",
+            "image_url": product_data.get("image_url"),
+            "analysis": analysis,
+        })
         
         # Save scan
         scan_doc = {
@@ -1094,6 +1279,14 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     # STEP 6.5: Cache the result for future lookups
     product_data["analysis"] = analysis
     await cache_product(barcode, product_data)
+    # Also save to memory cache
+    memory_cache.put(barcode, {
+        "product_name": product_data.get("product_name"),
+        "brands": product_data.get("brands"),
+        "ingredients_text": ingredients_text,
+        "image_url": product_data.get("image_url"),
+        "analysis": analysis,
+    })
     
     # STEP 7: Save to user's scan history
     scan_doc = {
@@ -1218,7 +1411,8 @@ async def clear_product_cache(current_user = Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     result = await product_cache_collection.delete_many({})
-    return {"message": f"Cleared {result.deleted_count} cached products"}
+    mem_cleared = memory_cache.clear()
+    return {"message": f"Cleared {result.deleted_count} cached products from DB + {mem_cleared} from memory"}
 
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
@@ -1663,7 +1857,7 @@ WHAT YOU CANNOT DO (Medical Advice):
         messages.append({"role": "user", "content": chat_req.message})
         
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model=OPENAI_MODEL,
             messages=messages,
             max_tokens=500,
             temperature=0.7
