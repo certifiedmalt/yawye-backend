@@ -124,8 +124,11 @@ async def send_reset_email(to_email: str, reset_code: str):
         logger.error(f"Failed to send email via Resend to {to_email}: {e}")
         return False
 
-# Open Food Facts API
+# Open Food Facts API (Global + UK-specific)
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product"
+OFF_UK_API_URL = "https://uk.openfoodfacts.org/api/v2/product"
+# Brocade.io - Open barcode database (free, no key needed)
+BROCADE_API_URL = "https://www.brocade.io/api/items"
 # Backup API - UPC Item DB
 UPC_API_URL = "https://api.upcitemdb.com/prod/trial/lookup"
 # USDA FoodData Central API (Free)
@@ -225,7 +228,7 @@ def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from Open Food Facts API"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=3, timeout=20)
+        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=2, timeout=10)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -419,6 +422,57 @@ def fetch_from_off_search(barcode: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"OFF Search error: {e}")
     
+    return None
+
+def fetch_from_off_uk(barcode: str) -> Optional[Dict[str, Any]]:
+    """Fetch product data from UK-specific Open Food Facts database"""
+    start_time = time.time()
+    try:
+        response = fetch_with_retry(f"{OFF_UK_API_URL}/{barcode}.json", max_retries=2, timeout=10)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get("status") == 1:
+                product = data.get("product", {})
+                name = product.get("product_name", "")
+                if name:
+                    return {
+                        "product_name": name,
+                        "brands": product.get("brands", "Unknown Brand"),
+                        "ingredients_text": product.get("ingredients_text", ""),
+                        "image_url": product.get("image_url", ""),
+                        "source": "openfoodfacts_uk",
+                        "fetch_time": time.time() - start_time
+                    }
+    except Exception as e:
+        logger.error(f"OFF UK error: {e}")
+    return None
+
+def fetch_from_brocade(barcode: str) -> Optional[Dict[str, Any]]:
+    """Fetch product data from Brocade.io open barcode database"""
+    start_time = time.time()
+    try:
+        # Pad barcode to 14 digits (GTIN format)
+        gtin = barcode.zfill(14)
+        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=8)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            name = data.get("name", "")
+            if name:
+                # Brocade stores ingredients in properties
+                props = data.get("properties", {})
+                ingredients = props.get("ingredients", "")
+                return {
+                    "product_name": name,
+                    "brands": data.get("brand_name", "Unknown Brand"),
+                    "ingredients_text": ingredients,
+                    "image_url": "",
+                    "source": "brocade",
+                    "fetch_time": time.time() - start_time
+                }
+    except Exception as e:
+        logger.error(f"Brocade.io error: {e}")
     return None
 
 # Models
@@ -650,7 +704,7 @@ STRICT SCORING: 8-10 whole/minimally processed foods only. 5-7 mixed. 1-4 ultra-
                 {"role": "system", "content": "You are a food science expert. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,
+            temperature=0.3,
             response_format={"type": "json_object"}
         )
         
@@ -853,10 +907,28 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
-    # CACHE DISABLED - Always fetch fresh results for accuracy
-    # Each scan will get the latest AI analysis
+    # STEP 1: Check cache first for instant results
+    cached = await get_cached_product(barcode)
+    if cached and cached.get("analysis"):
+        response_time = time.time() - start_time
+        await log_scan_analytics(barcode, True, "cache", response_time)
+        # Increment scan count
+        await users_collection.update_one(
+            {"_id": current_user["_id"]},
+            {"$inc": {"total_scans": 1}}
+        )
+        result = {
+            "product_name": cached.get("product_name", "Unknown"),
+            "brands": cached.get("brands", ""),
+            "ingredients_text": cached.get("ingredients_text", ""),
+            "image_url": cached.get("image_url", ""),
+            "analysis": cached["analysis"],
+            "source": "cache",
+            "response_time_ms": int(response_time * 1000)
+        }
+        return {k: v for k, v in result.items() if k != "_id"}
     
-    # STEP 1: Parallel API calls with smart routing based on barcode prefix
+    # STEP 2: Parallel API calls with smart routing based on barcode prefix
     # UK/EU barcodes start with 50/40-44, US barcodes start with 0
     barcode_prefix = barcode[:2] if len(barcode) >= 2 else ""
     
@@ -866,14 +938,16 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     product_data = None
     source = "none"
     
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         # Smart ordering: prioritize based on barcode region
         if barcode_prefix in ['50', '40', '41', '42', '43', '44', '45', '46', '47', '48', '49', '87', '90', '93', '94']:
-            # EU/UK barcode — Open Food Facts first, then others in parallel
+            # EU/UK barcode — OFF + OFF UK first, plus all others in parallel
             futures = {
                 executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+                executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
                 executor.submit(fetch_from_usda, barcode): "usda",
                 executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+                executor.submit(fetch_from_brocade, barcode): "brocade",
             }
         elif barcode_prefix in ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09']:
             # US/Canada barcode — USDA first, then others in parallel
@@ -881,20 +955,23 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
                 executor.submit(fetch_from_usda, barcode): "usda",
                 executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
                 executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+                executor.submit(fetch_from_brocade, barcode): "brocade",
             }
         else:
             # Other regions — try all simultaneously
             futures = {
                 executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+                executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
                 executor.submit(fetch_from_usda, barcode): "usda",
                 executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+                executor.submit(fetch_from_brocade, barcode): "brocade",
             }
         
         # Collect ALL results, prioritize ones WITH ingredients
         results_with_ingredients = []
         results_without_ingredients = []
         
-        for future in as_completed(futures, timeout=20):
+        for future in as_completed(futures, timeout=12):
             src = futures[future]
             try:
                 result = future.result()
@@ -957,6 +1034,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         await log_scan_analytics(barcode, True, source, response_time, "No ingredients - AI name analysis")
         
         product_data["analysis"] = analysis
+        await cache_product(barcode, product_data)
         
         # Save scan
         scan_doc = {
@@ -1002,8 +1080,9 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "additives": []
         }
     
-    # CACHE DISABLED - No longer caching results
+    # STEP 6.5: Cache the result for future lookups
     product_data["analysis"] = analysis
+    await cache_product(barcode, product_data)
     
     # STEP 7: Save to user's scan history
     scan_doc = {
@@ -1121,6 +1200,14 @@ async def get_scan_analytics():
     except Exception as e:
         logger.error(f"Analytics error: {e}")
         return {"error": str(e)}
+
+@app.delete("/api/admin/cache")
+async def clear_product_cache(current_user = Depends(get_current_user)):
+    """Clear the product cache - use after updating AI prompts"""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    result = await product_cache_collection.delete_many({})
+    return {"message": f"Cleared {result.deleted_count} cached products"}
 
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
