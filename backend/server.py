@@ -1414,6 +1414,15 @@ async def clear_product_cache(current_user = Depends(get_current_user)):
     mem_cleared = memory_cache.clear()
     return {"message": f"Cleared {result.deleted_count} cached products from DB + {mem_cleared} from memory"}
 
+@app.delete("/api/cache/clear")
+async def clear_cache_with_key(key: str = ""):
+    """Clear product cache with secret key (no auth required)"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    result = await product_cache_collection.delete_many({})
+    mem_cleared = memory_cache.clear()
+    return {"message": f"Cleared {result.deleted_count} cached products from DB + {mem_cleared} from memory"}
+
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
     scans = await scans_collection.find(
