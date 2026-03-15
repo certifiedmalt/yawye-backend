@@ -578,44 +578,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def analyze_product_by_name(client, product_name: str) -> dict:
     """When no ingredients list is available, use AI knowledge to analyze the product by name"""
     try:
-        prompt = f"""You are a food science expert. The product "{product_name}" was scanned but no ingredient list was found in the database.
+        prompt = f"""Product "{product_name}" scanned, no ingredient list found. Analyze based on your knowledge of this product's typical formulation.
 
-Based on your knowledge of this product (or similar products with this name), provide your best analysis. If you recognize the product, analyze its typical ingredients. If not, indicate that clearly.
+SCORE CAPS: Alcohol=1-3, Sugary drinks/crisps/sweets=1-4, Processed ready meals=3-5, Mixed wholesome=5-7, Whole/natural=7-10. Do NOT default to 5.
 
-CRITICAL: Do NOT default to 5/10. Analyze the product honestly:
-- Alcohol products: 1-3/10
-- Sugary drinks, crisps, sweets: 1-4/10
-- Processed ready meals: 3-5/10
-- Mixed items with some wholesome ingredients: 5-7/10
-- Whole/natural foods: 7-10/10
-
-Respond with JSON only:
-{{
-  "harmful_ingredients": [
-    {{"name": "ingredient", "health_impact": "explanation", "severity": "high/medium/low", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "pubmed link"}}
-  ],
-  "beneficial_ingredients": [
-    {{"name": "ingredient", "health_benefit": "explanation", "benefit_type": "type", "key_nutrients": "list", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "link"}}
-  ],
-  "carcinogens_found": [
-    {{"name": "chemical", "iarc_group": "Group classification", "cancer_types": "linked cancers", "explanation": "how it causes harm", "source": "reference"}}
-  ],
-  "chemical_breakdown": [
-    {{"name": "E-number or chemical", "common_name": "actual name", "purpose": "why used", "health_concern": "risk summary", "banned_in": "countries or empty"}}
-  ],
-  "healthier_alternatives": [
-    {{"product_type": "what to buy instead", "example_brands": "brand examples", "why_better": "reason", "score_estimate": "X/10"}}
-  ],
-  "shocking_facts": [
-    {{"fact": "A single alarming but TRUE fact about an ingredient in this product. Focus on contradictions, bans, industrial uses, or comparisons that shock consumers. E.g. 'Banned in cosmetics but still in your food', 'Same cancer classification as tobacco', 'Used in industrial paint removal'.", "ingredient": "which ingredient"}}
-  ],
-  "overall_score": 1-10,
-  "upf_score": "percentage estimate",
-  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
-  "recommendation": "actionable advice",
-  "ingredients_estimated": true,
-  "confidence": "high/medium/low"
-}}"""
+JSON response:
+{{"harmful_ingredients":[{{"name":"x","health_impact":"explanation","severity":"high/medium/low","processing_level":"NOVA level","research_summary":"cite","study_link":"pubmed"}}],
+"beneficial_ingredients":[{{"name":"x","health_benefit":"explanation","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA level","research_summary":"cite","study_link":"link"}}],
+"carcinogens_found":[{{"name":"x","iarc_group":"Group X","cancer_types":"types","explanation":"how it harms","source":"ref"}}],
+"chemical_breakdown":[{{"name":"E-number","common_name":"x","purpose":"why","health_concern":"1 sentence","banned_in":"countries or empty"}}],
+"healthier_alternatives":[{{"product_type":"x","example_brands":"2-3 brands","why_better":"reason","score_estimate":"X/10"}}],
+"shocking_facts":[{{"fact":"1 alarming TRUE fact about an ingredient - bans, industrial uses, contradictions. Specific to THIS product.","ingredient":"x"}}],
+"overall_score":1-10,"upf_score":"% estimate","processing_category":"Whole Food/Minimally Processed/Processed/Ultra-Processed","recommendation":"actionable advice","ingredients_estimated":true,"confidence":"high/medium/low"}}"""
 
         response = await client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -652,93 +626,29 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> di
         if not ingredients or ingredients.strip() == "":
             return await analyze_product_by_name(client, product_name)
         
-        prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs), carcinogens, and nutritional health risks.
-
-Analyze this product: {product_name}
-
+        prompt = f"""Analyze: {product_name}
 Ingredients: {ingredients}
 
-MANDATORY SCORE CAPS (override all other scoring):
-- ALCOHOL (beer, wine, spirits, cider, cocktails, alcopops): ALWAYS 1-3/10. Group 1 carcinogen. Flag liver damage, cancer risk, addiction, empty calories.
-- PROCESSED MEAT (bacon, sausages, ham, salami, hot dogs, pepperoni, chorizo, deli meat, corned beef, pate, meat pies with nitrites): ALWAYS 1-4/10. Group 1 carcinogen — same classification as tobacco and asbestos. Flag colorectal cancer, stomach cancer.
-- RED MEAT (beef, lamb, pork — unprocessed): Max 5/10. Group 2A probable carcinogen. Flag colorectal cancer risk.
-- HIGH SUGAR products (soft drinks, energy drinks, sweets, candy): ALWAYS 1-4/10.
-- HIGH CAFFEINE (energy drinks with >150mg caffeine): Flag cardiac risk.
-- Any product with 3+ carcinogens from the list below: Max 3/10.
+SCORE CAPS: Alcohol=1-3, Processed meat=1-4, Red meat≤5, Sugary drinks=1-4, High caffeine=flag cardiac, 3+ carcinogens≤3, Group 1 carcinogen≤4.
+SCORING: 8-10=whole food, 5-7=mixed, 1-4=UPF.
 
-CARCINOGENS & CHEMICALS TO FLAG:
-Group 1 (CONFIRMED carcinogens — same certainty as tobacco):
-- Alcohol/ethanol
-- Processed meat (via nitrites/nitrates forming nitrosamines)
-- Aflatoxins (found in improperly stored grains/nuts)
+FLAG THESE:
+G1 carcinogens: ethanol, nitrites/nitrosamines(processed meat), aflatoxins
+G2A: acrylamide, red meat, glyphosate, glycidol/glycidyl esters
+G2B: BHA/E320, TiO2/E171(banned EU), aspartame/E951, 4-MEI/E150d, E153, Red3/E127, Red40/E129, Yellow6/E110
+Endocrine: BPA, phthalates, PFAS
+Dangerous: E250(nitrite→nitrosamines), E924(bromate,banned EU/UK), E217(propylparaben), E319(TBHQ), E321(BHT), E211+vitC→benzene, E338(phosphoric acid), BVO(banned EU), E102/tartrazine, E407/carrageenan
+UPF: seed oils, emulsifiers(E471/E472/polysorbate80), sucralose, acesulfame K, modified starch, hydrogenated oils, HFCS, MSG/E621, maltodextrin, palm oil, dextrose, invert sugar
+BENEFICIAL: protein, vitamins, minerals, fiber, olive oil, omega-3, probiotics, whole grains, antioxidants, polyphenols
 
-Group 2A (PROBABLE carcinogens):
-- Acrylamide (formed in fried/baked starchy foods — crisps, chips, toast, biscuits)
-- Red meat (beef, lamb, pork)
-- Glyphosate residues (pesticide traces in non-organic grains)
-- Glycidyl esters / glycidol (formed when palm oil is refined at high temperatures)
-- Very hot beverages (>65C)
-
-Group 2B (POSSIBLE carcinogens):
-- BHA / butylated hydroxyanisole (E320) — preservative in cereals, snacks
-- Titanium dioxide (E171) — whitening agent, BANNED in EU since 2022
-- Aspartame (E951) — artificial sweetener
-- 4-MEI / 4-methylimidazole (in caramel coloring E150d) — found in cola, soy sauce, dark beers
-- Carbon black (E153)
-- Lead (trace contamination)
-- Styrene (from polystyrene packaging leaching)
-- Red 3 / Erythrosine (E127) — banned in cosmetics, still in food
-- Allura Red / Red 40 (E129)
-- Sunset Yellow / Yellow 6 (E110)
-
-Endocrine disruptors:
-- BPA / Bisphenol A (from can linings, plastic packaging)
-- Phthalates (from plastic food packaging)
-- PFAS / forever chemicals (from microwave popcorn bags, fast food wrappers)
-
-Other dangerous chemicals:
-- Sodium nitrite (E250) — forms nitrosamines, colorectal cancer
-- Potassium bromate (E924) — flour treatment, BANNED in EU/UK/Canada/Brazil
-- Propylparaben (E217) — preservative, endocrine disruptor
-- TBHQ (E319) — preservative linked to tumors in animal studies
-- BHT / butylated hydroxytoluene (E321) — preservative
-- Sodium benzoate (E211) — when combined with vitamin C/citric acid forms BENZENE (known carcinogen)
-- Phosphoric acid (E338) — in cola, erodes bones and teeth
-- Brominated vegetable oil / BVO — BANNED in EU, still in some US drinks
-- Tartrazine / Yellow 5 (E102) — linked to hyperactivity, banned for children in EU
-- Carrageenan (E407) — intestinal inflammation
-
-HARMFUL UPF ingredients: seed oils (sunflower, rapeseed, soybean), emulsifiers (E471/E472/polysorbate 80), artificial sweeteners (sucralose, acesulfame K), preservatives, artificial colors, modified starches, hydrogenated/partially hydrogenated oils, added sugars, high fructose corn syrup, MSG (E621), maltodextrin, palm oil, dextrose, invert sugar syrup.
-
-BENEFICIAL: proteins, vitamins, minerals, fiber, healthy fats (olive oil, avocado, nuts), omega-3, probiotics, whole grains, antioxidants, polyphenols, iron, calcium, zinc.
-
-Respond with JSON only:
-{{
-  "harmful_ingredients": [
-    {{"name": "ingredient", "health_impact": "2-3 sentences explaining what this does to the body", "severity": "high/medium/low", "processing_level": "NOVA 4", "research_summary": "study citation", "study_link": "pubmed link"}}
-  ],
-  "beneficial_ingredients": [
-    {{"name": "ingredient", "health_benefit": "2-3 sentences", "benefit_type": "protein/vitamin/fiber", "key_nutrients": "list", "processing_level": "NOVA 1", "research_summary": "citation", "study_link": "link"}}
-  ],
-  "carcinogens_found": [
-    {{"name": "chemical/ingredient name", "iarc_group": "Group 1/2A/2B/Endocrine Disruptor", "cancer_types": "types of cancer linked", "explanation": "1-2 sentences on how it causes harm", "source": "WHO/IARC/EFSA reference"}}
-  ],
-  "chemical_breakdown": [
-    {{"name": "E-number or chemical name", "common_name": "what it actually is", "purpose": "why its in the product", "health_concern": "1 sentence risk summary", "banned_in": "list countries where banned, or empty"}}
-  ],
-  "healthier_alternatives": [
-    {{"product_type": "what to look for instead", "example_brands": "2-3 specific brand examples if possible", "why_better": "1 sentence explaining why this is healthier", "score_estimate": "estimated score out of 10"}}
-  ],
-  "shocking_facts": [
-    {{"fact": "A single alarming but TRUE fact about an ingredient in this product. Focus on contradictions, bans, industrial uses, or comparisons that would shock a consumer. Examples: 'This dye is banned in cosmetics but still allowed in your food', 'This preservative shares a cancer classification with tobacco', 'This ingredient is used in industrial paint removal', 'Banned in 30+ countries but legal in the US/UK'. Make each fact specific to THIS product's actual ingredients.", "ingredient": "which ingredient this fact is about"}}
-  ],
-  "overall_score": 1-10,
-  "upf_score": "percentage of ingredients that are ultra-processed",
-  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
-  "recommendation": "actionable advice on whether to consume and what to switch to"
-}}
-
-STRICT SCORING: 8-10 whole/minimally processed foods only. 5-7 mixed. 1-4 ultra-processed. Alcohol ALWAYS 1-3. Processed meat ALWAYS 1-4. Products with ANY Group 1 carcinogen MUST score no higher than 4."""
+JSON response:
+{{"harmful_ingredients":[{{"name":"x","health_impact":"2-3 sentences","severity":"high/medium/low","processing_level":"NOVA 4","research_summary":"cite","study_link":"pubmed"}}],
+"beneficial_ingredients":[{{"name":"x","health_benefit":"2-3 sentences","benefit_type":"type","key_nutrients":"list","processing_level":"NOVA 1","research_summary":"cite","study_link":"link"}}],
+"carcinogens_found":[{{"name":"x","iarc_group":"Group X","cancer_types":"types","explanation":"1-2 sentences","source":"WHO/IARC ref"}}],
+"chemical_breakdown":[{{"name":"E-number","common_name":"x","purpose":"why","health_concern":"1 sentence","banned_in":"countries or empty"}}],
+"healthier_alternatives":[{{"product_type":"x","example_brands":"2-3 brands","why_better":"1 sentence","score_estimate":"X/10"}}],
+"shocking_facts":[{{"fact":"1 alarming TRUE fact about an ingredient - bans, industrial uses, contradictions, comparisons to tobacco etc. Specific to THIS product.","ingredient":"x"}}],
+"overall_score":1-10,"upf_score":"% UPF","processing_category":"Whole Food/Minimally Processed/Processed/Ultra-Processed","recommendation":"actionable advice"}}"""
 
         response = await client.chat.completions.create(
             model=OPENAI_MODEL,
