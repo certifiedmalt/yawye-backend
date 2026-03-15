@@ -270,7 +270,7 @@ def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from Open Food Facts API"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=2, timeout=10)
+        response = fetch_with_retry(f"{OFF_API_URL}/{barcode}.json", max_retries=2, timeout=7)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -419,7 +419,7 @@ def fetch_from_upcitemdb(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from UPC Item DB as backup"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{UPC_API_URL}?upc={barcode}", max_retries=2, timeout=10)
+        response = fetch_with_retry(f"{UPC_API_URL}?upc={barcode}", max_retries=2, timeout=7)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -470,7 +470,7 @@ def fetch_from_off_uk(barcode: str) -> Optional[Dict[str, Any]]:
     """Fetch product data from UK-specific Open Food Facts database"""
     start_time = time.time()
     try:
-        response = fetch_with_retry(f"{OFF_UK_API_URL}/{barcode}.json", max_retries=2, timeout=10)
+        response = fetch_with_retry(f"{OFF_UK_API_URL}/{barcode}.json", max_retries=2, timeout=7)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -496,7 +496,7 @@ def fetch_from_brocade(barcode: str) -> Optional[Dict[str, Any]]:
     try:
         # Pad barcode to 14 digits (GTIN format)
         gtin = barcode.zfill(14)
-        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=8)
+        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=6)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -1146,17 +1146,22 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             }
         
         # Collect ALL results, prioritize ones WITH ingredients
+        # EARLY TERMINATION: stop as soon as we get a result with ingredients
         results_with_ingredients = []
         results_without_ingredients = []
         
-        for future in as_completed(futures, timeout=12):
+        for future in as_completed(futures, timeout=9):
             src = futures[future]
             try:
                 result = future.result()
                 if result:
                     if result.get("ingredients_text"):
                         results_with_ingredients.append((result, src))
-                        logger.info(f"{src}: Found product WITH ingredients")
+                        logger.info(f"{src}: Found product WITH ingredients - stopping early")
+                        # Cancel remaining futures
+                        for f in futures:
+                            f.cancel()
+                        break
                     else:
                         results_without_ingredients.append((result, src))
                         logger.info(f"{src}: Found product WITHOUT ingredients")
