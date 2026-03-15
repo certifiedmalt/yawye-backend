@@ -67,7 +67,7 @@ export default function Scan() {
       const response = await axios.post(
         `${BACKEND_URL}/api/scan`,
         { barcode: data },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 30000 }
       );
 
       // Update gamification streak (non-blocking)
