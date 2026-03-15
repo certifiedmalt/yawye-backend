@@ -88,11 +88,14 @@ export default function Scan() {
       });
     } catch (error: any) {
       console.error('Scan error:', error.response?.data);
-      const errorMessage = error.response?.data?.detail || 'Failed to scan product';
+      const detail = error.response?.data?.detail;
+      const errorMessage = typeof detail === 'object' 
+        ? `${detail.message}${detail.suggestion ? '\n\n' + detail.suggestion : ''}`
+        : detail || 'Failed to scan product';
       
       Alert.alert(
-        'Scan Error',
-        `Barcode: ${data}\n\n${errorMessage}\n\nWould you like to try entering it manually?`,
+        'Scan Failed',
+        `Barcode: ${data}\n\n${errorMessage}`,
         [
           {
             text: 'Try Again',
@@ -151,9 +154,13 @@ export default function Scan() {
         params: { productData: JSON.stringify(response.data) },
       });
     } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      const errorMessage = typeof detail === 'object'
+        ? `${detail.message}${detail.suggestion ? '\n\n' + detail.suggestion : ''}`
+        : detail || 'Product not found';
       Alert.alert(
-        'Error',
-        error.response?.data?.detail || 'Product not found',
+        'Scan Failed',
+        errorMessage,
         [
           {
             text: 'Try Again',

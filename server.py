@@ -1004,11 +1004,21 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             product_data = fetch_from_fatsecret(barcode)
             source = "fatsecret"
     
-    # STEP 4: If all sources fail, return 404
+    # STEP 4: If all sources fail, return with specific error
     if not product_data:
         response_time = time.time() - start_time
         await log_scan_analytics(barcode, False, "none", response_time, "Product not found in any database")
-        raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
+        raise HTTPException(
+            status_code=404, 
+            detail={
+                "error_code": "PRODUCT_NOT_FOUND",
+                "message": "Product not found in any database",
+                "suggestion": "Make sure the barcode is clear and well-lit. Try holding your camera steadier or typing the number manually.",
+                "barcode": barcode,
+                "databases_checked": 7,
+                "response_time_ms": int(response_time * 1000)
+            }
+        )
     
     # STEP 5: Check if we have ingredients (required for analysis)
     ingredients_text = product_data.get("ingredients_text", "")
@@ -1026,8 +1036,9 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
                 "harmful_ingredients": [],
                 "beneficial_ingredients": [],
                 "overall_score": 0,
-                "recommendation": "No ingredient information available. Check the packaging for details.",
-                "analysis_note": "No ingredient data available from any source"
+                "recommendation": "Our AI couldn't analyse this product right now. This is usually temporary — please try again in a moment.",
+                "analysis_note": "AI analysis failed - try again shortly",
+                "error_type": "AI_ANALYSIS_FAILED"
             }
         
         response_time = time.time() - start_time
@@ -1074,10 +1085,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         analysis = {
             "harmful_ingredients": [],
             "beneficial_ingredients": [],
-            "overall_score": 5,
-            "recommendation": "Analysis temporarily unavailable. Please try again.",
-            "nova_group": None,
-            "additives": []
+            "overall_score": 0,
+            "recommendation": "Our AI analysis is temporarily unavailable. Your internet connection may be slow, or our servers are busy. Please try again.",
+            "analysis_note": "AI analysis failed - temporary issue",
+            "error_type": "AI_ANALYSIS_FAILED"
         }
     
     # STEP 6.5: Cache the result for future lookups
