@@ -839,96 +839,104 @@ async def get_me(current_user = Depends(get_current_user)):
 
 
 @app.post("/api/scan/quick")
-async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user), background_tasks: BackgroundTasks = None):
+async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
     Two-stage scan: Returns product info instantly, analysis may be pending.
-    If cached, returns full result. If not, returns product info + analysis_status: 'processing'.
-    Frontend can then poll /api/scan/status/{barcode} for the analysis.
     """
-    barcode = scan_req.barcode.strip()
-    start_time = time.time()
-    
-    # Check memory cache first
-    mem_cached = memory_cache.get(barcode)
-    if mem_cached and mem_cached.get("analysis"):
+    try:
+        barcode = scan_req.barcode.strip()
+        start_time = time.time()
+        
+        # Check memory cache first
+        mem_cached = memory_cache.get(barcode)
+        if mem_cached and mem_cached.get("analysis"):
+            return {
+                "product_name": mem_cached.get("product_name", "Unknown"),
+                "brands": mem_cached.get("brands", ""),
+                "image_url": mem_cached.get("image_url", ""),
+                "analysis": mem_cached["analysis"],
+                "analysis_status": "complete",
+                "source": "memory_cache",
+                "response_time_ms": int((time.time() - start_time) * 1000)
+            }
+        
+        # Check MongoDB cache
+        cached = await get_cached_product(barcode)
+        if cached and cached.get("analysis"):
+            memory_cache.put(barcode, {
+                "product_name": cached.get("product_name"),
+                "brands": cached.get("brands"),
+                "ingredients_text": cached.get("ingredients_text"),
+                "image_url": cached.get("image_url"),
+                "analysis": cached["analysis"],
+            })
+            return {
+                "product_name": cached.get("product_name", "Unknown"),
+                "brands": cached.get("brands", ""),
+                "image_url": cached.get("image_url", ""),
+                "analysis": cached["analysis"],
+                "analysis_status": "complete",
+                "source": "cache",
+                "response_time_ms": int((time.time() - start_time) * 1000)
+            }
+        
+        # Not cached — fetch product info from databases using asyncio
+        product_data = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: _quick_fetch_product(barcode)
+        )
+        
+        if not product_data:
+            raise HTTPException(status_code=404, detail={
+                "error_code": "PRODUCT_NOT_FOUND",
+                "message": "Product not found in any database",
+                "suggestion": "Make sure the barcode is clear and well-lit."
+            })
+        
         return {
-            "product_name": mem_cached.get("product_name", "Unknown"),
-            "brands": mem_cached.get("brands", ""),
-            "image_url": mem_cached.get("image_url", ""),
-            "analysis": mem_cached["analysis"],
-            "analysis_status": "complete",
-            "source": "memory_cache",
+            "product_name": product_data.get("product_name", "Unknown"),
+            "brands": product_data.get("brands", ""),
+            "image_url": product_data.get("image_url", ""),
+            "ingredients_text": product_data.get("ingredients_text", ""),
+            "analysis": None,
+            "analysis_status": "pending",
+            "source": product_data.get("source", "unknown"),
             "response_time_ms": int((time.time() - start_time) * 1000)
         }
-    
-    # Check MongoDB cache
-    cached = await get_cached_product(barcode)
-    if cached and cached.get("analysis"):
-        memory_cache.put(barcode, {
-            "product_name": cached.get("product_name"),
-            "brands": cached.get("brands"),
-            "ingredients_text": cached.get("ingredients_text"),
-            "image_url": cached.get("image_url"),
-            "analysis": cached["analysis"],
-        })
-        return {
-            "product_name": cached.get("product_name", "Unknown"),
-            "brands": cached.get("brands", ""),
-            "image_url": cached.get("image_url", ""),
-            "analysis": cached["analysis"],
-            "analysis_status": "complete",
-            "source": "cache",
-            "response_time_ms": int((time.time() - start_time) * 1000)
-        }
-    
-    # Not cached — fetch product info from databases (fast part)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Quick scan error: {e}")
+        return {"error": str(e), "analysis_status": "error"}
+
+def _quick_fetch_product(barcode: str) -> Optional[Dict[str, Any]]:
+    """Synchronous helper to fetch product data from databases"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     product_data = None
     
-    try:
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = {
-                executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
-                executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
-                executor.submit(fetch_from_usda, barcode): "usda",
-                executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
-                executor.submit(fetch_from_brocade, barcode): "brocade",
-            }
-            
-            try:
-                for future in as_completed(futures, timeout=8):
-                    try:
-                        result = future.result(timeout=1)
-                        if result:
-                            if result.get("ingredients_text") or not product_data:
-                                product_data = result
-                            if result.get("ingredients_text"):
-                                break  # Got ingredients, no need to wait
-                    except Exception:
-                        pass
-            except TimeoutError:
-                logger.info(f"Quick scan: database lookup timed out for {barcode}")
-    except Exception as e:
-        logger.error(f"Quick scan executor error: {e}")
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+            executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
+            executor.submit(fetch_from_usda, barcode): "usda",
+            executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+            executor.submit(fetch_from_brocade, barcode): "brocade",
+        }
+        
+        try:
+            for future in as_completed(futures, timeout=8):
+                try:
+                    result = future.result(timeout=1)
+                    if result:
+                        if result.get("ingredients_text") or not product_data:
+                            product_data = result
+                        if result.get("ingredients_text"):
+                            break
+                except Exception:
+                    pass
+        except TimeoutError:
+            pass
     
-    if not product_data:
-        raise HTTPException(status_code=404, detail={
-            "error_code": "PRODUCT_NOT_FOUND",
-            "message": "Product not found in any database",
-            "suggestion": "Make sure the barcode is clear and well-lit."
-        })
-    
-    # Return product info immediately — analysis will be done by main /api/scan endpoint
-    return {
-        "product_name": product_data.get("product_name", "Unknown"),
-        "brands": product_data.get("brands", ""),
-        "image_url": product_data.get("image_url", ""),
-        "ingredients_text": product_data.get("ingredients_text", ""),
-        "analysis": None,
-        "analysis_status": "pending",
-        "source": product_data.get("source", "unknown"),
-        "response_time_ms": int((time.time() - start_time) * 1000)
-    }
+    return product_data
 
 @app.get("/api/scan/status/{barcode}")
 async def scan_status(barcode: str, current_user = Depends(get_current_user)):
