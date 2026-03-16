@@ -19,6 +19,7 @@ import logging
 import random
 import hashlib
 import hmac
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -33,6 +34,16 @@ logger = logging.getLogger("barcode_scanner")
 load_dotenv()
 
 app = FastAPI()
+
+# Global exception handler for unhandled errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.url.path}: {exc}")
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong. Please try again."}
+    )
 
 # CORS
 app.add_middleware(
@@ -933,7 +944,6 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     barcode_prefix = barcode[:2] if len(barcode) >= 2 else ""
     
     # Run all API sources in parallel using ThreadPoolExecutor
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     
     product_data = None
     source = "none"
@@ -971,19 +981,22 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         results_with_ingredients = []
         results_without_ingredients = []
         
-        for future in as_completed(futures, timeout=12):
-            src = futures[future]
-            try:
-                result = future.result()
-                if result:
-                    if result.get("ingredients_text"):
-                        results_with_ingredients.append((result, src))
-                        logger.info(f"{src}: Found product WITH ingredients")
-                    else:
-                        results_without_ingredients.append((result, src))
-                        logger.info(f"{src}: Found product WITHOUT ingredients")
-            except Exception as e:
-                logger.warning(f"{src} error: {e}")
+        try:
+            for future in as_completed(futures, timeout=15):
+                src = futures[future]
+                try:
+                    result = future.result()
+                    if result:
+                        if result.get("ingredients_text"):
+                            results_with_ingredients.append((result, src))
+                            logger.info(f"{src}: Found product WITH ingredients")
+                        else:
+                            results_without_ingredients.append((result, src))
+                            logger.info(f"{src}: Found product WITHOUT ingredients")
+                except Exception as e:
+                    logger.warning(f"{src} error: {e}")
+        except TimeoutError:
+            logger.warning(f"Some API sources timed out for {barcode}, using partial results")
         
         # Prefer results WITH ingredients
         if results_with_ingredients:
@@ -1149,14 +1162,6 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         "source": source,
         "response_time_ms": int(response_time * 1000)
     }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Scan endpoint crash for barcode {scan_req.barcode}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Scan failed: {str(e)[:200]}. Please try again."
-        )
 
 @app.get("/api/analytics/scans")
 async def get_scan_analytics():
