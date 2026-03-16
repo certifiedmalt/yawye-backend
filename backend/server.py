@@ -1149,6 +1149,14 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         "source": source,
         "response_time_ms": int(response_time * 1000)
     }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Scan endpoint crash for barcode {scan_req.barcode}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Scan failed: {str(e)[:200]}. Please try again."
+        )
 
 @app.get("/api/analytics/scans")
 async def get_scan_analytics():
