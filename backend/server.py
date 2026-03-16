@@ -1264,6 +1264,43 @@ async def admin_cache_count(key: str = ""):
     count = await product_cache_collection.count_documents({})
     return {"cached_products": count}
 
+@app.post("/api/admin/prewarm")
+async def admin_prewarm(request: Request, key: str = ""):
+    """Pre-warm cache by analyzing a product by name using AI (no barcode lookup needed)"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    body = await request.json()
+    barcode = body.get("barcode", "")
+    product_name = body.get("product_name", "")
+    if not barcode or not product_name:
+        raise HTTPException(status_code=400, detail="barcode and product_name required")
+    # Check if already cached
+    existing = await product_cache_collection.find_one({"barcode": barcode})
+    if existing and existing.get("analysis"):
+        return {"status": "already_cached", "barcode": barcode}
+    # Use AI to analyze by product name
+    try:
+        analysis = await analyze_ingredients_with_ai(product_name, "")
+        product_data = {
+            "barcode": barcode,
+            "product_name": product_name,
+            "brands": "",
+            "ingredients_text": "",
+            "image_url": "",
+            "analysis": analysis,
+            "cached_at": datetime.utcnow(),
+            "source": "ai_prewarm"
+        }
+        await product_cache_collection.update_one(
+            {"barcode": barcode},
+            {"$set": product_data},
+            upsert=True
+        )
+        return {"status": "cached", "barcode": barcode, "score": analysis.get("overall_score")}
+    except Exception as e:
+        logger.error(f"Prewarm error for {product_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
     scans = await scans_collection.find(
