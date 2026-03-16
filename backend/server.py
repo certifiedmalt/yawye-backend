@@ -1230,6 +1230,40 @@ async def clear_cache_with_key(key: str = ""):
     result = await product_cache_collection.delete_many({})
     return {"message": f"Cleared {result.deleted_count} cached products"}
 
+@app.post("/api/admin/cache_insert")
+async def admin_cache_insert(request: Request, key: str = ""):
+    """Admin endpoint to directly insert product data into cache for pre-warming"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    body = await request.json()
+    barcode = body.get("barcode")
+    if not barcode:
+        raise HTTPException(status_code=400, detail="barcode required")
+    product_data = {
+        "barcode": barcode,
+        "product_name": body.get("product_name", "Unknown"),
+        "brands": body.get("brands", ""),
+        "ingredients_text": body.get("ingredients_text", ""),
+        "image_url": body.get("image_url", ""),
+        "analysis": body.get("analysis"),
+        "cached_at": datetime.utcnow(),
+        "source": body.get("source", "admin_prewarm")
+    }
+    await product_cache_collection.update_one(
+        {"barcode": barcode},
+        {"$set": product_data},
+        upsert=True
+    )
+    return {"status": "ok", "barcode": barcode}
+
+@app.get("/api/admin/cache_count")
+async def admin_cache_count(key: str = ""):
+    """Get number of cached products"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    count = await product_cache_collection.count_documents({})
+    return {"cached_products": count}
+
 @app.get("/api/scans/history")
 async def get_scan_history(current_user = Depends(get_current_user)):
     scans = await scans_collection.find(
