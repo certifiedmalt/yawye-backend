@@ -1264,6 +1264,24 @@ async def admin_cache_count(key: str = ""):
     count = await product_cache_collection.count_documents({})
     return {"cached_products": count}
 
+@app.get("/api/admin/user_stats")
+async def admin_user_stats(key: str = ""):
+    """Get user and subscriber statistics"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    total_users = await users_collection.count_documents({})
+    premium_users = await users_collection.count_documents({"subscription_tier": "premium"})
+    free_users = total_users - premium_users
+    premium_list = []
+    async for u in users_collection.find({"subscription_tier": "premium"}, {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1}):
+        premium_list.append(u)
+    return {
+        "total_users": total_users,
+        "premium_subscribers": premium_users,
+        "free_users": free_users,
+        "premium_user_details": premium_list
+    }
+
 @app.post("/api/admin/prewarm")
 async def admin_prewarm(request: Request, key: str = ""):
     """Pre-warm cache by analyzing a product by name using AI (no barcode lookup needed)"""
