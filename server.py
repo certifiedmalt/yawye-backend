@@ -1296,7 +1296,7 @@ async def admin_reset_password(request: Request, key: str = ""):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     hashed = get_password_hash(new_password)
-    await users_collection.update_one({"email": email}, {"$set": {"password_hash": hashed}})
+    await users_collection.update_one({"email": email}, {"$set": {"password": hashed}})
     return {"status": "ok", "email": email}
 
 @app.post("/api/admin/prewarm")
