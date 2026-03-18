@@ -344,8 +344,11 @@ export default function Main() {
             <TouchableOpacity
               style={styles.settingsItem}
               onPress={() => {
-                import('react-native').then(({ Linking }) => {
-                  Linking.openURL('https://play.google.com/store/account/subscriptions');
+                import('react-native').then(({ Linking, Platform }) => {
+                  const url = Platform.OS === 'ios'
+                    ? 'https://apps.apple.com/account/subscriptions'
+                    : 'https://play.google.com/store/account/subscriptions';
+                  Linking.openURL(url);
                 });
               }}
             >
