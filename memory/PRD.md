@@ -85,6 +85,7 @@ Build a mobile food scanning app that analyzes food products via barcode, provid
 - Samsung Galaxy Store publishing
 - RevenueCat for Amazon IAP
 - Two-stage scan UI (frontend shows product name instantly, AI analysis loads after)
+- **Admin Dashboard**: Standalone web dashboard at `/admin` on Railway - live users, subscriptions, scan activity, revenue, user details, cache health. Built into existing FastAPI backend. (~50-100 credits)
 
 ## Credentials
 - Admin: jpsaila1986@gmail.com / hello123
