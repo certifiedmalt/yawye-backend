@@ -1282,6 +1282,23 @@ async def admin_user_stats(key: str = ""):
         "premium_user_details": premium_list
     }
 
+@app.post("/api/admin/reset_password")
+async def admin_reset_password(request: Request, key: str = ""):
+    """Admin endpoint to reset a user's password"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    body = await request.json()
+    email = body.get("email", "")
+    new_password = body.get("new_password", "")
+    if not email or not new_password:
+        raise HTTPException(status_code=400, detail="email and new_password required")
+    user = await users_collection.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    hashed = get_password_hash(new_password)
+    await users_collection.update_one({"email": email}, {"$set": {"password_hash": hashed}})
+    return {"status": "ok", "email": email}
+
 @app.post("/api/admin/prewarm")
 async def admin_prewarm(request: Request, key: str = ""):
     """Pre-warm cache by analyzing a product by name using AI (no barcode lookup needed)"""
