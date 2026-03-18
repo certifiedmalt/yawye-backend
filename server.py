@@ -1296,8 +1296,12 @@ async def admin_reset_password(request: Request, key: str = ""):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     hashed = get_password_hash(new_password)
-    await users_collection.update_one({"email": email}, {"$set": {"password": hashed}})
-    return {"status": "ok", "email": email}
+    # Update all possible password field names
+    update_fields = {"password": hashed, "password_hash": hashed}
+    await users_collection.update_one({"email": email}, {"$set": update_fields})
+    # Return field names for debugging
+    user_fields = [k for k in user.keys() if k != "_id"]
+    return {"status": "ok", "email": email, "fields": user_fields}
 
 @app.post("/api/admin/prewarm")
 async def admin_prewarm(request: Request, key: str = ""):
