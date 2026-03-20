@@ -46,18 +46,21 @@ Build a mobile food scanning app that analyzes food products via barcode, provid
 
 ## What's Been Implemented
 - Full barcode scanning with 7 food databases + GPT-4o analysis
+- **Two-stage scan: `/api/scan/quick` (instant product lookup) + `/api/scan/status/{barcode}` (poll for AI analysis)** (Mar 2026)
 - User auth (register, login, forgot password)
 - Subscription system (RevenueCat + Google Play + Apple IAP + webhook)
 - Gamification (streaks, XP, daily quests, achievements)
 - Health Assistant AI chat
 - Push notifications
-- App version v1.0.26 live on Google Play
+- App version v1.0.27 with two-stage scan + iOS Manage Subscription fix
 - iOS build submitted to App Store Connect (pending Apple review)
 - Static website served from backend (privacy, terms, support)
 - AI analysis with carcinogen detection, chemical breakdown, shocking facts, alternatives
-- **Product cache pre-warmed with 90 common UK grocery products** (Mar 2026)
-- **Global exception handler for unhandled errors** (Mar 2026)
-- **TimeoutError handling in ThreadPoolExecutor** (Mar 2026)
+- Product cache pre-warmed with 90 common UK grocery products (Mar 2026)
+- Global exception handler for unhandled errors (Mar 2026)
+- TimeoutError handling in ThreadPoolExecutor (Mar 2026)
+- **iOS "Manage Subscription" now opens correct store per platform** (Mar 2026)
+- **Admin endpoints: user_stats, reset_password, cache_count, cache_insert, prewarm** (Mar 2026)
 
 ## Bug Fixes Applied (Mar 2026)
 - Fixed SyntaxError from orphaned except blocks in scan_product function
