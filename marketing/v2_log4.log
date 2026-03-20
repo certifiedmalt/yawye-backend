@@ -1,0 +1,27 @@
+Generating Video 4/4: White man - comparing two products...
+Video generation initiated with ID: video_69b088db21b08190b3c42f8f016293ab05423dd56d15a727
+Waiting for video generation to complete (ID: video_69b088db21b08190b3c42f8f016293ab05423dd56d15a727)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (11s elapsed, status: queued, progress: 0%)
+Still processing... (23s elapsed, status: in_progress, progress: 10%)
+Still processing... (39s elapsed, status: in_progress, progress: 65%)
+Still processing... (57s elapsed, status: in_progress, progress: 76%)
+Still processing... (78s elapsed, status: in_progress, progress: 90%)
+Still processing... (103s elapsed, status: in_progress, progress: 90%)
+Still processing... (133s elapsed, status: in_progress, progress: 90%)
+Still processing... (164s elapsed, status: in_progress, progress: 90%)
+Still processing... (194s elapsed, status: in_progress, progress: 90%)
+Still processing... (225s elapsed, status: in_progress, progress: 90%)
+Still processing... (255s elapsed, status: in_progress, progress: 90%)
+Still processing... (285s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b088db21b08190b3c42f8f016293ab05423dd56d15a727/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b088db21b08190b3c42f8f016293ab05423dd56d15a727/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b088db21b08190b3c42f8f016293ab05423dd56d15a727/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b088db21b08190b3c42f8f016293ab05423dd56d15a727/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 4627172
+Downloaded 4627172 bytes
+Video saved to: /app/marketing/ad_v2_clip4_man_compare.mp4
+DONE: Video 4 saved!

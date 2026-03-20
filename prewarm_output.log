@@ -1,0 +1,22 @@
+Logging in...
+Current cache size: ? products
+
+Starting cache pre-warm for 91 products...
+Scan timeout: 45s, delay between scans: 1s
+------------------------------------------------------------
+[1/91] CACHED: Coca-Cola score:2 (0.2s)
+[2/91] CACHED: Coca-Cola Zero score:3 (0.2s)
+[3/91] NEW: Diet Coke score:2 via ? (26.7s)
+[4/91] CACHED: Fanta Orange score:3 (0.3s)
+[5/91] NEW: Sprite score:2 via ? (29.0s)
+[6/91] NOT FOUND: Fanta Lemon (31.9s)
+[7/91] NOT FOUND: Coca-Cola Cherry (31.7s)
+[8/91] CACHED: Heinz Baked Beans score:2 (0.3s)
+[9/91] NOT FOUND: Heinz Tomato Soup (31.8s)
+[10/91] CACHED: Heinz Beans score:5 (0.3s)
+[11/91] NOT FOUND: HP Sauce (31.6s)
+[12/91] CACHED: Marmite score:5 (0.3s)
+[13/91] NOT FOUND: Lurpak (31.7s)
+[14/91] NOT FOUND: Lurpak Butter (31.7s)
+[15/91] NOT FOUND: Kelloggs Corn Flakes (31.9s)
+[16/91] NOT FOUND: Weetabix (31.5s)

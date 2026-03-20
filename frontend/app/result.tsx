@@ -9,12 +9,17 @@ import {
   Animated,
   Easing,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Haptics from 'expo-haptics';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-production-66c05.up.railway.app';
 
 interface HarmfulIngredient {
   name: string;
@@ -88,12 +93,13 @@ export default function Result() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [productData, setProductData] = useState<ProductData | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
   const scoreAnim = useRef(new Animated.Value(0)).current;
+  const { token } = useAuth();
 
   useEffect(() => {
-    if (productData) {
-      // Animate the score ring whenever productData changes
+    if (productData?.analysis) {
       Animated.timing(scoreAnim, {
         toValue: productData.analysis.overall_score,
         duration: 800,
@@ -101,7 +107,7 @@ export default function Result() {
         useNativeDriver: false,
       }).start();
     }
-  }, [productData]);
+  }, [productData?.analysis]);
 
   const [showResearchModal, setShowResearchModal] = useState(false);
   const confettiRef = useRef<any>(null);
@@ -112,21 +118,80 @@ export default function Result() {
         const data = JSON.parse(params.productData as string);
         setProductData(data);
         
-        // Celebrate healthy products!
-        if (data.analysis.overall_score >= 8) {
-          // Trigger confetti
-          confettiRef.current?.start();
-          // Haptic feedback
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else if (data.analysis.overall_score <= 3) {
-          // Warning haptic for unhealthy products
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        // If analysis is complete, celebrate
+        if (data.analysis) {
+          if (data.analysis.overall_score >= 8) {
+            confettiRef.current?.start();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } else if (data.analysis.overall_score <= 3) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          }
+        }
+        
+        // If needs analysis polling, start it
+        if (params.needsAnalysis === 'true' && params.barcode) {
+          setAnalysisLoading(true);
+          pollForAnalysis(params.barcode as string);
         }
       } catch (error) {
         console.error('Error parsing product data:', error);
       }
     }
-  }, [params]);
+  }, []);
+
+  const pollForAnalysis = async (barcode: string) => {
+    const maxAttempts = 20; // Poll for up to 60 seconds (20 * 3s)
+    let attempts = 0;
+    
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setAnalysisLoading(false);
+        return;
+      }
+      attempts++;
+      
+      try {
+        const response = await axios.get(
+          `${BACKEND_URL}/api/scan/status/${barcode}`,
+          { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 }
+        );
+        
+        if (response.data.status === 'complete' && response.data.analysis) {
+          setProductData(response.data);
+          setAnalysisLoading(false);
+          
+          // Celebrate/warn based on score
+          if (response.data.analysis.overall_score >= 8) {
+            confettiRef.current?.start();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } else if (response.data.analysis.overall_score <= 3) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          }
+
+          // Update gamification streak (non-blocking)
+          try {
+            await axios.post(
+              `${BACKEND_URL}/api/gamification/update-streak`,
+              {},
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } catch (e) {
+            console.log('Gamification update failed');
+          }
+          return;
+        }
+        
+        // Still analyzing, poll again in 3 seconds
+        setTimeout(poll, 3000);
+      } catch (error) {
+        console.error('Poll error:', error);
+        setTimeout(poll, 3000);
+      }
+    };
+    
+    // Start polling after 3 seconds
+    setTimeout(poll, 3000);
+  };
 
   const toggleResearch = (ingredientName: string) => {
     setExpandedResearch(prev => ({
@@ -144,14 +209,14 @@ export default function Result() {
   }
 
   const { product_name, brands, image_url, analysis } = productData;
-  const scoreColor =
+  const scoreColor = !analysis ? '#4CAF50' :
     analysis.overall_score >= 7
-      ? '#00E676' // Bright vibrant green for healthy!
+      ? '#00E676'
       : analysis.overall_score >= 4
-      ? '#FFD54F' // Bright yellow for mediocre
-      : '#FF5252'; // Red for unhealthy
+      ? '#FFD54F'
+      : '#FF5252';
   
-  const scoreGradient = 
+  const scoreGradient = !analysis ? ['#4CAF50', '#388E3C'] :
     analysis.overall_score >= 7
       ? ['#00E676', '#00C853'] // Green gradient for healthy
       : analysis.overall_score >= 4
@@ -179,6 +244,16 @@ export default function Result() {
           <Text style={styles.brandName}>{brands}</Text>
         </View>
 
+        {analysisLoading && !analysis ? (
+          <View style={[styles.scoreCard, { borderColor: '#4CAF50' }]}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={[styles.scoreLabel, { marginTop: 16 }]}>Analyzing ingredients...</Text>
+            <Text style={[styles.recommendation, { marginTop: 8, fontSize: 14 }]}>
+              Our AI is reviewing this product. This usually takes 10-15 seconds.
+            </Text>
+          </View>
+        ) : analysis ? (
+          <>
         <View style={[styles.scoreCard, { borderColor: scoreColor }]}>
           <Text style={styles.scoreLabel}>Health Score</Text>
 
@@ -443,6 +518,8 @@ export default function Result() {
           <Ionicons name="book-outline" size={20} color="#4CAF50" />
           <Text style={styles.viewResearchText}>View All Research Studies</Text>
         </TouchableOpacity>
+          </>
+        ) : null}
 
         <TouchableOpacity
           style={styles.scanAgainButton}

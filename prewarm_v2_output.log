@@ -1,0 +1,13 @@
+Logging in...
+Cache: 13 products
+
+Pre-warming 91 products...
+------------------------------------------------------------
+[1/91] CACHED: Coca-Cola Original score:2 (0.2s)
+[2/91] CACHED: Coca-Cola Zero Sugar score:3 (0.2s)
+[3/91] CACHED: Diet Coke score:2 (0.2s)
+[4/91] CACHED: Fanta Orange score:3 (0.1s)
+[5/91] CACHED: Sprite score:2 (0.1s)
+[6/91] FAIL: Fanta Lemon - HTTPSConnectionPool(host='web-production-66c05.up.
+[7/91] FAIL: Coca-Cola Cherry - HTTPSConnectionPool(host='web-production-66c05.up.
+[8/91] CACHED: Heinz Baked Beans score:2 (0.3s)

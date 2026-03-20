@@ -1,0 +1,21 @@
+Generating Video 1/4: Young Black woman - unhealthy scan result...
+Video generation initiated with ID: video_69b08313dfe88198ae5a11ba438e4434011bb695f5489b97
+Waiting for video generation to complete (ID: video_69b08313dfe88198ae5a11ba438e4434011bb695f5489b97)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (11s elapsed, status: queued, progress: 0%)
+Still processing... (23s elapsed, status: in_progress, progress: 10%)
+Still processing... (38s elapsed, status: in_progress, progress: 64%)
+Still processing... (56s elapsed, status: in_progress, progress: 75%)
+Still processing... (78s elapsed, status: in_progress, progress: 99%)
+Still processing... (104s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b08313dfe88198ae5a11ba438e4434011bb695f5489b97/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b08313dfe88198ae5a11ba438e4434011bb695f5489b97/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b08313dfe88198ae5a11ba438e4434011bb695f5489b97/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b08313dfe88198ae5a11ba438e4434011bb695f5489b97/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 3574334
+Downloaded 3574334 bytes
+Video saved to: /app/marketing/ad_v2_clip1_woman_unhealthy.mp4
+DONE: Video 1 saved!

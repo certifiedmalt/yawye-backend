@@ -1,0 +1,21 @@
+Generating Video 2/4: Asian man - healthy scan result...
+Video generation initiated with ID: video_69b087a9a0f08191a437686a93bb6c780a9b89ffb789282c
+Waiting for video generation to complete (ID: video_69b087a9a0f08191a437686a93bb6c780a9b89ffb789282c)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (11s elapsed, status: queued, progress: 0%)
+Still processing... (24s elapsed, status: in_progress, progress: 40%)
+Still processing... (38s elapsed, status: in_progress, progress: 64%)
+Still processing... (56s elapsed, status: in_progress, progress: 75%)
+Still processing... (77s elapsed, status: in_progress, progress: 90%)
+Still processing... (103s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b087a9a0f08191a437686a93bb6c780a9b89ffb789282c/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b087a9a0f08191a437686a93bb6c780a9b89ffb789282c/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b087a9a0f08191a437686a93bb6c780a9b89ffb789282c/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b087a9a0f08191a437686a93bb6c780a9b89ffb789282c/content
+Initial response status: 200
+Content-Type: video/mp4
+Content-Length: 3909886
+Downloaded 3909886 bytes
+Video saved to: /app/marketing/ad_v2_clip2_man_healthy.mp4
+DONE: Video 2 saved!
