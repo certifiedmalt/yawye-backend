@@ -1163,6 +1163,145 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         "response_time_ms": int(response_time * 1000)
     }
 
+# Background AI analysis task storage
+_pending_analyses = {}
+
+@app.post("/api/scan/quick")
+async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user)):
+    """
+    Stage 1: Quick product lookup - returns product name/image fast.
+    If cached with full analysis, returns everything immediately.
+    If not cached, fetches product data from food DBs and starts background AI analysis.
+    """
+    barcode = scan_req.barcode.strip()
+    
+    # Check subscription limits
+    subscription_tier = current_user.get("subscription_tier", "free")
+    total_scans = current_user.get("total_scans", 0)
+    if subscription_tier == "free" and total_scans >= 5:
+        raise HTTPException(status_code=403, detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans.")
+    
+    # Check cache first - if full analysis exists, return it immediately
+    cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
+    if cached and cached.get("analysis"):
+        # Increment scan count
+        user_id = str(current_user["_id"])
+        await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+        return {
+            "status": "complete",
+            "product_name": cached.get("product_name"),
+            "brands": cached.get("brands", ""),
+            "ingredients_text": cached.get("ingredients_text", ""),
+            "image_url": cached.get("image_url", ""),
+            "analysis": cached.get("analysis"),
+            "source": cached.get("source", "cache")
+        }
+    
+    # Not in cache - do a quick product lookup (no AI)
+    product_data = None
+    source = "none"
+    
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {}
+        futures[executor.submit(fetch_openfoodfacts, barcode)] = "openfoodfacts"
+        futures[executor.submit(fetch_openfoodfacts_uk, barcode)] = "openfoodfacts_uk"
+        futures[executor.submit(fetch_upc_itemdb, barcode)] = "upc_itemdb"
+        futures[executor.submit(fetch_usda, barcode)] = "usda"
+        futures[executor.submit(fetch_brocade, barcode)] = "brocade"
+        
+        results_with_ingredients = []
+        results_without_ingredients = []
+        
+        try:
+            for future in as_completed(futures, timeout=10):
+                src = futures[future]
+                try:
+                    result = future.result()
+                    if result:
+                        if result.get("ingredients_text"):
+                            results_with_ingredients.append((result, src))
+                        else:
+                            results_without_ingredients.append((result, src))
+                except Exception as e:
+                    logger.warning(f"Quick scan {src} error: {e}")
+        except TimeoutError:
+            logger.warning(f"Quick scan: some sources timed out for {barcode}")
+        
+        if results_with_ingredients:
+            product_data, source = results_with_ingredients[0]
+        elif results_without_ingredients:
+            product_data, source = results_without_ingredients[0]
+    
+    if not product_data:
+        raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
+    
+    # Increment scan count
+    await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+    
+    # Start background AI analysis
+    ingredients_text = product_data.get("ingredients_text", "")
+    product_name = product_data.get("product_name", "Unknown")
+    
+    async def run_background_analysis():
+        try:
+            if ingredients_text:
+                analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
+            else:
+                analysis = await analyze_product_by_name(product_name)
+            
+            # Cache the full result
+            cache_data = {
+                "barcode": barcode,
+                "product_name": product_name,
+                "brands": product_data.get("brands", ""),
+                "ingredients_text": ingredients_text,
+                "image_url": product_data.get("image_url", ""),
+                "analysis": analysis,
+                "cached_at": datetime.utcnow(),
+                "source": source
+            }
+            await product_cache_collection.update_one(
+                {"barcode": barcode},
+                {"$set": cache_data},
+                upsert=True
+            )
+            logger.info(f"Background analysis complete for {barcode}: score {analysis.get('overall_score')}")
+        except Exception as e:
+            logger.error(f"Background analysis failed for {barcode}: {e}")
+    
+    # Fire and forget the background analysis
+    import asyncio
+    asyncio.create_task(run_background_analysis())
+    
+    return {
+        "status": "analyzing",
+        "product_name": product_name,
+        "brands": product_data.get("brands", ""),
+        "ingredients_text": ingredients_text,
+        "image_url": product_data.get("image_url", ""),
+        "analysis": None,
+        "source": source
+    }
+
+@app.get("/api/scan/status/{barcode}")
+async def scan_status(barcode: str, current_user = Depends(get_current_user)):
+    """
+    Stage 2: Poll for analysis results. Returns full data when AI analysis is complete.
+    """
+    cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
+    if cached and cached.get("analysis"):
+        return {
+            "status": "complete",
+            "product_name": cached.get("product_name"),
+            "brands": cached.get("brands", ""),
+            "ingredients_text": cached.get("ingredients_text", ""),
+            "image_url": cached.get("image_url", ""),
+            "analysis": cached.get("analysis"),
+            "source": cached.get("source", "cache")
+        }
+    
+    return {"status": "analyzing"}
+
 @app.get("/api/analytics/scans")
 async def get_scan_analytics():
     """Get scan analytics summary for monitoring"""

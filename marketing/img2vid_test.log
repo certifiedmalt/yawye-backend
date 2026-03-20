@@ -1,0 +1,4 @@
+Testing image-to-video with app screenshot as starting frame...
+Error initiating video generation: 400 Client Error: Bad Request for url: https://integrations.emergentagent.com/llm/openai/v1/videos
+Response content: {"error":{"message":"{\n  \"error\": {\n    \"message\": \"Unknown parameter: 'reference_image'.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"reference_image\",\n    \"code\": \"unknown_parameter\"\n  }\n}","type":"None","param":"None","code":"400"}}
+FAILED

@@ -64,28 +64,46 @@ export default function Scan() {
 
     try {
       console.log('Scanned barcode:', data);
-      const response = await axios.post(
-        `${BACKEND_URL}/api/scan`,
+      
+      // Stage 1: Quick lookup - get product name/image fast
+      const quickResponse = await axios.post(
+        `${BACKEND_URL}/api/scan/quick`,
         { barcode: data },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 30000 }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
       );
 
-      // Update gamification streak (non-blocking)
-      try {
-        await axios.post(
-          `${BACKEND_URL}/api/gamification/update-streak`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      } catch (e: any) {
-        console.log('Gamification streak update failed', e?.response?.data || e?.message);
-      }
+      const quickData = quickResponse.data;
+      
+      // If fully cached, navigate immediately with complete data
+      if (quickData.status === 'complete') {
+        // Update gamification streak (non-blocking)
+        try {
+          await axios.post(
+            `${BACKEND_URL}/api/gamification/update-streak`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (e: any) {
+          console.log('Gamification streak update failed', e?.response?.data || e?.message);
+        }
 
-      // Navigate to result page with product data
+        router.push({
+          pathname: '/result',
+          params: { productData: JSON.stringify(quickData) },
+        });
+        return;
+      }
+      
+      // Stage 2: Navigate with partial data, result page will poll for analysis
       router.push({
         pathname: '/result',
-        params: { productData: JSON.stringify(response.data) },
+        params: { 
+          productData: JSON.stringify(quickData),
+          barcode: data,
+          needsAnalysis: 'true'
+        },
       });
+
     } catch (error: any) {
       console.error('Scan error:', error.response?.data);
       const detail = error.response?.data?.detail;
@@ -132,27 +150,39 @@ export default function Scan() {
     setScannedBarcode(manualCode);
 
     try {
-      const response = await axios.post(
-        `${BACKEND_URL}/api/scan`,
+      const quickResponse = await axios.post(
+        `${BACKEND_URL}/api/scan/quick`,
         { barcode: manualCode },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
       );
 
-      // Update gamification streak (non-blocking)
-      try {
-        await axios.post(
-          `${BACKEND_URL}/api/gamification/update-streak`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      } catch (e: any) {
-        console.log('Gamification streak update failed', e?.response?.data || e?.message);
-      }
+      const quickData = quickResponse.data;
 
-      router.push({
-        pathname: '/result',
-        params: { productData: JSON.stringify(response.data) },
-      });
+      if (quickData.status === 'complete') {
+        try {
+          await axios.post(
+            `${BACKEND_URL}/api/gamification/update-streak`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (e: any) {
+          console.log('Gamification streak update failed', e?.response?.data || e?.message);
+        }
+
+        router.push({
+          pathname: '/result',
+          params: { productData: JSON.stringify(quickData) },
+        });
+      } else {
+        router.push({
+          pathname: '/result',
+          params: { 
+            productData: JSON.stringify(quickData),
+            barcode: manualCode,
+            needsAnalysis: 'true'
+          },
+        });
+      }
     } catch (error: any) {
       const detail = error.response?.data?.detail;
       const errorMessage = typeof detail === 'object'

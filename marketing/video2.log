@@ -1,0 +1,19 @@
+Generating Video 2: App Score Reveal (Healthy)...
+Video generation initiated with ID: video_69b0712e9a6c8190adc5c3ef858bc98c03b9ba4ffcf7ee20
+Waiting for video generation to complete (ID: video_69b0712e9a6c8190adc5c3ef858bc98c03b9ba4ffcf7ee20)...
+Still processing... (0s elapsed, status: in_progress, progress: 0%)
+Still processing... (10s elapsed, status: queued, progress: 0%)
+Still processing... (22s elapsed, status: in_progress, progress: 40%)
+Still processing... (37s elapsed, status: in_progress, progress: 51%)
+Still processing... (55s elapsed, status: in_progress, progress: 77%)
+Still processing... (76s elapsed, status: in_progress, progress: 90%)
+Still processing... (102s elapsed, status: in_progress, progress: 99%)
+Video generation completed!
+No URL in response, constructed download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0712e9a6c8190adc5c3ef858bc98c03b9ba4ffcf7ee20/content
+Video ready at: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0712e9a6c8190adc5c3ef858bc98c03b9ba4ffcf7ee20/content
+Downloading video from: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0712e9a6c8190adc5c3ef858bc98c03b9ba4ffcf7ee20/content
+Final download URL: https://integrations.emergentagent.com/llm/openai/v1/videos/video_69b0712e9a6c8190adc5c3ef858bc98c03b9ba4ffcf7ee20/content
+Initial response status: 400
+Error: Final status code: 400
+Response text: {"error":{"message":"Budget has been exceeded! Current cost: 6.181107849999997, Max budget: 5.4","type":"budget_exceeded","param":null,"code":"400"}}
+FAILED: Video 2 generation failed
