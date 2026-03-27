@@ -1203,11 +1203,11 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {}
-        futures[executor.submit(fetch_openfoodfacts, barcode)] = "openfoodfacts"
-        futures[executor.submit(fetch_openfoodfacts_uk, barcode)] = "openfoodfacts_uk"
-        futures[executor.submit(fetch_upc_itemdb, barcode)] = "upc_itemdb"
-        futures[executor.submit(fetch_usda, barcode)] = "usda"
-        futures[executor.submit(fetch_brocade, barcode)] = "brocade"
+        futures[executor.submit(fetch_from_openfoodfacts, barcode)] = "openfoodfacts"
+        futures[executor.submit(fetch_from_off_uk, barcode)] = "openfoodfacts_uk"
+        futures[executor.submit(fetch_from_upcitemdb, barcode)] = "upcitemdb"
+        futures[executor.submit(fetch_from_usda, barcode)] = "usda"
+        futures[executor.submit(fetch_from_brocade, barcode)] = "brocade"
         
         results_with_ingredients = []
         results_without_ingredients = []
@@ -1247,7 +1247,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             if ingredients_text:
                 analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
             else:
-                analysis = await analyze_product_by_name(product_name)
+                analysis = await analyze_ingredients_with_ai(product_name, "")
             
             # Cache the full result
             cache_data = {
