@@ -181,6 +181,12 @@ export default function Result() {
           return;
         }
         
+        // AI analysis failed on backend
+        if (response.data.status === 'error') {
+          setAnalysisLoading(false);
+          return;
+        }
+        
         // Still analyzing, poll again in 3 seconds
         setTimeout(poll, 3000);
       } catch (error) {
