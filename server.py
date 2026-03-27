@@ -344,7 +344,7 @@ def fetch_from_fatsecret(barcode: str) -> Optional[Dict[str, Any]]:
         
         # Make request
         url = f"{FATSECRET_API_URL}?{urllib.parse.urlencode(oauth_params)}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=10, headers={"User-Agent": "YAWYE-App/1.0 (contact@yawye.app)"})
         
         if response.status_code == 200:
             data = response.json()
@@ -366,7 +366,7 @@ def fetch_from_fatsecret(barcode: str) -> Optional[Dict[str, Any]]:
                 oauth_params["oauth_signature"] = base64.b64encode(signature).decode('utf-8')
                 
                 detail_url = f"{FATSECRET_API_URL}?{urllib.parse.urlencode(oauth_params)}"
-                detail_response = requests.get(detail_url, timeout=10)
+                detail_response = requests.get(detail_url, timeout=10, headers={"User-Agent": "YAWYE-App/1.0 (contact@yawye.app)"})
                 
                 if detail_response.status_code == 200:
                     food_data = detail_response.json().get("food", {})
@@ -416,7 +416,8 @@ def fetch_from_off_search(barcode: str) -> Optional[Dict[str, Any]]:
     try:
         # Try the v2 search endpoint which sometimes finds products the direct lookup misses
         search_url = f"https://world.openfoodfacts.org/cgi/search.pl?search_terms={barcode}&search_simple=1&action=process&json=1&page_size=1"
-        response = requests.get(search_url, timeout=10)
+        headers = {"User-Agent": "YAWYE-App/1.0 (contact@yawye.app)"}
+        response = requests.get(search_url, timeout=10, headers=headers)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -466,7 +467,8 @@ def fetch_from_brocade(barcode: str) -> Optional[Dict[str, Any]]:
     try:
         # Pad barcode to 14 digits (GTIN format)
         gtin = barcode.zfill(14)
-        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=8)
+        headers = {"User-Agent": "YAWYE-App/1.0 (contact@yawye.app)"}
+        response = requests.get(f"{BROCADE_API_URL}/{gtin}", timeout=8, headers=headers)
         
         if response and response.status_code == 200:
             data = response.json()
@@ -1172,9 +1174,10 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     """
     Stage 1: Quick product lookup - returns product name/image fast.
     If cached with full analysis, returns everything immediately.
-    If not cached, fetches product data from food DBs and starts background AI analysis.
+    If not cached, fetches product data from ALL food DBs and starts background AI analysis.
     """
     barcode = scan_req.barcode.strip()
+    logger.info(f"Quick scan request for barcode: {barcode}")
     
     # Check subscription limits
     subscription_tier = current_user.get("subscription_tier", "free")
@@ -1185,9 +1188,8 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     # Check cache first - if full analysis exists, return it immediately
     cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
     if cached and cached.get("analysis"):
-        # Increment scan count
-        user_id = str(current_user["_id"])
         await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+        logger.info(f"Cache hit for {barcode}")
         return {
             "status": "complete",
             "product_name": cached.get("product_name"),
@@ -1198,31 +1200,40 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             "source": cached.get("source", "cache")
         }
     
-    # Not in cache - do a quick product lookup (no AI)
+    # Check if a previous analysis failed - clear it so we retry
+    if cached and cached.get("analysis_error"):
+        await product_cache_collection.delete_one({"barcode": barcode})
+    
+    # Not in cache - do a quick product lookup from ALL sources (no AI yet)
     product_data = None
     source = "none"
     
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {}
-        futures[executor.submit(fetch_from_openfoodfacts, barcode)] = "openfoodfacts"
-        futures[executor.submit(fetch_from_off_uk, barcode)] = "openfoodfacts_uk"
-        futures[executor.submit(fetch_from_upcitemdb, barcode)] = "upcitemdb"
-        futures[executor.submit(fetch_from_usda, barcode)] = "usda"
-        futures[executor.submit(fetch_from_brocade, barcode)] = "brocade"
+    with ThreadPoolExecutor(max_workers=7) as executor:
+        futures = {
+            executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
+            executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
+            executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
+            executor.submit(fetch_from_usda, barcode): "usda",
+            executor.submit(fetch_from_brocade, barcode): "brocade",
+            executor.submit(fetch_from_off_search, barcode): "openfoodfacts_search",
+            executor.submit(fetch_from_fatsecret, barcode): "fatsecret",
+        }
         
         results_with_ingredients = []
         results_without_ingredients = []
         
         try:
-            for future in as_completed(futures, timeout=10):
+            for future in as_completed(futures, timeout=12):
                 src = futures[future]
                 try:
                     result = future.result()
                     if result:
                         if result.get("ingredients_text"):
                             results_with_ingredients.append((result, src))
+                            logger.info(f"Quick scan {src}: found WITH ingredients")
                         else:
                             results_without_ingredients.append((result, src))
+                            logger.info(f"Quick scan {src}: found WITHOUT ingredients")
                 except Exception as e:
                     logger.warning(f"Quick scan {src} error: {e}")
         except TimeoutError:
@@ -1234,19 +1245,8 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             product_data, source = results_without_ingredients[0]
     
     if not product_data:
-        # Quick lookup failed - fall back to the full scan endpoint
-        # This handles products that need fallback searches (OFF search, FatSecret, etc.)
-        try:
-            logger.info(f"Quick scan fallback: running full scan for {barcode}")
-            # Call the internal scan logic directly
-            full_scan_req = ScanRequest(barcode=barcode)
-            result = await scan_product(full_scan_req, current_user)
-            return result
-        except HTTPException as he:
-            raise he
-        except Exception as e:
-            logger.error(f"Quick scan fallback failed for {barcode}: {e}")
-            raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
+        logger.warning(f"Quick scan: NO product found in any source for {barcode}")
+        raise HTTPException(status_code=404, detail="Product not found in any database. Please check the barcode and try again.")
     
     # Increment scan count
     await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
@@ -1255,12 +1255,25 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     ingredients_text = product_data.get("ingredients_text", "")
     product_name = product_data.get("product_name", "Unknown")
     
+    # Save scan to history immediately (analysis will be added when complete)
+    scan_doc = {
+        "user_id": str(current_user["_id"]),
+        "barcode": barcode,
+        "product_name": product_name,
+        "brands": product_data.get("brands", ""),
+        "ingredients_text": ingredients_text,
+        "image_url": product_data.get("image_url", ""),
+        "analysis": None,
+        "scanned_at": datetime.utcnow(),
+        "source": source
+    }
+    scan_insert = await scans_collection.insert_one(scan_doc)
+    scan_id = str(scan_insert.inserted_id)
+    
     async def run_background_analysis():
         try:
-            if ingredients_text:
-                analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
-            else:
-                analysis = await analyze_ingredients_with_ai(product_name, "")
+            logger.info(f"Background AI analysis starting for {barcode} ({product_name})")
+            analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
             
             # Cache the full result
             cache_data = {
@@ -1278,14 +1291,36 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 {"$set": cache_data},
                 upsert=True
             )
+            
+            # Update the scan history entry with the analysis
+            await scans_collection.update_one(
+                {"_id": ObjectId(scan_id)},
+                {"$set": {"analysis": analysis}}
+            )
+            
             logger.info(f"Background analysis complete for {barcode}: score {analysis.get('overall_score')}")
         except Exception as e:
-            logger.error(f"Background analysis failed for {barcode}: {e}")
+            logger.error(f"Background analysis FAILED for {barcode}: {e}")
+            # Mark the error in cache so the status endpoint can report it
+            await product_cache_collection.update_one(
+                {"barcode": barcode},
+                {"$set": {
+                    "barcode": barcode,
+                    "product_name": product_name,
+                    "brands": product_data.get("brands", ""),
+                    "ingredients_text": ingredients_text,
+                    "image_url": product_data.get("image_url", ""),
+                    "analysis_error": str(e),
+                    "cached_at": datetime.utcnow(),
+                    "source": source
+                }},
+                upsert=True
+            )
     
     # Fire and forget the background analysis
-    import asyncio
     asyncio.create_task(run_background_analysis())
     
+    logger.info(f"Quick scan returning 'analyzing' for {barcode} ({product_name}) from {source}")
     return {
         "status": "analyzing",
         "product_name": product_name,
@@ -1300,18 +1335,27 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
 async def scan_status(barcode: str, current_user = Depends(get_current_user)):
     """
     Stage 2: Poll for analysis results. Returns full data when AI analysis is complete.
+    Also reports errors so the frontend doesn't poll forever.
     """
     cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
-    if cached and cached.get("analysis"):
-        return {
-            "status": "complete",
-            "product_name": cached.get("product_name"),
-            "brands": cached.get("brands", ""),
-            "ingredients_text": cached.get("ingredients_text", ""),
-            "image_url": cached.get("image_url", ""),
-            "analysis": cached.get("analysis"),
-            "source": cached.get("source", "cache")
-        }
+    if cached:
+        if cached.get("analysis"):
+            return {
+                "status": "complete",
+                "product_name": cached.get("product_name"),
+                "brands": cached.get("brands", ""),
+                "ingredients_text": cached.get("ingredients_text", ""),
+                "image_url": cached.get("image_url", ""),
+                "analysis": cached.get("analysis"),
+                "source": cached.get("source", "cache")
+            }
+        if cached.get("analysis_error"):
+            return {
+                "status": "error",
+                "error": "AI analysis failed. Please try scanning again.",
+                "product_name": cached.get("product_name"),
+                "brands": cached.get("brands", ""),
+            }
     
     return {"status": "analyzing"}
 
