@@ -14,7 +14,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Scan product barcodes to analyze ingredients"
       },
-      "buildNumber": "28"
+      "buildNumber": "29"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
         "backgroundColor": "#000000"
       },
       "package": "com.youarewhatyoueat.app",
-      "versionCode": 28,
+      "versionCode": 29,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",

@@ -317,12 +317,12 @@ export default function Main() {
                 }
               }}>
               <Text style={styles.upgradeButtonText}>
-                {purchaseInProgress ? 'Processing...' : 'Start 7-Day Free Trial'}
+                {purchaseInProgress ? 'Processing...' : 'Subscribe Now'}
               </Text>
             </TouchableOpacity>
             <Text style={styles.trialText}>
               {offerings?.availablePackages?.[0]?.product?.priceString 
-                ? `Then ${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
+                ? `${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
                 : 'Cancel anytime.'}
             </Text>
           </View>
