@@ -1233,7 +1233,19 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             product_data, source = results_without_ingredients[0]
     
     if not product_data:
-        raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
+        # Quick lookup failed - fall back to the full scan endpoint
+        # This handles products that need fallback searches (OFF search, FatSecret, etc.)
+        try:
+            logger.info(f"Quick scan fallback: running full scan for {barcode}")
+            # Call the internal scan logic directly
+            full_scan_req = ScanRequest(barcode=barcode)
+            result = await scan_product(full_scan_req, current_user)
+            return result
+        except HTTPException as he:
+            raise he
+        except Exception as e:
+            logger.error(f"Quick scan fallback failed for {barcode}: {e}")
+            raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
     
     # Increment scan count
     await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
