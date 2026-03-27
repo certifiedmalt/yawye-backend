@@ -215,9 +215,10 @@ async def cache_product(barcode: str, product_data: Dict[str, Any]):
 # Retry logic for API calls
 def fetch_with_retry(url: str, max_retries: int = 3, timeout: int = 15) -> Optional[requests.Response]:
     """Fetch URL with retry logic and exponential backoff"""
+    headers = {"User-Agent": "YAWYE-App/1.0 (contact@yawye.app)"}
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, timeout=timeout)
+            response = requests.get(url, timeout=timeout, headers=headers)
             if response.status_code == 200:
                 return response
             elif response.status_code == 404:
