@@ -32,7 +32,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       // Only import and use RevenueCat when enabled
       const Purchases = require('react-native-purchases').default;
       const apiKey = Platform.OS === 'ios'
-        ? 'appl_test_UVSbyqEktCmCDPUoYrrsUqkuWhk'  // TODO: Replace with iOS production key when ready
+        ? 'appl_qDwlqIUvHJHGuewqEExfpAgaCpw'
         : 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx';
 
       await Purchases.configure({ apiKey });
