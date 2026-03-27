@@ -1,0 +1,9 @@
+★ eas-cli@18.4.0 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+
+Set ascAppId in the submit profile (eas.json) or re-run this command in interactive mode.
+Submission failed
+    Error: submit command failed.
