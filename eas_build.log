@@ -1,0 +1,72 @@
+★ eas-cli@18.4.0 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+The field "cli.appVersionSource" is not set, but it will be required in the future. Learn more: https://docs.expo.dev/build-reference/app-versions/
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+
+app.json is missing ios.infoPlist.ITSAppUsesNonExemptEncryption boolean. Manual configuration is required in App Store Connect before the app can be tested.
+
+
+The field "cli.appVersionSource" is not set, but it will be required in the future. Learn more: https://docs.expo.dev/build-reference/app-versions/
+✔ Using remote iOS credentials (Expo server)
+
+Distribution Certificate is not validated for non-interactive builds.
+Skipping Provisioning Profile validation on Apple Servers because we aren't authenticated.
+
+Project Credentials Configuration
+
+Project                   @certifiedmalt/you-are-what-you-eat
+Bundle Identifier         com.youarewhatyoueat.app
+                          
+App Store Configuration   
+                          
+Distribution Certificate  
+Serial Number             322223B270FA630DF5D6202364DC37B9
+Expiration Date           Sun, 14 Mar 2027 19:49:14 UTC
+Apple Team                9N9CFTV7J5 (JASON ANTONY J PSAILA (Individual))
+Updated                   6 days ago
+                          
+Provisioning Profile      
+Developer Portal ID       2GWK9WY9YK
+Status                    active
+Expiration                Sun, 14 Mar 2027 19:49:14 UTC
+Apple Team                9N9CFTV7J5 (JASON ANTONY J PSAILA (Individual))
+Updated                   6 days ago
+                          
+All credentials are ready to build @certifiedmalt/you-are-what-you-eat (com.youarewhatyoueat.app)
+
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Compressing project files
+Your project archive is 909 MB. You can reduce its size and the time it takes to upload by excluding files that are unnecessary for the build process in .easignore file. Learn more: https://expo.fyi/eas-build-archive
+- Uploading to EAS Build (0 / 909 MB)
+Failed to upload metadata to EAS Build
+
+Reason: Request failed: 400 (Bad Request)
+✔ Uploaded to EAS 8s
+- Computing project fingerprint
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/certifiedmalt/projects/you-are-what-you-eat/builds/0f789949-c5af-4dc0-acdf-d6929d3f0b5f
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+- Waiting for build to complete.
+  Build queued...
+
+Start builds sooner in the priority queue.
+Sign up for a paid plan at https://expo.dev/accounts/certifiedmalt/settings/billing
+
+Waiting in Free tier queue
+
+- Build is about to start
+✔ Build finished
+🍏 iOS app:
+https://expo.dev/artifacts/eas/2UNGZDbbTBhxgV3kbRS8Dz.ipa
