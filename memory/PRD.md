@@ -1,97 +1,73 @@
-# You Are What You Eat (YAWYE) - Product Requirements Document
+# You Are What You Eat - PRD
 
 ## Original Problem Statement
-Build a mobile food scanning app that analyzes food products via barcode, provides AI-powered health scores based on ingredients and processing level, and offers premium features through subscriptions.
-
-## Core Principles
-- Ultra-processed foods and certain harmful ingredients should be scored negatively
-- AI explanations must be detailed and science-backed
-- App must work independently of the development agent
-
-## Tech Stack
-- **Frontend**: React Native (Expo), TypeScript
-- **Backend**: Python, FastAPI
-- **Database**: MongoDB (on Railway)
-- **Deployment**: Railway (backend), Google Play Store + Apple App Store (frontend)
-- **AI**: OpenAI GPT-4o (via openai SDK, user API key)
-- **Monetization**: RevenueCat SDK, Google Play Billing, Apple IAP, RevenueCat Webhooks
-- **Email**: Resend (domain verification pending)
+Food scanning app that analyzes products via barcode, provides health scores based on ingredients/processing level via AI (GPT-4o), and offers premium features through RevenueCat subscriptions. Live on Google Play, submitting to Apple App Store.
 
 ## Architecture
-```
-/
-├── backend/
-│   ├── server.py       # FastAPI backend (main application)
-│   └── requirements.txt
-├── frontend/
-│   ├── app/            # Expo Router pages
-│   ├── context/        # Auth + Subscription contexts
-│   └── utils/          # Subscription utilities
-├── server.py           # Railway deployment copy (MUST stay in sync with backend/server.py)
-├── requirements.txt    # Railway deployment copy
-├── prewarm_cache_v3.py # Smart cache pre-warming script
-└── marketing/          # Marketing assets, videos, screenshots
-```
+- **Frontend**: React Native (Expo), TypeScript, EAS Build/Submit
+- **Backend**: Python, FastAPI (deployed on Railway)
+- **Database**: MongoDB (on Railway)
+- **AI**: OpenAI GPT-4o
+- **Subscriptions**: RevenueCat (Google Play + Apple App Store)
+- **APIs**: Open Food Facts, USDA, UPC Item DB, Brocade, FatSecret
+
+## Key DB Schema
+- `product_cache`: `{barcode, product_name, brands, ingredients_text, image_url, analysis, analysis_error, cached_at, source}`
+- `users`: `{email, password_hash, role, subscription_tier, total_scans}`
+- `scans`: `{user_id, barcode, product_name, analysis, scanned_at, source}`
+- `gamification`: `{user_id, daily_quests}`
 
 ## Key API Endpoints
-- `POST /api/scan` - Scan barcode, analyze with GPT-4o (full result)
-- `POST /api/admin/prewarm?key=yawye2024clear` - Pre-warm cache by product name (AI analysis)
-- `POST /api/admin/cache_insert?key=yawye2024clear` - Direct cache insertion
-- `GET /api/admin/cache_count?key=yawye2024clear` - Get number of cached products
-- `DELETE /api/cache/clear?key=yawye2024clear` - Clear product cache
-- `POST /api/webhooks/revenuecat` - Subscription webhook
-- `POST /api/subscription/upgrade` - Manual subscription upgrade fallback
-- `POST /api/assistant/chat` - AI health assistant
-- `GET /api/gamification/stats` - Streak & XP data
+- `POST /api/scan/quick` — Two-stage scan: instant product lookup from 7 databases, AI fallback for unknown barcodes
+- `GET /api/scan/status/{barcode}` — Poll for AI analysis completion (returns complete/analyzing/error)
+- `POST /api/scan` — Legacy full-scan fallback
+- `POST /api/admin/prewarm` — Admin tool to cache items
+- `POST /api/webhooks/revenuecat` — Subscription webhook
 
 ## What's Been Implemented
-- Full barcode scanning with 7 food databases + GPT-4o analysis
-- **Two-stage scan: `/api/scan/quick` (instant product lookup) + `/api/scan/status/{barcode}` (poll for AI analysis)** (Mar 2026)
-- User auth (register, login, forgot password)
-- Subscription system (RevenueCat + Google Play + Apple IAP + webhook)
-- Gamification (streaks, XP, daily quests, achievements)
-- Health Assistant AI chat
-- Push notifications
-- App version v1.0.27 with two-stage scan + iOS Manage Subscription fix
-- iOS build submitted to App Store Connect (pending Apple review)
-- Static website served from backend (privacy, terms, support)
-- AI analysis with carcinogen detection, chemical breakdown, shocking facts, alternatives
-- Product cache pre-warmed with 90 common UK grocery products (Mar 2026)
-- Global exception handler for unhandled errors (Mar 2026)
-- TimeoutError handling in ThreadPoolExecutor (Mar 2026)
-- **iOS "Manage Subscription" now opens correct store per platform** (Mar 2026)
-- **Admin endpoints: user_stats, reset_password, cache_count, cache_insert, prewarm** (Mar 2026)
+- Two-stage scan with 7 parallel food DB sources + AI barcode identification fallback
+- User-Agent headers on ALL API calls (Open Food Facts requires this)
+- Background AI analysis with error reporting to status endpoint
+- RevenueCat Apple App Store integration (`appl_qDwlqIUvHJHGuewqEExfpAgaCpw`)
+- Platform-specific subscription text (iOS: "Subscribe Now", Android: "Start 7-Day Free Trial")
+- Subscription product `yawye_premium_monthly` configured in App Store Connect + RevenueCat
+- Pre-warmed cache with ~90 products
+- Marketing assets library (screenshots, icons, feature graphics)
 
-## Bug Fixes Applied (Mar 2026)
-- Fixed SyntaxError from orphaned except blocks in scan_product function
-- Fixed unhandled `TimeoutError` from `concurrent.futures.as_completed()` causing 500 errors on cold scans
-- Added global FastAPI exception handler for any unhandled exceptions
-- Moved `concurrent.futures` import to module level
-- Created admin endpoints for cache management (prewarm, insert, count)
-- Pre-warmed cache with 90 products — all returning in 2-5ms
+## Current Status (March 27, 2026)
+- iOS v1.0.28 (build 29): Building on EAS, awaiting submission to App Store Connect
+- Android v1.0.28 (build 29): Building on EAS
+- Backend: All scan fixes deployed to Railway
+- Subscription: Fully configured for both platforms
+
+## Credentials
+- Admin: jpsaila1986@gmail.com / hello123
+- RevenueCat iOS: appl_qDwlqIUvHJHGuewqEExfpAgaCpw
+- RevenueCat Android: goog_sSuefaqGfyQKJvmIkNrWEyVElTx
+- Apple IAP Product ID: yawye_premium_monthly
+- Google Play Product ID: premium_monthly:monthly-base
 
 ## Pending Issues
-1. **P1**: Password reset emails blocked (Resend domain `yawye.app` not verified by user)
-2. **P1**: Cold scans for products NOT in cache still take 20-30s (mobile timeout issue)
-3. **P2**: Custom domain `yawye.app` not pointed to Railway (user action needed)
-4. **P2**: Health Assistant keyboard may hide text input (user verification pending)
-5. **P2**: Splash screen may show generic logo (user verification pending)
+1. P1: Password reset emails (Resend domain not verified)
+2. P2: Custom domain yawye.app not configured
+3. P2: Minor UI bugs (keyboard/splash screen) — verify on v1.0.28
 
 ## Upcoming Tasks
-1. **P0**: Wait for Apple App Store review approval
-2. **P1**: After approval, build new app version with longer network timeout + two-stage scan UI
-3. **P1**: Continue expanding cache with more products
-4. **P2**: Refactor Railway deployment (rootDirectory config to remove file duplication)
+1. P0: Submit iOS build to App Store Connect once EAS finishes → resubmit for Apple review
+2. P0: Upload Android .aab to Google Play Console
+3. P1: Build admin dashboard (user stats, scan analytics)
+4. P2: Refactor Railway deployment (rootDirectory setting)
 
 ## Future/Backlog
 - Multi-language support (i18n)
 - Samsung Galaxy Store publishing
-- RevenueCat for Amazon IAP
-- Two-stage scan UI (frontend shows product name instantly, AI analysis loads after)
-- **Admin Dashboard**: Standalone web dashboard at `/admin` on Railway - live users, subscriptions, scan activity, revenue, user details, cache health. Built into existing FastAPI backend. (~50-100 credits)
+- Amazon IAP via RevenueCat
+- Marketing video creation
 
-## Credentials
-- Admin: jpsaila1986@gmail.com / hello123
-- Premium: jason.psaila@kwik-fit.com
-- Test: jpsaila@live.com
-- Cache admin key: yawye2024clear
+## Critical Notes for Next Agent
+- Railway deploys from root — `server.py` and `requirements.txt` must be copied from `/backend/` to root
+- Open Food Facts REQUIRES User-Agent header on ALL requests (403 without it)
+- When no food database has a barcode, AI (GPT-4o) identifies the product — zero 404s
+- iOS subscription has NO free trial; Android has 7-day free trial
+- EAS build commands: `npx eas-cli build --platform ios --non-interactive --no-wait`
+- EAS submit: `npx eas-cli submit --platform ios --latest --non-interactive`
