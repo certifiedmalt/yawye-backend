@@ -106,6 +106,51 @@ export default function Scan() {
 
     } catch (error: any) {
       console.error('Scan error:', error.response?.data);
+      
+      // If quick scan returns 404, fall back to full scan
+      if (error.response?.status === 404) {
+        try {
+          const fullResponse = await axios.post(
+            `${BACKEND_URL}/api/scan`,
+            { barcode: data },
+            { headers: { Authorization: `Bearer ${token}` }, timeout: 45000 }
+          );
+          
+          try {
+            await axios.post(
+              `${BACKEND_URL}/api/gamification/update-streak`,
+              {},
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } catch (e: any) {
+            console.log('Gamification streak update failed');
+          }
+          
+          router.push({
+            pathname: '/result',
+            params: { productData: JSON.stringify(fullResponse.data) },
+          });
+          return;
+        } catch (fallbackError: any) {
+          console.error('Fallback scan also failed:', fallbackError.response?.data);
+          const fallbackDetail = fallbackError.response?.data?.detail;
+          const fallbackMessage = typeof fallbackDetail === 'object'
+            ? `${fallbackDetail.message}${fallbackDetail.suggestion ? '\n\n' + fallbackDetail.suggestion : ''}`
+            : fallbackDetail || 'Product not found in our database';
+          
+          Alert.alert(
+            'Product Not Found',
+            `Barcode: ${data}\n\n${fallbackMessage}`,
+            [
+              { text: 'Try Again', onPress: () => { setScanned(false); setScannedBarcode(''); setLoading(false); } },
+              { text: 'Manual Entry', onPress: () => { setShowManualInput(true); setLoading(false); } },
+              { text: 'Go Back', style: 'cancel', onPress: () => router.back() },
+            ]
+          );
+          return;
+        }
+      }
+      
       const detail = error.response?.data?.detail;
       const errorMessage = typeof detail === 'object' 
         ? `${detail.message}${detail.suggestion ? '\n\n' + detail.suggestion : ''}`
