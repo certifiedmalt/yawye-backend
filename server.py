@@ -547,6 +547,73 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+async def identify_product_by_barcode(client, barcode: str) -> dict:
+    """When no food database has this barcode, use AI to identify and analyze the product"""
+    try:
+        prompt = f"""You are a food product expert with encyclopedic knowledge of barcodes and commercial food products worldwide.
+
+A user scanned barcode: {barcode}
+
+Barcode prefixes indicate the country of origin:
+- 50xxxxx = United Kingdom
+- 40-44xxx = Germany
+- 30-37xxx = France
+- 80-83xxx = Italy/Spain
+- 00-09xxx = USA/Canada
+- 87xxxxx = Netherlands
+- 93-94xxx = Australia/NZ
+
+TASK: Identify what product this barcode belongs to. If you recognize it, provide the product name, brand, typical ingredients, and full health analysis. If you don't recognize the exact barcode, say so honestly but still provide your best guess based on the barcode prefix (country) and any patterns you recognize.
+
+Respond with JSON only:
+{{
+  "identified_product": "product name or 'Unknown product'",
+  "identified_brand": "brand name or 'Unknown'",
+  "typical_ingredients": "comma-separated list of typical ingredients for this product",
+  "harmful_ingredients": [
+    {{"name": "ingredient", "health_impact": "explanation", "severity": "high/medium/low", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "pubmed link"}}
+  ],
+  "beneficial_ingredients": [
+    {{"name": "ingredient", "health_benefit": "explanation", "benefit_type": "type", "key_nutrients": "list", "processing_level": "NOVA level", "research_summary": "citation", "study_link": "link"}}
+  ],
+  "carcinogens_found": [
+    {{"name": "chemical", "iarc_group": "Group classification", "cancer_types": "linked cancers", "explanation": "how it causes harm", "source": "reference"}}
+  ],
+  "chemical_breakdown": [
+    {{"name": "E-number or chemical", "common_name": "actual name", "purpose": "why used", "health_concern": "risk summary", "banned_in": "countries or empty"}}
+  ],
+  "healthier_alternatives": [
+    {{"product_type": "what to buy instead", "example_brands": "brand examples", "why_better": "reason", "score_estimate": "X/10"}}
+  ],
+  "shocking_facts": [
+    {{"fact": "alarming but TRUE fact", "ingredient": "which ingredient"}}
+  ],
+  "overall_score": 1-10,
+  "upf_score": "percentage estimate",
+  "processing_category": "Whole Food/Minimally Processed/Processed/Ultra-Processed",
+  "recommendation": "actionable advice",
+  "ingredients_estimated": true,
+  "confidence": "high/medium/low"
+}}"""
+
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a food product identification expert. You know thousands of commercial food products and their barcodes. Identify the product and provide health analysis. Be honest about your confidence level. Respond only with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"}
+        )
+        
+        import json
+        result = json.loads(response.choices[0].message.content)
+        result["analysis_note"] = "Product identified by AI - not found in food databases"
+        return result
+    except Exception as e:
+        logger.error(f"AI barcode identification error: {e}")
+        return None
+
 async def analyze_product_by_name(client, product_name: str) -> dict:
     """When no ingredients list is available, use AI knowledge to analyze the product by name"""
     try:
@@ -1245,8 +1312,10 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             product_data, source = results_without_ingredients[0]
     
     if not product_data:
-        logger.warning(f"Quick scan: NO product found in any source for {barcode}")
-        raise HTTPException(status_code=404, detail="Product not found in any database. Please check the barcode and try again.")
+        # NO database has this barcode — use AI as last resort to identify and analyze
+        logger.info(f"Quick scan: no DB match for {barcode}, falling back to AI identification")
+        product_data = {"product_name": f"Product (barcode {barcode})", "brands": "", "ingredients_text": "", "image_url": ""}
+        source = "ai_identification"
     
     # Increment scan count
     await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
@@ -1273,19 +1342,63 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     async def run_background_analysis():
         try:
             logger.info(f"Background AI analysis starting for {barcode} ({product_name})")
-            analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
             
-            # Cache the full result
-            cache_data = {
-                "barcode": barcode,
-                "product_name": product_name,
-                "brands": product_data.get("brands", ""),
-                "ingredients_text": ingredients_text,
-                "image_url": product_data.get("image_url", ""),
-                "analysis": analysis,
-                "cached_at": datetime.utcnow(),
-                "source": source
-            }
+            if source == "ai_identification":
+                # No database had this product — ask AI to identify it from the barcode
+                client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+                ai_result = await identify_product_by_barcode(client, barcode)
+                if ai_result:
+                    # AI identified the product — update the product info
+                    identified_name = ai_result.pop("identified_product", product_name)
+                    identified_brand = ai_result.pop("identified_brand", "")
+                    typical_ingredients = ai_result.pop("typical_ingredients", "")
+                    analysis = ai_result
+                    
+                    cache_data = {
+                        "barcode": barcode,
+                        "product_name": identified_name,
+                        "brands": identified_brand,
+                        "ingredients_text": typical_ingredients,
+                        "image_url": "",
+                        "analysis": analysis,
+                        "cached_at": datetime.utcnow(),
+                        "source": "ai_identification"
+                    }
+                else:
+                    # AI also couldn't identify — store a generic result
+                    analysis = {
+                        "harmful_ingredients": [],
+                        "beneficial_ingredients": [],
+                        "overall_score": 0,
+                        "upf_score": "Unknown",
+                        "processing_category": "Unknown",
+                        "recommendation": "This product could not be identified. Please check the barcode or enter the product name manually.",
+                        "analysis_note": "Product not recognized by any source"
+                    }
+                    cache_data = {
+                        "barcode": barcode,
+                        "product_name": f"Unknown Product ({barcode})",
+                        "brands": "",
+                        "ingredients_text": "",
+                        "image_url": "",
+                        "analysis": analysis,
+                        "cached_at": datetime.utcnow(),
+                        "source": "ai_identification"
+                    }
+            else:
+                # Normal path — product found in database, just need AI analysis
+                analysis = await analyze_ingredients_with_ai(product_name, ingredients_text)
+                cache_data = {
+                    "barcode": barcode,
+                    "product_name": product_name,
+                    "brands": product_data.get("brands", ""),
+                    "ingredients_text": ingredients_text,
+                    "image_url": product_data.get("image_url", ""),
+                    "analysis": analysis,
+                    "cached_at": datetime.utcnow(),
+                    "source": source
+                }
+            
             await product_cache_collection.update_one(
                 {"barcode": barcode},
                 {"$set": cache_data},
@@ -1295,7 +1408,10 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             # Update the scan history entry with the analysis
             await scans_collection.update_one(
                 {"_id": ObjectId(scan_id)},
-                {"$set": {"analysis": analysis}}
+                {"$set": {
+                    "analysis": analysis,
+                    "product_name": cache_data.get("product_name", product_name)
+                }}
             )
             
             logger.info(f"Background analysis complete for {barcode}: score {analysis.get('overall_score')}")
