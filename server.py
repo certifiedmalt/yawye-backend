@@ -2525,6 +2525,12 @@ async def website_support():
     with open("/app/website-public/index.html", "r") as f:
         return HTMLResponse(content=f.read())
 
+
+# Serve static files (images, assets)
+import os
+if os.path.exists("/app/backend/static"):
+    app.mount("/api/static", StaticFiles(directory="/app/backend/static"), name="static")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)

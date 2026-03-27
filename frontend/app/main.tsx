@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -317,12 +318,14 @@ export default function Main() {
                 }
               }}>
               <Text style={styles.upgradeButtonText}>
-                {purchaseInProgress ? 'Processing...' : 'Subscribe Now'}
+                {purchaseInProgress ? 'Processing...' : Platform.OS === 'android' ? 'Start 7-Day Free Trial' : 'Subscribe Now'}
               </Text>
             </TouchableOpacity>
             <Text style={styles.trialText}>
               {offerings?.availablePackages?.[0]?.product?.priceString 
-                ? `${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
+                ? Platform.OS === 'android'
+                  ? `Then ${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
+                  : `${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
                 : 'Cancel anytime.'}
             </Text>
           </View>
