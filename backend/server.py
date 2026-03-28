@@ -1252,11 +1252,11 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     if subscription_tier == "free" and total_scans >= 5:
         raise HTTPException(status_code=403, detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans.")
     
-    # Check cache first - if full analysis exists, return it immediately
+    # Check cache first - if ANY data exists (with or without analysis), use it
     cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
     if cached and cached.get("analysis"):
         await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
-        logger.info(f"Cache hit for {barcode}")
+        logger.info(f"Cache hit (complete) for {barcode}")
         return {
             "status": "complete",
             "product_name": cached.get("product_name"),
@@ -1264,6 +1264,19 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             "ingredients_text": cached.get("ingredients_text", ""),
             "image_url": cached.get("image_url", ""),
             "analysis": cached.get("analysis"),
+            "source": cached.get("source", "cache")
+        }
+    
+    # If product data is cached but analysis is still pending, return analyzing
+    if cached and cached.get("product_name") and not cached.get("analysis_error"):
+        logger.info(f"Cache hit (pending analysis) for {barcode}")
+        return {
+            "status": "analyzing",
+            "product_name": cached.get("product_name"),
+            "brands": cached.get("brands", ""),
+            "ingredients_text": cached.get("ingredients_text", ""),
+            "image_url": cached.get("image_url", ""),
+            "analysis": None,
             "source": cached.get("source", "cache")
         }
     
@@ -1324,20 +1337,44 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     ingredients_text = product_data.get("ingredients_text", "")
     product_name = product_data.get("product_name", "Unknown")
     
-    # Save scan to history immediately (analysis will be added when complete)
-    scan_doc = {
+    # IMMEDIATELY cache the product data (without analysis) to prevent duplicate lookups
+    await product_cache_collection.update_one(
+        {"barcode": barcode},
+        {"$set": {
+            "barcode": barcode,
+            "product_name": product_name,
+            "brands": product_data.get("brands", ""),
+            "ingredients_text": ingredients_text,
+            "image_url": product_data.get("image_url", ""),
+            "cached_at": datetime.utcnow(),
+            "source": source
+        }},
+        upsert=True
+    )
+    
+    # Save scan to history (one entry per barcode per user per minute to avoid duplicates)
+    recent_scan = await scans_collection.find_one({
         "user_id": str(current_user["_id"]),
         "barcode": barcode,
-        "product_name": product_name,
-        "brands": product_data.get("brands", ""),
-        "ingredients_text": ingredients_text,
-        "image_url": product_data.get("image_url", ""),
-        "analysis": None,
-        "scanned_at": datetime.utcnow(),
-        "source": source
-    }
-    scan_insert = await scans_collection.insert_one(scan_doc)
-    scan_id = str(scan_insert.inserted_id)
+        "scanned_at": {"$gte": datetime.utcnow() - timedelta(minutes=1)}
+    })
+    
+    if recent_scan:
+        scan_id = str(recent_scan["_id"])
+    else:
+        scan_doc = {
+            "user_id": str(current_user["_id"]),
+            "barcode": barcode,
+            "product_name": product_name,
+            "brands": product_data.get("brands", ""),
+            "ingredients_text": ingredients_text,
+            "image_url": product_data.get("image_url", ""),
+            "analysis": None,
+            "scanned_at": datetime.utcnow(),
+            "source": source
+        }
+        scan_insert = await scans_collection.insert_one(scan_doc)
+        scan_id = str(scan_insert.inserted_id)
     
     async def run_background_analysis():
         try:
