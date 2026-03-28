@@ -1284,45 +1284,34 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     if cached and cached.get("analysis_error"):
         await product_cache_collection.delete_one({"barcode": barcode})
     
-    # Not in cache - do a quick product lookup from ALL sources (no AI yet)
+    # Not in cache - do prioritized sequential database lookups
+    # Stop as soon as one finds the product (most found in first 1-2 checks)
     product_data = None
     source = "none"
     
-    with ThreadPoolExecutor(max_workers=7) as executor:
-        futures = {
-            executor.submit(fetch_from_openfoodfacts, barcode): "openfoodfacts",
-            executor.submit(fetch_from_off_uk, barcode): "openfoodfacts_uk",
-            executor.submit(fetch_from_upcitemdb, barcode): "upcitemdb",
-            executor.submit(fetch_from_usda, barcode): "usda",
-            executor.submit(fetch_from_brocade, barcode): "brocade",
-            executor.submit(fetch_from_off_search, barcode): "openfoodfacts_search",
-            executor.submit(fetch_from_fatsecret, barcode): "fatsecret",
-        }
-        
-        results_with_ingredients = []
-        results_without_ingredients = []
-        
+    lookup_order = [
+        (fetch_from_openfoodfacts, "openfoodfacts"),
+        (fetch_from_off_uk, "openfoodfacts_uk"),
+        (fetch_from_usda, "usda"),
+        (fetch_from_upcitemdb, "upcitemdb"),
+        (fetch_from_brocade, "brocade"),
+        (fetch_from_off_search, "openfoodfacts_search"),
+        (fetch_from_fatsecret, "fatsecret"),
+    ]
+    
+    loop = asyncio.get_event_loop()
+    for fetch_fn, src_name in lookup_order:
         try:
-            for future in as_completed(futures, timeout=12):
-                src = futures[future]
-                try:
-                    result = future.result()
-                    if result:
-                        if result.get("ingredients_text"):
-                            results_with_ingredients.append((result, src))
-                            logger.info(f"Quick scan {src}: found WITH ingredients")
-                        else:
-                            results_without_ingredients.append((result, src))
-                            logger.info(f"Quick scan {src}: found WITHOUT ingredients")
-                except Exception as e:
-                    logger.warning(f"Quick scan {src} error: {e}")
-        except TimeoutError:
-            logger.warning(f"Quick scan: some sources timed out for {barcode}")
-        
-        if results_with_ingredients:
-            product_data, source = results_with_ingredients[0]
-        elif results_without_ingredients:
-            product_data, source = results_without_ingredients[0]
+            result = await loop.run_in_executor(None, fetch_fn, barcode)
+            if result and result.get("product_name"):
+                product_data = result
+                source = src_name
+                logger.info(f"Quick scan: found in {src_name} - {result.get('product_name')}")
+                break
+            else:
+                logger.debug(f"Quick scan: not found in {src_name}")
+        except Exception as e:
+            logger.warning(f"Quick scan {src_name} error: {e}")
     
     if not product_data:
         # NO database has this barcode — use AI as last resort to identify and analyze
