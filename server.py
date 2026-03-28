@@ -777,7 +777,30 @@ Respond with JSON only:
   "recommendation": "actionable advice on whether to consume and what to switch to"
 }}
 
-STRICT SCORING: 8-10 whole/minimally processed foods only. 5-7 mixed. 1-4 ultra-processed. Alcohol ALWAYS 1-3. Processed meat ALWAYS 1-4. Products with ANY Group 1 carcinogen MUST score no higher than 4."""
+STRICT SCORING RULES (THESE ARE ABSOLUTE — NO EXCEPTIONS):
+
+RULE 1 — CARCINOGENS = AUTOMATIC 1/10 RED:
+- ANY product containing ANY carcinogen (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
+- This includes: acrylamide, nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
+
+RULE 2 — NOVA 4 (ULTRA-PROCESSED) = MAX 3/10 RED:
+- Any product classified as NOVA 4 / Ultra-Processed = MAX score 3/10.
+- Contains emulsifiers, artificial sweeteners, modified starches, hydrogenated oils, seed oils, preservatives, artificial flavors/colors, maltodextrin, dextrose? = NOVA 4 = Max 3/10.
+- If ALSO contains carcinogens, Rule 1 takes priority (score 1/10).
+
+RULE 3 — NOVA 3 (PROCESSED) = MAX 5/10 AMBER:
+- Processed foods (NOVA 3) = MAX score 5/10.
+- Examples: canned vegetables with salt, cured meats, cheeses, bread with additives.
+
+RULE 4 — ONLY NOVA 1-2 CAN SCORE 6+:
+- 6-7/10: Minimally processed with minor concerns
+- 8-10/10: Whole/minimally processed, no harmful additives, no carcinogens
+
+RULE 5 — ALCOHOL ALWAYS 1/10:
+- All alcohol products = 1/10. Group 1 carcinogen.
+
+RULE 6 — PROCESSED MEAT ALWAYS 1/10:
+- All processed meat = 1/10. Group 1 carcinogen (nitrosamines)."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
