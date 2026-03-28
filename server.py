@@ -813,7 +813,24 @@ RULE 6 — PROCESSED MEAT ALWAYS 1/10:
         )
         
         import json
-        return json.loads(response.choices[0].message.content)
+        result = json.loads(response.choices[0].message.content)
+        
+        # ENFORCE SCORING RULES IN CODE (don't trust AI to follow them)
+        carcinogens = result.get("carcinogens_found", [])
+        category = result.get("processing_category", "").lower()
+        score = result.get("overall_score", 5)
+        
+        # Rule 1: Any carcinogen = score 1
+        if carcinogens and len(carcinogens) > 0:
+            result["overall_score"] = 1
+        # Rule 2: Ultra-Processed (NOVA 4) = max 3
+        elif "ultra" in category:
+            result["overall_score"] = min(score, 3)
+        # Rule 3: Processed (NOVA 3) = max 5
+        elif "processed" in category and "minimally" not in category:
+            result["overall_score"] = min(score, 5)
+        
+        return result
     except Exception as e:
         print(f"AI Analysis error: {e}")
         return {
