@@ -779,27 +779,38 @@ Respond with JSON only:
 
 STRICT SCORING RULES (THESE ARE ABSOLUTE — NO EXCEPTIONS):
 
+NOVA CLASSIFICATION GUIDE (YOU MUST FOLLOW THIS EXACTLY):
+- NOVA 1 (Unprocessed/Minimally processed): Fresh fruits, vegetables, eggs, fresh meat, milk, plain grains, nuts, seeds, herbs, spices, tea, coffee, water
+- NOVA 2 (Processed culinary ingredients): Sugar, salt, butter, cream, lard, oils (olive, sunflower, vegetable), flour, honey, vinegar, starches. These are single-ingredient products extracted from NOVA 1 foods. THEY ARE NOT ULTRA-PROCESSED.
+- NOVA 3 (Processed foods): Simple combination of NOVA 1 + NOVA 2. Examples: canned vegetables with salt, cheese, fresh bread (flour+water+salt+yeast), cured meats, canned fish, jam
+- NOVA 4 (Ultra-processed): Contains additives NEVER found in a kitchen: emulsifiers (lecithin, mono/diglycerides), artificial sweeteners (aspartame, sucralose, acesulfame-k), modified starches, hydrogenated oils, protein isolates, maltodextrin, high-fructose corn syrup, artificial flavors, artificial colors, anti-caking agents, bulking agents, carbonating agents
+
+CRITICAL: Sugar, salt, butter, flour, olive oil, honey = NOVA 2 (NOT NOVA 4). Only classify as NOVA 4 if the product contains NOVA 4 marker additives listed above.
+
 RULE 1 — CARCINOGENS = AUTOMATIC 1/10 RED:
 - ANY product containing ANY carcinogen (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
 - This includes: acrylamide, nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
 
 RULE 2 — NOVA 4 (ULTRA-PROCESSED) = MAX 3/10 RED:
 - Any product classified as NOVA 4 / Ultra-Processed = MAX score 3/10.
-- Contains emulsifiers, artificial sweeteners, modified starches, hydrogenated oils, seed oils, preservatives, artificial flavors/colors, maltodextrin, dextrose? = NOVA 4 = Max 3/10.
+- ONLY classify as NOVA 4 if it contains NOVA 4 marker additives (emulsifiers, artificial sweeteners, modified starches, hydrogenated oils, artificial flavors/colors, maltodextrin, protein isolates, etc.)
 - If ALSO contains carcinogens, Rule 1 takes priority (score 1/10).
 
 RULE 3 — NOVA 3 (PROCESSED) = MAX 5/10 AMBER:
 - Processed foods (NOVA 3) = MAX score 5/10.
-- Examples: canned vegetables with salt, cured meats, cheeses, bread with additives.
+- Examples: canned vegetables with salt, cheese, cured meats, bread with additives.
 
-RULE 4 — ONLY NOVA 1-2 CAN SCORE 6+:
-- 6-7/10: Minimally processed with minor concerns
-- 8-10/10: Whole/minimally processed, no harmful additives, no carcinogens
+RULE 4 — NOVA 2 (CULINARY INGREDIENTS) = SCORE 5-7:
+- Single-ingredient culinary items: sugar, salt, butter, flour, oils, honey, vinegar
+- Score based on health impact: honey/olive oil = 7, butter = 6, sugar = 5, salt = 5
 
-RULE 5 — ALCOHOL ALWAYS 1/10:
+RULE 5 — ONLY NOVA 1 CAN SCORE 8+:
+- 8-10/10: Whole/unprocessed, no harmful additives, no carcinogens
+
+RULE 6 — ALCOHOL ALWAYS 1/10:
 - All alcohol products = 1/10. Group 1 carcinogen.
 
-RULE 6 — PROCESSED MEAT ALWAYS 1/10:
+RULE 7 — PROCESSED MEAT ALWAYS 1/10:
 - All processed meat = 1/10. Group 1 carcinogen (nitrosamines)."""
 
         response = await client.chat.completions.create(
