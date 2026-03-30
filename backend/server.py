@@ -1729,6 +1729,21 @@ async def admin_fix_scan_count(key: str = "", email: str = ""):
     await users_collection.update_one({"email": email}, {"$set": {"total_scans": actual_count}})
     return {"email": email, "old_count": old_count, "new_count": actual_count}
 
+@app.post("/api/admin/fix_all_scan_counts")
+async def admin_fix_all_scan_counts(key: str = ""):
+    """Bulk fix inflated scan counts for ALL users"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    fixed = []
+    async for user in users_collection.find({}, {"_id": 1, "email": 1, "total_scans": 1}):
+        uid = str(user["_id"])
+        actual = await scans_collection.count_documents({"user_id": uid})
+        old = user.get("total_scans", 0)
+        if old != actual:
+            await users_collection.update_one({"_id": user["_id"]}, {"$set": {"total_scans": actual}})
+            fixed.append({"email": user.get("email"), "old": old, "new": actual})
+    return {"fixed_count": len(fixed), "details": fixed}
+
 @app.get("/api/admin/user_scans")
 async def admin_user_scans(key: str = "", email: str = ""):
     """Get scan history for a specific user"""
