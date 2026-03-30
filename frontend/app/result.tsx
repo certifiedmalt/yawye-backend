@@ -11,6 +11,7 @@ import {
   Linking,
   ActivityIndicator,
   Share,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -224,9 +225,14 @@ export default function Result() {
     if (carcinogenCount > 0) details += `\n${carcinogenCount} carcinogen${carcinogenCount > 1 ? 's' : ''} detected!`;
     if (analysis.shocking_facts?.length) details += `\n\nDid you know? ${analysis.shocking_facts[0].fact}`;
 
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.youarewhatyoueat.app';
+    const appStoreUrl = 'https://apps.apple.com/app/you-are-what-you-eat/id6743126498';
+    const downloadLink = Platform.OS === 'ios' ? appStoreUrl : playStoreUrl;
+    const otherLink = Platform.OS === 'ios' ? playStoreUrl : appStoreUrl;
+
     try {
       await Share.share({
-        message: `${headline}\n${details}\n\nScanned with You Are What You Eat — download free on iOS & Android!`,
+        message: `${headline}\n${details}\n\nScan your food with You Are What You Eat:\n${downloadLink}\n\nAlso available: ${otherLink}`,
       });
     } catch (e) {
       console.log('Share error:', e);
