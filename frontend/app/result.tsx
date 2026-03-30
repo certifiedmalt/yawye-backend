@@ -10,6 +10,7 @@ import {
   Easing,
   Linking,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -206,6 +207,32 @@ export default function Result() {
     }));
   };
 
+  const handleShare = async () => {
+    if (!productData || !analysis) return;
+    const score = analysis.overall_score;
+    const category = analysis.processing_category || 'Unknown';
+    const harmfulCount = analysis.harmful_ingredients?.length || 0;
+    const carcinogenCount = analysis.carcinogens_found?.length || 0;
+
+    let headline = '';
+    if (score <= 3) headline = `${product_name} scored ${score}/10 — avoid this!`;
+    else if (score <= 6) headline = `${product_name} scored ${score}/10 — could be better.`;
+    else headline = `${product_name} scored ${score}/10 — a healthy choice!`;
+
+    let details = `Category: ${category}`;
+    if (harmfulCount > 0) details += `\n${harmfulCount} harmful ingredient${harmfulCount > 1 ? 's' : ''} found`;
+    if (carcinogenCount > 0) details += `\n${carcinogenCount} carcinogen${carcinogenCount > 1 ? 's' : ''} detected!`;
+    if (analysis.shocking_facts?.length) details += `\n\nDid you know? ${analysis.shocking_facts[0].fact}`;
+
+    try {
+      await Share.share({
+        message: `${headline}\n${details}\n\nScanned with You Are What You Eat — download free on iOS & Android!`,
+      });
+    } catch (e) {
+      console.log('Share error:', e);
+    }
+  };
+
   if (!productData) {
     return (
       <View style={styles.container}>
@@ -249,6 +276,15 @@ export default function Result() {
           <Text style={styles.productName}>{product_name}</Text>
           <Text style={styles.brandName}>{brands}</Text>
         </View>
+
+        {analysis && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.shareButton} onPress={handleShare} data-testid="share-result-btn">
+              <Ionicons name="share-social" size={22} color="#fff" />
+              <Text style={styles.shareButtonText}>Share Result</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {analysisLoading && !analysis ? (
           <View style={[styles.scoreCard, { borderColor: '#4CAF50' }]}>
@@ -616,6 +652,24 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 16,
     color: '#888',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2196F3',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   scoreCard: {
     backgroundColor: '#1a1a1a',

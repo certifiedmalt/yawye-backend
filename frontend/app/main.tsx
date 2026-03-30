@@ -219,6 +219,12 @@ export default function Main() {
           <Text style={styles.scanButtonText}>Scan a Product</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.libraryButton} onPress={() => router.push('/library')} data-testid="library-btn">
+          <Ionicons name="library" size={36} color="#fff" />
+          <Text style={styles.libraryButtonText}>My Library</Text>
+          <Text style={styles.librarySubtext}>Browse your scanned products</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.assistantButton} onPress={() => router.push('/assistant')}>
           <Ionicons name="chatbubbles" size={36} color="#fff" />
           <Text style={styles.assistantButtonText}>Health Assistant</Text>
@@ -462,6 +468,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginTop: 12,
+  },
+  libraryButton: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  libraryButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  librarySubtext: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 4,
   },
   assistantButton: {
     backgroundColor: '#2196F3',
