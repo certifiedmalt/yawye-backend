@@ -1671,6 +1671,21 @@ async def admin_user_stats(key: str = ""):
         "premium_user_details": premium_list
     }
 
+@app.get("/api/admin/search_users")
+async def admin_search_users(key: str = "", q: str = ""):
+    """Search users by name or email"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    results = []
+    query = {"$or": [
+        {"name": {"$regex": q, "$options": "i"}},
+        {"email": {"$regex": q, "$options": "i"}}
+    ]}
+    async for u in users_collection.find(query, {"_id": 0, "password_hash": 0}):
+        results.append(u)
+    return {"users": results, "count": len(results)}
+
+
 @app.post("/api/admin/reset_password")
 async def admin_reset_password(request: Request, key: str = ""):
     """Admin endpoint to reset a user's password"""
