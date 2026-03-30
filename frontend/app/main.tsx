@@ -125,7 +125,7 @@ export default function Main() {
     ]);
   };
 
-  const scansRemaining = user?.subscription_tier === 'premium' ? '∞' : Math.max(0, 5 - (user?.total_scans || 0));
+  const scansRemaining = user?.subscription_tier === 'premium' ? '∞' : Math.max(0, 10 - (user?.total_scans || 0));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

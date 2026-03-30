@@ -1033,10 +1033,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     subscription_tier = current_user.get("subscription_tier", "free")
     total_scans = current_user.get("total_scans", 0)
     
-    if subscription_tier == "free" and total_scans >= 5:
+    if subscription_tier == "free" and total_scans >= 10:
         raise HTTPException(
             status_code=403,
-            detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
+            detail="Free scan limit reached (10 scans). Upgrade to premium for unlimited scans."
         )
     
     # STEP 1: Check cache first for instant results
@@ -1300,8 +1300,8 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     # Check subscription limits
     subscription_tier = current_user.get("subscription_tier", "free")
     total_scans = current_user.get("total_scans", 0)
-    if subscription_tier == "free" and total_scans >= 5:
-        raise HTTPException(status_code=403, detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans.")
+    if subscription_tier == "free" and total_scans >= 10:
+        raise HTTPException(status_code=403, detail="Free scan limit reached (10 scans). Upgrade to premium for unlimited scans.")
     
     # Check cache first - if ANY data exists (with or without analysis), use it
     cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
