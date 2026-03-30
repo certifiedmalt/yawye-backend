@@ -1306,7 +1306,25 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     # Check cache first - if ANY data exists (with or without analysis), use it
     cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
     if cached and cached.get("analysis"):
-        await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+        # Only count as a new scan if user hasn't scanned this barcode in the last 5 minutes
+        recent_scan = await scans_collection.find_one({
+            "user_id": str(current_user["_id"]),
+            "barcode": barcode,
+            "scanned_at": {"$gte": datetime.utcnow() - timedelta(minutes=5)}
+        })
+        if not recent_scan:
+            await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+            await scans_collection.insert_one({
+                "user_id": str(current_user["_id"]),
+                "barcode": barcode,
+                "product_name": cached.get("product_name", "Unknown"),
+                "brands": cached.get("brands", ""),
+                "ingredients_text": cached.get("ingredients_text", ""),
+                "image_url": cached.get("image_url", ""),
+                "analysis": cached.get("analysis"),
+                "scanned_at": datetime.utcnow(),
+                "source": "cache"
+            })
         logger.info(f"Cache hit (complete) for {barcode}")
         return {
             "status": "complete",
@@ -1370,9 +1388,6 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
         product_data = {"product_name": f"Product (barcode {barcode})", "brands": "", "ingredients_text": "", "image_url": ""}
         source = "ai_identification"
     
-    # Increment scan count
-    await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
-    
     # Start background AI analysis
     ingredients_text = product_data.get("ingredients_text", "")
     product_name = product_data.get("product_name", "Unknown")
@@ -1392,16 +1407,18 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
         upsert=True
     )
     
-    # Save scan to history (one entry per barcode per user per minute to avoid duplicates)
+    # Save scan to history — only count as new scan if not a recent duplicate (5 min window)
     recent_scan = await scans_collection.find_one({
         "user_id": str(current_user["_id"]),
         "barcode": barcode,
-        "scanned_at": {"$gte": datetime.utcnow() - timedelta(minutes=1)}
+        "scanned_at": {"$gte": datetime.utcnow() - timedelta(minutes=5)}
     })
     
     if recent_scan:
         scan_id = str(recent_scan["_id"])
     else:
+        # Only increment scan count when a genuinely new scan record is created
+        await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
         scan_doc = {
             "user_id": str(current_user["_id"]),
             "barcode": barcode,
@@ -1698,6 +1715,19 @@ async def admin_set_premium(key: str = "", email: str = ""):
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"Upgraded {email} to premium"}
+
+@app.post("/api/admin/fix_scan_count")
+async def admin_fix_scan_count(key: str = "", email: str = ""):
+    """Fix inflated scan count by setting it to actual unique scan records"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    user = await users_collection.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    actual_count = await scans_collection.count_documents({"user_id": str(user["_id"])})
+    old_count = user.get("total_scans", 0)
+    await users_collection.update_one({"email": email}, {"$set": {"total_scans": actual_count}})
+    return {"email": email, "old_count": old_count, "new_count": actual_count}
 
 @app.get("/api/admin/user_scans")
 async def admin_user_scans(key: str = "", email: str = ""):
