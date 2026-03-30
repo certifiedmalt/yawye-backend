@@ -1686,6 +1686,33 @@ async def admin_search_users(key: str = "", q: str = ""):
     return {"users": results, "count": len(results)}
 
 
+@app.post("/api/admin/set_premium")
+async def admin_set_premium(key: str = "", email: str = ""):
+    """Grant premium to a user by email"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    result = await users_collection.update_one(
+        {"email": email},
+        {"$set": {"subscription_tier": "premium"}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": f"Upgraded {email} to premium"}
+
+@app.get("/api/admin/user_scans")
+async def admin_user_scans(key: str = "", email: str = ""):
+    """Get scan history for a specific user"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    user = await users_collection.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    scans = []
+    async for s in scans_collection.find({"user_id": str(user["_id"])}, {"_id": 0}).sort("scanned_at", -1).limit(20):
+        scans.append(s)
+    return {"user": email, "total_scans": len(scans), "scans": scans}
+
+
 @app.post("/api/admin/reset_password")
 async def admin_reset_password(request: Request, key: str = ""):
     """Admin endpoint to reset a user's password"""
