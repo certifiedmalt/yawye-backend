@@ -2289,7 +2289,14 @@ async def serve_marketing_file(filename: str):
     safe_name = os.path.basename(filename)
     file_path = f"/app/marketing/{safe_name}"
     if os.path.exists(file_path):
-        media_type = "image/png" if safe_name.endswith(".png") else "video/mp4"
+        if safe_name.endswith(".png"):
+            media_type = "image/png"
+        elif safe_name.endswith(".md"):
+            media_type = "text/markdown"
+        elif safe_name.endswith(".html"):
+            media_type = "text/html"
+        else:
+            media_type = "video/mp4"
         return FileResponse(file_path, media_type=media_type, filename=safe_name)
     raise HTTPException(status_code=404, detail="File not found")
 
@@ -2481,6 +2488,46 @@ async def marketing_catalog():
                 <img src="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" alt="IG Story">
                 <div class="card-info"><h3>SCAN. SCORE. KNOW.</h3><div class="meta">Instagram / TikTok Stories</div>
                 <div class="img-btn-row"><a class="btn save-btn" href="https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png" download="ig_story.png">Save</a><button class="btn share-btn" onclick="shareAsset('https://static.prod-images.emergentagent.com/jobs/f81b4164-3f7c-418b-9e38-85342e9419f0/images/af0b4e2fe3e045458d158fb0a670dad23536de7c26732176d00043cbda500171.png', 'SCAN SCORE KNOW')" data-testid="share-igstory">Share</button></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 data-testid="book-section-title">Book Franchise Documents</h2>
+        <p class="desc">Manuscript additions and visual briefs for the "You Are What You Eat" book.</p>
+        <div class="grid">
+            <div class="card" data-testid="book-chapter2">
+                <div style="padding:32px;text-align:center;background:linear-gradient(135deg,#1a3a1a,#1a1a1a);">
+                    <div style="font-size:48px;margin-bottom:12px;">&#x1F4D6;</div>
+                    <div style="font-size:18px;font-weight:700;color:#4CAF50;">Chapter 2</div>
+                </div>
+                <div class="card-info">
+                    <h3>The Scale They Don't Want You to Understand</h3>
+                    <div class="meta">Markdown | ~2,500 words | NOVA Classification</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_chapter2_draft.md" download>Download</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="book-restructured">
+                <div style="padding:32px;text-align:center;background:linear-gradient(135deg,#3a2a1a,#1a1a1a);">
+                    <div style="font-size:48px;margin-bottom:12px;">&#x2702;</div>
+                    <div style="font-size:18px;font-weight:700;color:#F39C12;">Restructured</div>
+                </div>
+                <div class="card-info">
+                    <h3>Back Half Restructured — Chapters 10-14</h3>
+                    <div class="meta">Markdown | ~5,000 words | With meals & shopping list</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_back_half_restructured.md" download>Download</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="book-visuals">
+                <div style="padding:32px;text-align:center;background:linear-gradient(135deg,#1a1a3a,#1a1a1a);">
+                    <div style="font-size:48px;margin-bottom:12px;">&#x1F3A8;</div>
+                    <div style="font-size:18px;font-weight:700;color:#64B5F6;">Visual Briefs</div>
+                </div>
+                <div class="card-info">
+                    <h3>10 Visual Concept Briefs for Print/eBook</h3>
+                    <div class="meta">Markdown | Designer-ready specs | Style guide included</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_briefs.md" download>Download</a></div>
+                </div>
             </div>
         </div>
     </div>
