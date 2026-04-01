@@ -33,6 +33,10 @@ logger = logging.getLogger("barcode_scanner")
 
 load_dotenv()
 
+# Resolve marketing directory - works on both local (/app) and Railway (repo root)
+_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+MARKETING_DIR = os.path.join(os.path.dirname(_SERVER_DIR), "marketing") if os.path.basename(_SERVER_DIR) == "backend" else os.path.join(_SERVER_DIR, "marketing")
+
 app = FastAPI()
 
 # Global exception handler for unhandled errors
@@ -2278,7 +2282,7 @@ import mimetypes
 @app.delete("/api/marketing/video/{filename}")
 async def delete_marketing_video(filename: str):
     safe_name = os.path.basename(filename)
-    file_path = f"/app/marketing/{safe_name}"
+    file_path = os.path.join(MARKETING_DIR, safe_name)
     if os.path.exists(file_path) and (safe_name.endswith(".mp4") or safe_name.endswith(".png")):
         os.remove(file_path)
         return {"message": f"Deleted {safe_name}"}
@@ -2287,7 +2291,7 @@ async def delete_marketing_video(filename: str):
 @app.get("/api/marketing/file/{filename}")
 async def serve_marketing_file(filename: str):
     safe_name = os.path.basename(filename)
-    file_path = f"/app/marketing/{safe_name}"
+    file_path = os.path.join(MARKETING_DIR, safe_name)
     if os.path.exists(file_path):
         if safe_name.endswith(".png"):
             media_type = "image/png"
@@ -2303,7 +2307,7 @@ async def serve_marketing_file(filename: str):
 @app.get("/api/marketing")
 async def marketing_catalog():
     """Serve the full marketing assets viewer with videos and images"""
-    marketing_dir = "/app/marketing"
+    marketing_dir = MARKETING_DIR
     video_cards = ""
     appstore_cards = ""
     if os.path.exists(marketing_dir):
@@ -2699,14 +2703,14 @@ async def marketing_catalog():
 @app.get("/api/marketing/video/{filename}")
 async def serve_marketing_video(filename: str):
     safe_name = os.path.basename(filename)
-    file_path = f"/app/marketing/{safe_name}"
+    file_path = os.path.join(MARKETING_DIR, safe_name)
     if os.path.exists(file_path) and safe_name.endswith(".mp4"):
         return FileResponse(file_path, media_type="video/mp4")
     raise HTTPException(status_code=404, detail="Video not found")
 
 @app.get("/api/marketing/videos")
 async def list_marketing_videos():
-    marketing_dir = "/app/marketing"
+    marketing_dir = MARKETING_DIR
     videos = []
     if os.path.exists(marketing_dir):
         for f in sorted(os.listdir(marketing_dir)):
