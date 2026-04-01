@@ -2299,7 +2299,7 @@ async def serve_marketing_file(filename: str):
             return FileResponse(file_path, media_type="text/markdown", filename=safe_name)
         else:
             media_type = "text/html" if safe_name.endswith(".html") else "video/mp4"
-            return FileResponse(file_path, media_type=media_type, filename=safe_name)
+            return FileResponse(file_path, media_type=media_type)
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/api/marketing")
