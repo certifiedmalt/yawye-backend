@@ -2294,14 +2294,12 @@ async def serve_marketing_file(filename: str):
     file_path = os.path.join(MARKETING_DIR, safe_name)
     if os.path.exists(file_path):
         if safe_name.endswith(".png"):
-            media_type = "image/png"
+            return FileResponse(file_path, media_type="image/png")
         elif safe_name.endswith(".md"):
-            media_type = "text/markdown"
-        elif safe_name.endswith(".html"):
-            media_type = "text/html"
+            return FileResponse(file_path, media_type="text/markdown", filename=safe_name)
         else:
-            media_type = "video/mp4"
-        return FileResponse(file_path, media_type=media_type, filename=safe_name)
+            media_type = "text/html" if safe_name.endswith(".html") else "video/mp4"
+            return FileResponse(file_path, media_type=media_type, filename=safe_name)
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.get("/api/marketing")
@@ -2531,6 +2529,45 @@ async def marketing_catalog():
                     <h3>10 Visual Concept Briefs for Print/eBook</h3>
                     <div class="meta">Markdown | Designer-ready specs | Style guide included</div>
                     <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_briefs.md" download>Download</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Book Visuals (AI-Generated)</h2>
+        <p class="desc">Full-page infographic illustrations for the print/eBook edition, generated with GPT Image 1.</p>
+        <div class="grid">
+            <div class="card" data-testid="visual-refinery">
+                <img src="/api/marketing/file/book_visual_refinery_comparison.png" alt="Refinery Comparison" loading="lazy">
+                <div class="card-info">
+                    <h3>Refinery Comparison (Chapter 3)</h3>
+                    <div class="meta">Vegetable Oil vs Fuel Refining — side by side</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_refinery_comparison.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-nova">
+                <img src="/api/marketing/file/book_visual_nova_classification.png" alt="NOVA Scale" loading="lazy">
+                <div class="card-info">
+                    <h3>NOVA Classification Scale (Chapter 2)</h3>
+                    <div class="meta">The 4 food groups — the line that matters</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_nova_classification.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-fizzy">
+                <img src="/api/marketing/file/book_visual_fizzy_drink_anatomy.png" alt="Fizzy Drink Anatomy" loading="lazy">
+                <div class="card-info">
+                    <h3>Fizzy Drink Anatomy (Chapter 5)</h3>
+                    <div class="meta">What's really inside a can of fizzy drink</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_fizzy_drink_anatomy.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-pyramid">
+                <img src="/api/marketing/file/book_visual_identity_pyramid.png" alt="Identity Pyramid" loading="lazy">
+                <div class="card-info">
+                    <h3>The Real-Food Life Pyramid (Chapter 10)</h3>
+                    <div class="meta">Identity, Environment, Routine, Biology, Momentum</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_identity_pyramid.png" download>Save</a></div>
                 </div>
             </div>
         </div>
