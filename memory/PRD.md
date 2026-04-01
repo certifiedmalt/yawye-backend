@@ -69,12 +69,15 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 5. P2: Guide iOS App Store Connect setup
 
 ## Book Franchise ("You Are What You Eat")
-- **Status**: Manuscript reviewed (Feb 2026). Three deliverables produced:
+- **Status**: Manuscript reviewed (Feb 2026). All deliverables complete and live on Railway.
   1. `/app/memory/book_chapter2_draft.md` — Missing Chapter 2 (NOVA Classification) drafted
   2. `/app/memory/book_back_half_restructured.md` — Back half consolidated from 9 chapters to 5
   3. `/app/memory/book_visual_briefs.md` — 10 visual concept briefs for print/eBook edition
-- **Key recommendations**: Add scientific citations, tighten repetitive back half, soften app chapter, add specific meals/shopping lists, add Chapter 2 on NOVA scale
-- **Brand synergy**: NOVA colours consistent across book visuals and app UI, QR codes in book linking to app features, 30-day plan as in-app guided experience
+  4. **10 AI-Generated Visuals** (GPT Image 1) — all in `/marketing/` and live at `/api/marketing`:
+     - Refinery Comparison (Ch3), NOVA Scale (Ch2), Fizzy Drink Anatomy (Ch5), Identity Pyramid (Ch10)
+     - UPF vs Disease Timeline (Ch6), Children's Calories Pie (Ch7), See the Matrix Checklist (Ch9)
+     - Label Comparison (Ch9/13), 30-Day Calendar (Ch11), 10 Swaps Table (Ch11)
+- **Asset Library URL**: `https://web-production-66c05.up.railway.app/api/marketing`
 
 ## Future/Backlog
 - Multi-language support (i18n)
