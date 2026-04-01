@@ -63,8 +63,18 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 
 ## Upcoming Tasks
 1. P0: Monitor Apple App Store review for v1.0.28
-2. P1: Marketing video creation
-3. P2: Guide iOS App Store Connect setup
+2. P1: Build A — Fix back buttons, update scan limit display (5→10), NOVA color scheme on results
+3. P1: Build B — Ship Library screen, Share button with store links, product confirmation step
+4. P1: Marketing video creation
+5. P2: Guide iOS App Store Connect setup
+
+## Book Franchise ("You Are What You Eat")
+- **Status**: Manuscript reviewed (Feb 2026). Three deliverables produced:
+  1. `/app/memory/book_chapter2_draft.md` — Missing Chapter 2 (NOVA Classification) drafted
+  2. `/app/memory/book_back_half_restructured.md` — Back half consolidated from 9 chapters to 5
+  3. `/app/memory/book_visual_briefs.md` — 10 visual concept briefs for print/eBook edition
+- **Key recommendations**: Add scientific citations, tighten repetitive back half, soften app chapter, add specific meals/shopping lists, add Chapter 2 on NOVA scale
+- **Brand synergy**: NOVA colours consistent across book visuals and app UI, QR codes in book linking to app features, 30-day plan as in-app guided experience
 
 ## Future/Backlog
 - Multi-language support (i18n)
