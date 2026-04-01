@@ -2570,6 +2570,54 @@ async def marketing_catalog():
                     <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_identity_pyramid.png" download>Save</a></div>
                 </div>
             </div>
+            <div class="card" data-testid="visual-timeline">
+                <img src="/api/marketing/file/book_visual_upf_disease_timeline.png" alt="UPF vs Disease Timeline" loading="lazy">
+                <div class="card-info">
+                    <h3>UPF vs Disease Timeline (Chapter 6)</h3>
+                    <div class="meta">The curves that tell the truth — 1960s to 2020s</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_upf_disease_timeline.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-children">
+                <img src="/api/marketing/file/book_visual_childrens_calories_pie.png" alt="Children's Calories" loading="lazy">
+                <div class="card-info">
+                    <h3>Children's Calorie Split (Chapter 7)</h3>
+                    <div class="meta">70% UPF vs 30% real food — the children's crisis</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_childrens_calories_pie.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-matrix">
+                <img src="/api/marketing/file/book_visual_see_the_matrix_checklist.png" alt="See the Matrix Checklist" loading="lazy">
+                <div class="card-info">
+                    <h3>See the Matrix — 10 Rules (Chapter 9)</h3>
+                    <div class="meta">Fridge-ready checklist for spotting UPFs</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_see_the_matrix_checklist.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-labels">
+                <img src="/api/marketing/file/book_visual_label_comparison.png" alt="Label Comparison" loading="lazy">
+                <div class="card-info">
+                    <h3>Real Bread vs UPF Bread (Chapter 9/13)</h3>
+                    <div class="meta">Side-by-side ingredient label comparison</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_label_comparison.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-calendar">
+                <img src="/api/marketing/file/book_visual_30_day_calendar.png" alt="30-Day Calendar" loading="lazy">
+                <div class="card-info">
+                    <h3>Your First 30 Days Calendar (Chapter 11)</h3>
+                    <div class="meta">Printable 4-week planner with daily checkboxes</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_30_day_calendar.png" download>Save</a></div>
+                </div>
+            </div>
+            <div class="card" data-testid="visual-swaps">
+                <img src="/api/marketing/file/book_visual_10_swaps_table.png" alt="10 Swaps Table" loading="lazy">
+                <div class="card-info">
+                    <h3>10 Swaps That Change Everything (Chapter 11)</h3>
+                    <div class="meta">Fridge-ready swap guide — not restriction, upgrades</div>
+                    <div class="btn-row"><a class="btn save-btn" href="/api/marketing/file/book_visual_10_swaps_table.png" download>Save</a></div>
+                </div>
+            </div>
         </div>
     </div>
 
