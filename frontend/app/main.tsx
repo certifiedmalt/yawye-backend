@@ -319,8 +319,14 @@ export default function Main() {
                 
                 // Check if offerings exist
                 if (!offerings) {
-                  Alert.alert('Loading...', 'Please wait while we load subscription options. Try again in a moment.');
-                  return;
+                  // Try to re-fetch offerings
+                  try {
+                    await initializeRevenueCat(user?.id);
+                  } catch (e) {}
+                  if (!offerings) {
+                    Alert.alert('Subscription Unavailable', 'Could not load subscription options. Please restart the app and try again.');
+                    return;
+                  }
                 }
                 
                 // Get available packages
@@ -339,7 +345,7 @@ export default function Main() {
                     (pkg: any) => pkg.identifier === '$rc_monthly' || pkg.identifier === 'Monthly' || pkg.identifier.toLowerCase().includes('monthly')
                   ) || packages[0];
                   
-                  await purchasePackage(monthlyPackage.identifier);
+                  await purchasePackage(monthlyPackage);
                   
                   // Update backend to mark user as premium
                   try {
