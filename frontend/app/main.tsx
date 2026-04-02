@@ -367,14 +367,12 @@ export default function Main() {
                 }
               }}>
               <Text style={styles.upgradeButtonText}>
-                {purchaseInProgress ? 'Processing...' : Platform.OS === 'android' ? 'Start 7-Day Free Trial' : 'Subscribe Now'}
+                {purchaseInProgress ? 'Processing...' : 'Subscribe Now'}
               </Text>
             </TouchableOpacity>
             <Text style={styles.trialText}>
               {offerings?.availablePackages?.[0]?.product?.priceString 
-                ? Platform.OS === 'android'
-                  ? `Then ${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
-                  : `${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
+                ? `${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
                 : 'Cancel anytime.'}
             </Text>
           </View>
