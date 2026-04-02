@@ -105,6 +105,15 @@ export default function Library() {
     const scoreColor = score != null ? getScoreColor(score) : '#666';
     const harmfulCount = item.analysis?.harmful_ingredients?.length || 0;
     const category = item.analysis?.processing_category;
+    const categoryColor = category
+      ? category.toLowerCase().includes('ultra')
+        ? '#FF5252'
+        : category.toLowerCase().includes('processed') && !category.toLowerCase().includes('minimally')
+        ? '#FFA726'
+        : category.toLowerCase().includes('minimally')
+        ? '#8BC34A'
+        : '#00E676'
+      : '#555';
 
     return (
       <TouchableOpacity
@@ -127,8 +136,8 @@ export default function Library() {
           <View style={styles.scanMeta}>
             <Text style={styles.scanDate}>{formatDate(item.scanned_at)}</Text>
             {category && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{category}</Text>
+              <View style={[styles.categoryBadge, { backgroundColor: categoryColor + '22', borderColor: categoryColor, borderWidth: 1 }]}>
+                <Text style={[styles.categoryText, { color: categoryColor }]}>{category}</Text>
               </View>
             )}
           </View>

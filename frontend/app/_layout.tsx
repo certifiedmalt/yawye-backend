@@ -148,6 +148,8 @@ export default function RootLayout() {
             <Stack.Screen name="assistant" options={{ title: 'Health Assistant' }} />
             <Stack.Screen name="achievements" options={{ title: 'Achievements' }} />
             <Stack.Screen name="quiz" options={{ title: 'Daily Quiz' }} />
+            <Stack.Screen name="library" options={{ title: 'My Library' }} />
+            <Stack.Screen name="about" options={{ title: 'About' }} />
           </Stack>
         </AuthProvider>
       </SubscriptionProvider>
