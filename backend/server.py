@@ -2624,18 +2624,28 @@ async def marketing_catalog():
     </div>
 
     <div class="section">
-        <h2>Audiobook Preview</h2>
-        <p class="desc">~14 minute HD narration preview (Prologue, Introduction, Chapter 3: Seed Oils) — OpenAI TTS HD, "Onyx" voice</p>
-        <div style="max-width:700px;margin:0 auto;background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;">
-            <audio controls style="width:100%;margin-bottom:12px;" data-testid="audiobook-player">
-                <source src="/api/marketing/file/audiobook_preview.mp3" type="audio/mpeg">
-            </audio>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="color:#888;font-size:13px;">Prologue + Introduction + Chapter 3 (The Refinery)</span>
-                <a class="btn save-btn" href="/api/marketing/file/audiobook_preview.mp3" download style="font-size:13px;padding:8px 16px;">Download MP3</a>
+        <h2>Audiobook</h2>
+        <p class="desc">Full book narration with dramatic pauses — OpenAI TTS HD, "Onyx" voice, 0.92x speed</p>
+        <div style="max-width:700px;margin:0 auto;">
+            <div style="background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;margin-bottom:16px;">
+                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">Full Audiobook (~60 minutes)</div>
+                <div style="font-size:13px;color:#888;margin-bottom:12px;">All 18 chapters with dramatic pauses — Prologue through The Beginning</div>
+                <audio controls style="width:100%;margin-bottom:12px;" data-testid="audiobook-full-player">
+                    <source src="/api/marketing/file/audiobook_full.mp3" type="audio/mpeg">
+                </audio>
+                <div style="display:flex;justify-content:flex-end;">
+                    <a class="btn save-btn" href="/api/marketing/file/audiobook_full.mp3" download style="font-size:13px;padding:8px 16px;">Download MP3 (60 MB)</a>
+                </div>
+            </div>
+            <div style="background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;">
+                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">Preview (~14 minutes)</div>
+                <div style="font-size:13px;color:#888;margin-bottom:12px;">Prologue + Introduction + Chapter 3 only</div>
+                <audio controls style="width:100%;" data-testid="audiobook-player">
+                    <source src="/api/marketing/file/audiobook_preview.mp3" type="audio/mpeg">
+                </audio>
             </div>
         </div>
-        <p class="desc" style="margin-top:12px;">
+        <p class="desc" style="margin-top:16px;">
             <a href="/api/marketing/file/book_visuals_hd.html" target="_blank" style="color:#4CAF50;">View HD Book Visuals (all 10 infographics) &rarr;</a>
         </p>
     </div>
