@@ -1781,8 +1781,8 @@ async def admin_set_premium(key: str = "", email: str = "", tier: str = "premium
         {"email": email},
         {"$set": {"subscription_tier": tier}}
     )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="User not found or already on that tier")
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"Set {email} to {tier}"}
 
 @app.post("/api/admin/fix_scan_count")
