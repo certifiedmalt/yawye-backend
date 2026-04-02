@@ -1771,17 +1771,19 @@ async def admin_search_users(key: str = "", q: str = ""):
 
 
 @app.post("/api/admin/set_premium")
-async def admin_set_premium(key: str = "", email: str = ""):
-    """Grant premium to a user by email"""
+async def admin_set_premium(key: str = "", email: str = "", tier: str = "premium"):
+    """Set user subscription tier by email"""
     if key != "yawye2024clear":
         raise HTTPException(status_code=403, detail="Invalid key")
+    if tier not in ["free", "premium"]:
+        raise HTTPException(status_code=400, detail="tier must be 'free' or 'premium'")
     result = await users_collection.update_one(
         {"email": email},
-        {"$set": {"subscription_tier": "premium"}}
+        {"$set": {"subscription_tier": tier}}
     )
     if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"message": f"Upgraded {email} to premium"}
+        raise HTTPException(status_code=404, detail="User not found or already on that tier")
+    return {"message": f"Set {email} to {tier}"}
 
 @app.post("/api/admin/fix_scan_count")
 async def admin_fix_scan_count(key: str = "", email: str = ""):
