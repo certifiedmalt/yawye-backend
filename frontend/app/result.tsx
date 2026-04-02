@@ -201,6 +201,16 @@ export default function Result() {
     setTimeout(poll, 3000);
   };
 
+  const getNovaColor = (level?: string) => {
+    if (!level) return '#2196F3';
+    const l = level.toLowerCase();
+    if (l.includes('4')) return '#FF5252';      // Red — Ultra-Processed
+    if (l.includes('3')) return '#FFA726';      // Amber — Processed
+    if (l.includes('2')) return '#8BC34A';      // Yellow-Green — Culinary Ingredients
+    if (l.includes('1')) return '#00E676';      // Green — Whole Food
+    return '#2196F3';
+  };
+
   const toggleResearch = (ingredientName: string) => {
     setExpandedResearch(prev => ({
       ...prev,
@@ -396,7 +406,7 @@ export default function Result() {
                   </View>
                 </View>
                 {ingredient.processing_level && (
-                  <Text style={styles.processingLevel}>{ingredient.processing_level}</Text>
+                  <Text style={[styles.processingLevel, { color: getNovaColor(ingredient.processing_level) }]}>{ingredient.processing_level}</Text>
                 )}
                 <Text style={styles.healthImpact}>
                   {ingredient.health_impact}
@@ -447,7 +457,7 @@ export default function Result() {
               <View key={index} style={styles.ingredientCard}>
                 <Text style={styles.ingredientName}>{ingredient.name}</Text>
                 {ingredient.processing_level && (
-                  <Text style={styles.processingLevel}>{ingredient.processing_level}</Text>
+                  <Text style={[styles.processingLevel, { color: getNovaColor(ingredient.processing_level) }]}>{ingredient.processing_level}</Text>
                 )}
                 <Text style={styles.healthImpact}>
                   {ingredient.health_benefit}
