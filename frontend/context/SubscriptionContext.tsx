@@ -23,31 +23,38 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
   const [offerings, setOfferings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [configured, setConfigured] = useState(false);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
 
   const apiKey = Platform.OS === 'ios'
     ? 'appl_OVnBBsTafRUvxYPvVfFMfhuvEva'
     : 'goog_LSdTYjNzFKaMnhJQRcfEzGRwOmt';
 
   const initializeRevenueCat = async (userId?: string) => {
-    if (!REVENUECAT_ENABLED || !Purchases || initialized) return;
+    if (!REVENUECAT_ENABLED || !Purchases) return;
     try {
-      Purchases.configure({ apiKey });
+      // Configure SDK only once
+      if (!configured) {
+        Purchases.configure({ apiKey });
+        setConfigured(true);
+        console.log('[RC] SDK configured');
+      }
 
-      // CRITICAL: Log in with backend user ID so RevenueCat links subscriptions to our users
-      if (userId) {
+      // CRITICAL: Log in whenever we have a userId and haven't logged in as this user yet
+      // This links RevenueCat subscriptions to our backend user accounts
+      if (userId && loggedInUserId !== userId) {
         try {
           const { customerInfo } = await Purchases.logIn(userId);
-          console.log('[RC] Logged in as:', userId);
+          console.log('[RC] Logged in as:', userId, '- active entitlements:', Object.keys(customerInfo.entitlements.active));
+          setLoggedInUserId(userId);
         } catch (loginErr) {
           console.warn('[RC] logIn failed, continuing as anonymous:', loginErr);
         }
       }
 
-      setInitialized(true);
-      const offerings = await Purchases.getOfferings();
-      if (offerings.current) {
-        setOfferings(offerings.current);
+      const offeringsResult = await Purchases.getOfferings();
+      if (offeringsResult.current) {
+        setOfferings(offeringsResult.current);
       }
     } catch (e) {
       console.log('RevenueCat init error:', e);
@@ -55,6 +62,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   };
 
   useEffect(() => {
+    // Configure SDK on mount (anonymous), userId will be linked later via initializeRevenueCat(userId)
     initializeRevenueCat();
   }, []);
 

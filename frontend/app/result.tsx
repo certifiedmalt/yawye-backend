@@ -332,7 +332,16 @@ export default function Result() {
             </View>
           </View>
           {analysis.processing_category && (
-            <View style={styles.processingBadge}>
+            <View style={[styles.processingBadge, {
+              backgroundColor:
+                analysis.processing_category.toLowerCase().includes('ultra')
+                  ? '#FF5252'
+                  : analysis.processing_category.toLowerCase().includes('processed') && !analysis.processing_category.toLowerCase().includes('minimally')
+                  ? '#FFA726'
+                  : analysis.processing_category.toLowerCase().includes('minimally')
+                  ? '#8BC34A'
+                  : '#00E676',
+            }]}>
               <Text style={styles.processingText}>{analysis.processing_category}</Text>
             </View>
           )}

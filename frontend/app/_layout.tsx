@@ -1,9 +1,10 @@
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { AuthProvider } from '../context/AuthContext';
 import { SubscriptionProvider } from '../context/SubscriptionContext';
+import { Ionicons } from '@expo/vector-icons';
 import '../i18n/config';
 
 // Safely configure notifications — wrapped to prevent crashes on some devices
@@ -93,6 +94,28 @@ const ebStyles = StyleSheet.create({
 });
 
 
+// Custom back button with larger touch target (44x44pt minimum for accessibility)
+function HeaderBackButton() {
+  const router = useRouter();
+  return (
+    <TouchableOpacity
+      onPress={() => router.back()}
+      style={{
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: Platform.OS === 'ios' ? -8 : 0,
+      }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      data-testid="header-back-button"
+    >
+      <Ionicons name="arrow-back" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
+}
+
+
 export default function RootLayout() {
   return (
     <ErrorBoundary>
@@ -108,6 +131,11 @@ export default function RootLayout() {
               headerTitleStyle: {
                 fontWeight: 'bold',
               },
+              headerBackVisible: false,
+              headerLeft: ({ canGoBack }) =>
+                canGoBack ? (
+                  <HeaderBackButton />
+                ) : null,
             }}
           >
             <Stack.Screen name="index" options={{ headerShown: false }} />
