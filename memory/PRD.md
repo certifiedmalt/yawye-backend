@@ -26,7 +26,7 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 - `POST /api/admin/fix_scan_count` — Fix inflated scan counts
 - `GET /api/admin/user_scans` — View user's scan history
 - `GET /api/admin/search_users` — Search users by email/name
-- `POST /api/webhooks/revenuecat` — Subscription webhook
+- `POST /api/webhooks/revenuecat` — Subscription webhook (now handles anonymous IDs)
 
 ## What's Been Implemented
 - Two-stage scan with 7 food DB sources + AI barcode identification fallback (0% 404s)
@@ -39,14 +39,16 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 - Strict scoring: Carcinogens = 1/10, NOVA 4 = max 3/10, enforced in Python code
 - Scan count dedup (5-min window) to prevent count inflation
 
-## Current Status (March 30, 2026)
-- iOS v1.0.28 (build 29): Submitted to App Store Connect, awaiting review
-- Android v1.0.28: Live on Google Play
-- Backend: Scan count bug fixed, all admin endpoints deployed to Railway
-- rosannaleggett@gmail.com upgraded to premium, scan count corrected
+## Current Status (April 2026)
+- iOS v1.0.28 (build 29): Pending Apple App Store review
+- Android v1.0.29 (build 30): Build submitted to EAS — includes Build A fixes
+- Backend: Webhook hardened for anonymous RC IDs, mirrored to root server.py
 
-## Bug Fixes This Session
-- **Scan count inflation bug (CRITICAL)**: `total_scans` was incrementing on every API call including cache hits and retries. Free users could exhaust 5-scan limit from 1 actual scan. Fixed with 5-minute dedup window — count only increments on new unique scan records.
+## Build A Fixes (v1.0.29) — Completed
+1. **RevenueCat Anonymous User Bug (P0 FIXED)**: Root cause was `initialized` flag blocking `Purchases.logIn(userId)`. Separated SDK `configure` from user `logIn` — now uses `configured` + `loggedInUserId` states so login always fires when user ID is available.
+2. **Backend Webhook Hardened (P0 FIXED)**: Webhook now handles non-ObjectId app_user_ids gracefully — falls back to aliases lookup, then email from subscriber_attributes, instead of silently ignoring.
+3. **Back Button UX Fix (P1 FIXED)**: Custom `HeaderBackButton` with 44x44pt touch target + hitSlop in `_layout.tsx`, replacing default back buttons.
+4. **NOVA Color Scheme (P1 FIXED)**: Processing badges in `result.tsx` now color-coded: Green (Whole Food), Yellow-Green (Minimally Processed), Amber (Processed), Red (Ultra-Processed).
 
 ## Credentials
 - Admin: jpsaila1986@gmail.com / hello123
@@ -57,26 +59,18 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 
 ## Pending Issues
 1. P1: Password reset emails (Resend domain `yawye.app` not verified)
-2. P1: NOVA-based color scheme on result page (deferred by user)
-3. P2: Custom domain yawye.app not configured
-4. P2: Railway rootDirectory refactor (currently duplicating server.py to root)
+2. P2: Custom domain yawye.app not configured
+3. P2: Railway rootDirectory refactor (currently duplicating server.py to root)
 
 ## Upcoming Tasks
-1. P0: Monitor Apple App Store review for v1.0.28
-2. P1: Build A — Fix back buttons, update scan limit display (5→10), NOVA color scheme on results
+1. P0: Monitor EAS Android build completion for v1.0.29 and submit to Google Play
+2. P0: Monitor Apple App Store review for v1.0.28
 3. P1: Build B — Ship Library screen, Share button with store links, product confirmation step
 4. P1: Marketing video creation
 5. P2: Guide iOS App Store Connect setup
 
 ## Book Franchise ("You Are What You Eat")
 - **Status**: Manuscript reviewed (Feb 2026). All deliverables complete and live on Railway.
-  1. `/app/memory/book_chapter2_draft.md` — Missing Chapter 2 (NOVA Classification) drafted
-  2. `/app/memory/book_back_half_restructured.md` — Back half consolidated from 9 chapters to 5
-  3. `/app/memory/book_visual_briefs.md` — 10 visual concept briefs for print/eBook edition
-  4. **10 AI-Generated Visuals** (GPT Image 1) — all in `/marketing/` and live at `/api/marketing`:
-     - Refinery Comparison (Ch3), NOVA Scale (Ch2), Fizzy Drink Anatomy (Ch5), Identity Pyramid (Ch10)
-     - UPF vs Disease Timeline (Ch6), Children's Calories Pie (Ch7), See the Matrix Checklist (Ch9)
-     - Label Comparison (Ch9/13), 30-Day Calendar (Ch11), 10 Swaps Table (Ch11)
 - **Asset Library URL**: `https://web-production-66c05.up.railway.app/api/marketing`
 
 ## Future/Backlog
@@ -93,3 +87,4 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 - Scan count now deduped with 5-min window to prevent inflation
 - iOS subscription has NO free trial; Android has 7-day free trial
 - Production URL: https://web-production-66c05.up.railway.app
+- RevenueCat webhook now handles: valid ObjectId, aliases, email fallback, and anonymous IDs (logs warning, returns ok)
