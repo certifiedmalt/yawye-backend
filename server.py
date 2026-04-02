@@ -1021,7 +1021,70 @@ async def get_me(current_user = Depends(get_current_user)):
         "total_scans": current_user.get("total_scans", 0)
     }
 
-@app.post("/api/scan")
+@app.post("/api/auth/push-token")
+async def register_push_token(request: Request, current_user = Depends(get_current_user)):
+    """Store Expo push token for server-side push notifications"""
+    body = await request.json()
+    push_token = body.get("push_token", "")
+    if not push_token:
+        raise HTTPException(status_code=400, detail="push_token required")
+    await users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"push_token": push_token, "push_token_updated": datetime.utcnow()}}
+    )
+    return {"status": "ok"}
+
+@app.post("/api/admin/send-notification")
+async def admin_send_notification(request: Request, key: str = ""):
+    """Send push notification to all users with registered tokens"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    body = await request.json()
+    title = body.get("title", "You Are What You Eat")
+    message = body.get("message", "Time to scan!")
+    
+    # Collect all push tokens
+    tokens = []
+    async for u in users_collection.find({"push_token": {"$exists": True, "$ne": ""}}, {"push_token": 1, "email": 1}):
+        tokens.append({"token": u["push_token"], "email": u.get("email", "?")})
+    
+    if not tokens:
+        return {"status": "no_tokens", "sent": 0, "message": "No users have registered push tokens yet"}
+    
+    # Send via Expo Push API
+    messages = []
+    for t in tokens:
+        if t["token"].startswith("ExponentPushToken[") or t["token"].startswith("ExpoPushToken["):
+            messages.append({
+                "to": t["token"],
+                "sound": "default",
+                "title": title,
+                "body": message,
+            })
+    
+    if not messages:
+        return {"status": "no_valid_tokens", "sent": 0}
+    
+    # Expo push API accepts batches of 100
+    sent = 0
+    errors = []
+    for i in range(0, len(messages), 100):
+        batch = messages[i:i+100]
+        try:
+            resp = requests.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=batch,
+                headers={"Content-Type": "application/json"}
+            )
+            result = resp.json()
+            sent += len(batch)
+            if "errors" in result:
+                errors.extend(result["errors"])
+        except Exception as e:
+            errors.append(str(e))
+    
+    logger.info(f"Push notification sent: {sent} recipients, {len(errors)} errors")
+    return {"status": "ok", "sent": sent, "total_tokens": len(tokens), "errors": errors}
 async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
     Improved barcode scanning with:

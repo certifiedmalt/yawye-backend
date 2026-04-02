@@ -40,46 +40,75 @@ export default function Main() {
     }
   }, [user?.id]);
 
+  // Register push token with backend for server-side notifications
+  useEffect(() => {
+    const registerPushToken = async () => {
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') return;
+        
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        });
+        const pushToken = tokenData.data;
+        
+        if (pushToken && token) {
+          await axios.post(
+            `${BACKEND_URL}/api/auth/push-token`,
+            { push_token: pushToken },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } catch (e) {
+        console.log('Push token registration error:', e);
+      }
+    };
+    
+    if (user?.id && token) {
+      registerPushToken();
+    }
+  }, [user?.id, token]);
+
   useEffect(() => {
     const setupNotifications = async () => {
       try {
-        const alreadyAsked = await AsyncStorage.getItem('notifications_scheduled');
+        const alreadyAsked = await AsyncStorage.getItem('notifications_v2_scheduled');
         if (alreadyAsked === 'true') return;
 
         const { status } = await Notifications.requestPermissionsAsync();
         if (status !== 'granted') {
-          await AsyncStorage.setItem('notifications_scheduled', 'true');
+          await AsyncStorage.setItem('notifications_v2_scheduled', 'true');
           return;
         }
 
-        // Cancel any existing schedules
+        // Create notification channel for Android (required for Android 8+)
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('daily-reminders', {
+            name: 'Daily Reminders',
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: 'default',
+            vibrationPattern: [0, 250, 250, 250],
+          });
+        }
+
+        // Cancel any old schedules
         await Notifications.cancelAllScheduledNotificationsAsync();
 
-        // Helper to create a daily trigger
-        const scheduleDaily = async (hour: number, minute: number, weekday?: number) => {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Keep your health streak alive',
-              body: 'Scan a product or take today\'s quiz to grow your streak and XP.',
-            },
-            trigger: weekday
-              ? { hour, minute, repeats: true, weekday }
-              : { hour, minute, repeats: true },
-          });
-        };
+        // Schedule daily reminder at 6pm (works on both iOS and Android)
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Shopping today?',
+            body: 'Scan before you buy — know what\'s really in your food.',
+            ...(Platform.OS === 'android' ? { channelId: 'daily-reminders' } : {}),
+          },
+          trigger: {
+            hour: 18,
+            minute: 0,
+            repeats: true,
+          },
+        });
 
-        // Weekdays (Monday–Friday): 18:00
-        await scheduleDaily(18, 0, 1);
-        await scheduleDaily(18, 0, 2);
-        await scheduleDaily(18, 0, 3);
-        await scheduleDaily(18, 0, 4);
-        await scheduleDaily(18, 0, 5);
-
-        // Weekends (Saturday–Sunday): 11:00
-        await scheduleDaily(11, 0, 6);
-        await scheduleDaily(11, 0, 7);
-
-        await AsyncStorage.setItem('notifications_scheduled', 'true');
+        await AsyncStorage.setItem('notifications_v2_scheduled', 'true');
       } catch (e) {
         console.log('Notification setup error', e);
       }
