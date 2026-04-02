@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 const REVENUECAT_ENABLED = !__DEV__;
@@ -23,46 +23,65 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
   const [offerings, setOfferings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [configured, setConfigured] = useState(false);
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  const configuredRef = useRef(false);
+  const loggedInUserRef = useRef<string | null>(null);
 
   const apiKey = Platform.OS === 'ios'
-    ? 'appl_OVnBBsTafRUvxYPvVfFMfhuvEva'
-    : 'goog_LSdTYjNzFKaMnhJQRcfEzGRwOmt';
+    ? 'appl_qDwlqIUvHJHGuewqEExfpAgaCpw'
+    : 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx';
+
+  const fetchOfferings = async () => {
+    try {
+      const result = await Purchases.getOfferings();
+      console.log('[RC] Offerings fetched, current:', result?.current ? 'YES' : 'NO',
+        'packages:', result?.current?.availablePackages?.length || 0);
+      if (result?.current) {
+        setOfferings(result.current);
+        return true;
+      }
+    } catch (e) {
+      console.warn('[RC] getOfferings failed:', e);
+    }
+    return false;
+  };
 
   const initializeRevenueCat = async (userId?: string) => {
-    if (!REVENUECAT_ENABLED || !Purchases) return;
+    if (!REVENUECAT_ENABLED || !Purchases) {
+      console.log('[RC] Skipping init - enabled:', REVENUECAT_ENABLED, 'Purchases:', !!Purchases);
+      return;
+    }
+
     try {
-      // Configure SDK only once
-      if (!configured) {
+      // Configure SDK only once (using ref to avoid async state race)
+      if (!configuredRef.current) {
+        console.log('[RC] Configuring SDK with key:', apiKey.substring(0, 8) + '...');
         Purchases.configure({ apiKey });
-        setConfigured(true);
-        console.log('[RC] SDK configured');
+        configuredRef.current = true;
+        console.log('[RC] SDK configured successfully');
       }
 
-      // CRITICAL: Log in whenever we have a userId and haven't logged in as this user yet
-      // This links RevenueCat subscriptions to our backend user accounts
-      if (userId && loggedInUserId !== userId) {
+      // Log in when we have a userId
+      if (userId && loggedInUserRef.current !== userId) {
         try {
+          console.log('[RC] Logging in as:', userId);
           const { customerInfo } = await Purchases.logIn(userId);
-          console.log('[RC] Logged in as:', userId, '- active entitlements:', Object.keys(customerInfo.entitlements.active));
-          setLoggedInUserId(userId);
+          loggedInUserRef.current = userId;
+          console.log('[RC] Logged in successfully. Active entitlements:',
+            Object.keys(customerInfo?.entitlements?.active || {}));
         } catch (loginErr) {
-          console.warn('[RC] logIn failed, continuing as anonymous:', loginErr);
+          console.warn('[RC] logIn failed:', loginErr);
+          // Continue anyway - offerings should still work for anonymous users
         }
       }
 
-      const offeringsResult = await Purchases.getOfferings();
-      if (offeringsResult.current) {
-        setOfferings(offeringsResult.current);
-      }
+      // Fetch offerings
+      await fetchOfferings();
     } catch (e) {
-      console.log('RevenueCat init error:', e);
+      console.error('[RC] Init error:', e);
     }
   };
 
   useEffect(() => {
-    // Configure SDK on mount (anonymous), userId will be linked later via initializeRevenueCat(userId)
     initializeRevenueCat();
   }, []);
 
