@@ -28,10 +28,18 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-producti
 
 export default function Main() {
   const { user, logout, refreshUser, token } = useAuth();
-  const { offerings, purchasePackage, isLoading: subscriptionLoading } = useSubscription();
+  const { offerings, purchasePackage, isLoading: subscriptionLoading, initializeRevenueCat } = useSubscription();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [purchaseInProgress, setPurchaseInProgress] = useState(false);
+
+  // Initialize RevenueCat with user ID so subscriptions link to our backend
+  useEffect(() => {
+    if (user?.id) {
+      initializeRevenueCat(user.id);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     const setupNotifications = async () => {
       try {
