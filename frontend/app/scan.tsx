@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Camera, CameraView } from 'expo-camera';
@@ -25,6 +26,9 @@ export default function Scan() {
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
+  const [confirmData, setConfirmData] = useState<any>(null);
+  const [confirmBarcode, setConfirmBarcode] = useState<string>('');
+  const [confirmNeedsAnalysis, setConfirmNeedsAnalysis] = useState(false);
   const { token } = useAuth();
   const router = useRouter();
 
@@ -55,6 +59,35 @@ export default function Scan() {
     }
   };
 
+  const proceedWithProduct = async (quickData: any, barcode: string, needsAnalysis: boolean) => {
+    // Update gamification streak (non-blocking)
+    try {
+      await axios.post(
+        `${BACKEND_URL}/api/gamification/update-streak`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (e: any) {
+      console.log('Gamification streak update failed', e?.response?.data || e?.message);
+    }
+
+    if (needsAnalysis) {
+      router.push({
+        pathname: '/result',
+        params: { 
+          productData: JSON.stringify(quickData),
+          barcode: barcode,
+          needsAnalysis: 'true'
+        },
+      });
+    } else {
+      router.push({
+        pathname: '/result',
+        params: { productData: JSON.stringify(quickData) },
+      });
+    }
+  };
+
   const handleBarCodeScanned = async ({ data }: BarcodeScanningResult) => {
     if (scanned || loading) return;
     
@@ -73,36 +106,13 @@ export default function Scan() {
       );
 
       const quickData = quickResponse.data;
+      const needsAnalysis = quickData.status !== 'complete';
       
-      // If fully cached, navigate immediately with complete data
-      if (quickData.status === 'complete') {
-        // Update gamification streak (non-blocking)
-        try {
-          await axios.post(
-            `${BACKEND_URL}/api/gamification/update-streak`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } catch (e: any) {
-          console.log('Gamification streak update failed', e?.response?.data || e?.message);
-        }
-
-        router.push({
-          pathname: '/result',
-          params: { productData: JSON.stringify(quickData) },
-        });
-        return;
-      }
-      
-      // Stage 2: Navigate with partial data, result page will poll for analysis
-      router.push({
-        pathname: '/result',
-        params: { 
-          productData: JSON.stringify(quickData),
-          barcode: data,
-          needsAnalysis: 'true'
-        },
-      });
+      // Show confirmation screen with product info
+      setConfirmData(quickData);
+      setConfirmBarcode(data);
+      setConfirmNeedsAnalysis(needsAnalysis);
+      setLoading(false);
 
     } catch (error: any) {
       console.error('Scan error:', error.response?.data);
@@ -116,20 +126,11 @@ export default function Scan() {
             { headers: { Authorization: `Bearer ${token}` }, timeout: 45000 }
           );
           
-          try {
-            await axios.post(
-              `${BACKEND_URL}/api/gamification/update-streak`,
-              {},
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-          } catch (e: any) {
-            console.log('Gamification streak update failed');
-          }
-          
-          router.push({
-            pathname: '/result',
-            params: { productData: JSON.stringify(fullResponse.data) },
-          });
+          // Show confirmation for full scan result too
+          setConfirmData(fullResponse.data);
+          setConfirmBarcode(data);
+          setConfirmNeedsAnalysis(false);
+          setLoading(false);
           return;
         } catch (fallbackError: any) {
           console.error('Fallback scan also failed:', fallbackError.response?.data);
@@ -202,32 +203,14 @@ export default function Scan() {
       );
 
       const quickData = quickResponse.data;
+      const needsAnalysis = quickData.status !== 'complete';
 
-      if (quickData.status === 'complete') {
-        try {
-          await axios.post(
-            `${BACKEND_URL}/api/gamification/update-streak`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } catch (e: any) {
-          console.log('Gamification streak update failed', e?.response?.data || e?.message);
-        }
-
-        router.push({
-          pathname: '/result',
-          params: { productData: JSON.stringify(quickData) },
-        });
-      } else {
-        router.push({
-          pathname: '/result',
-          params: { 
-            productData: JSON.stringify(quickData),
-            barcode: manualCode,
-            needsAnalysis: 'true'
-          },
-        });
-      }
+      // Show confirmation screen
+      setConfirmData(quickData);
+      setConfirmBarcode(manualCode);
+      setConfirmNeedsAnalysis(needsAnalysis);
+      setShowManualInput(false);
+      setLoading(false);
     } catch (error: any) {
       const detail = error.response?.data?.detail;
       const errorMessage = typeof detail === 'object'
@@ -251,6 +234,59 @@ export default function Scan() {
       setLoading(false);
     }
   };
+
+  const resetScan = () => {
+    setConfirmData(null);
+    setConfirmBarcode('');
+    setConfirmNeedsAnalysis(false);
+    setScanned(false);
+    setScannedBarcode('');
+    setLoading(false);
+  };
+
+  // Product confirmation screen
+  if (confirmData) {
+    const productName = confirmData.product_name || 'Unknown Product';
+    const brand = confirmData.brands || '';
+    const imageUrl = confirmData.image_url;
+
+    return (
+      <View style={styles.container}>
+        <View style={styles.confirmCard}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.confirmImage} />
+          ) : (
+            <View style={[styles.confirmImage, styles.confirmNoImage]}>
+              <Ionicons name="cube-outline" size={48} color="#555" />
+            </View>
+          )}
+          
+          <Text style={styles.confirmTitle}>Is this your product?</Text>
+          <Text style={styles.confirmName}>{productName}</Text>
+          {brand ? <Text style={styles.confirmBrand}>{brand}</Text> : null}
+          <Text style={styles.confirmBarcode}>Barcode: {confirmBarcode}</Text>
+
+          <TouchableOpacity
+            style={styles.confirmYes}
+            onPress={() => proceedWithProduct(confirmData, confirmBarcode, confirmNeedsAnalysis)}
+            data-testid="confirm-product-yes"
+          >
+            <Ionicons name="checkmark-circle" size={22} color="#fff" />
+            <Text style={styles.confirmYesText}>Yes, analyse this</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.confirmNo}
+            onPress={resetScan}
+            data-testid="confirm-product-no"
+          >
+            <Ionicons name="close-circle" size={22} color="#FF5252" />
+            <Text style={styles.confirmNoText}>Not this product</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   // Manual input UI
   if (showManualInput) {
@@ -538,5 +574,80 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  confirmCard: {
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 28,
+    marginHorizontal: 24,
+    width: '85%',
+  },
+  confirmImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  confirmNoImage: {
+    backgroundColor: '#252525',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  confirmName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  confirmBrand: {
+    fontSize: 14,
+    color: '#aaa',
+    marginBottom: 8,
+  },
+  confirmBarcode: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 24,
+  },
+  confirmYes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    width: '100%',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmYesText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  confirmNo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#252525',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  confirmNoText: {
+    color: '#FF5252',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
