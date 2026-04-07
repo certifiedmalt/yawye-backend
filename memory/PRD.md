@@ -1,7 +1,7 @@
 # You Are What You Eat - PRD
 
 ## Original Problem Statement
-Food scanning app that analyzes products via barcode, provides health scores based on ingredients/processing level via AI (GPT-4o), and offers premium features through RevenueCat subscriptions. Live on Google Play, submitting to Apple App Store.
+Food scanning app that analyzes products via barcode, provides health scores based on ingredients/processing level via AI (GPT-4o), and offers premium features through subscriptions. Live on Google Play, submitting to Apple App Store. Companion app to a book/audiobook franchise.
 
 ## Architecture
 - **Frontend**: React Native (Expo), TypeScript, EAS Build/Submit
@@ -10,62 +10,73 @@ Food scanning app that analyzes products via barcode, provides health scores bas
 - **AI**: OpenAI GPT-4o
 - **Subscriptions**: RevenueCat (Google Play + Apple App Store)
 
-## Current Status (April 2026)
-- **v1.0.32** (versionCode 33): Built and ready for Google Play. "Subscribe Now" button, correct RC keys, all UI fixes.
+## Current Status (April 7, 2026)
+- **v1.0.32** (versionCode 33): Live on Google Play, submitted for Apple review
 - Backend deployed on Railway with hardened webhook
+- First REAL subscription processed successfully (Status: Processed, not Refunded!)
 
-## RevenueCat Keys (CORRECT - verified against API)
+## RevenueCat Keys
 - iOS: `appl_qDwlqIUvHJHGuewqEExfpAgaCpw`
 - Android: `goog_sSuefaqGfyQKJvmIkNrWEyVElTx`
 - Secret: `sk_lkgtpXULPFdEblMPvMXeaRJPDcepH`
 
 ## Google Cloud Service Account
-- Project: `lithe-augury-486501-i9`
 - Email: `revenuecat@lithe-augury-486501-i9.iam.gserviceaccount.com`
-- JSON key downloaded and available
-- Google Play Android Developer API: ENABLED
-- **PENDING**: Service account needs to be granted access in Google Play Console (Settings → API Access)
-- **PENDING**: JSON needs to be uploaded to RevenueCat dashboard (requires Google Play Console linking first)
+- JSON uploaded to RevenueCat: YES (April 7, 2026)
+- Propagation: Up to 36 hours from upload
 
-## Completed This Session
-1. CRITICAL: Fixed wrong RevenueCat API keys (were invalid in ALL previous builds)
-2. RevenueCat anonymous user bug — separated configure/logIn flow with useRef
-3. Backend webhook hardened for anonymous IDs (aliases + email fallback)
-4. Custom back button with 44x44pt touch targets
-5. NOVA color scheme on processing badges, ingredient labels, and library badges
-6. Product confirmation step ("Is this your product?") after barcode scan
-7. Fixed Android notifications (channel, daily trigger, SCHEDULE_EXACT_ALARM permission)
-8. Push token registration + admin send-notification endpoint
-9. Admin set_premium now supports downgrade (tier=free)
-10. Downgraded all premium users to free (except Rosanna) for testing
-11. Removed "7-Day Free Trial" text, changed to "Subscribe Now"
-12. Granted promotional premium entitlement via RevenueCat API
-13. Google Cloud service account created for RevenueCat integration
-14. Multiple EAS Android builds (v1.0.29 through v1.0.32)
+## App Store Connect
+- Issuer ID: `15e998af-a427-4258-a434-7ed291c56f1b`
+- API Key: `QS39X6QRC7` (EAS Submit)
+- iOS v1.0.32 (build 33): Submitted for Apple review (April 7, 2026)
+- Subscription: `yawye_premium_monthly` attached to submission
+- Shared Secret: PENDING (need to set up for RevenueCat iOS validation)
+
+## Completed This Session (April 7, 2026)
+1. Uploaded Google Play Service Account JSON to RevenueCat (P0 BLOCKER resolved)
+2. Resubmitted iOS v1.0.32 to Apple App Store review (with subscription attached)
+3. Verified first REAL subscription: Order GPA.3392-2092-7721-00952, Status: Processed
+4. Confirmed 68 total users, 2 premium subscribers
+5. Set Jason's account back to free then resubscribed successfully
+6. Helped Miha (zeta.mol18@gmail.com) re-register after password issue
+
+## User Stats
+- Total users: 68
+- Premium subscribers: 2 (Jason, Rosie Leggett)
+- Notable active free users: Miha (53 scans), Dan (7), Michelle (7), Lisa (5), Glory (5)
 
 ## Pending Issues
-1. P0: Google Play service account not linked in Play Console (needs desktop access)
-2. P1: Password reset emails (Resend domain not verified - DNS records needed at Squarespace)
-3. P2: Railway rootDirectory refactor
+1. P1: Apple App Store review (waiting for approval, 24-48 hours)
+2. P1: Apple Shared Secret → RevenueCat (for iOS subscription validation)
+3. P2: Password reset emails (Resend domain not verified - DNS records needed)
+4. P2: Railway rootDirectory refactor
 
-## Upcoming Tasks
-1. P0: Link service account in Google Play Console (desktop only)
-2. P0: Upload JSON to RevenueCat after linking
-3. P1: Submit v1.0.32 to Google Play
-4. P1: Marketing video creation
-5. P2: Resend domain DNS verification
+## Upcoming Tasks (After Apple Approval)
+1. P0: Publish audiobook (ACX/Audible + Findaway Voices) - split into chapters first
+2. P0: Launch media campaign (screenshots + AI-generated videos)
+3. P1: Set up Apple Shared Secret in RevenueCat for iOS purchases
+4. P2: Resend domain DNS verification for password reset emails
 
 ## Future/Backlog
 - Multi-language support (i18n)
 - Samsung Galaxy Store publishing
 - Amazon IAP via RevenueCat
-- iOS App Store submission
+- Sell audiobook directly through the app
+
+## Audiobook Assets
+- Full audiobook: 61.5 MB MP3 (18 chapters)
+- Preview clip: 14.2 MB MP3
+- Book visuals: 9 HD illustrations
+- Needs: Split into individual chapter files, cover art (2400x2400), ISBN
 
 ## Critical Notes for Next Agent
 - RevenueCat keys MUST be: iOS=`appl_qDwlqIUvHJHGuewqEExfpAgaCpw`, Android=`goog_sSuefaqGfyQKJvmIkNrWEyVElTx`
 - Railway deploys from root — mirror `backend/server.py` to root `server.py`
 - Production URL: https://web-production-66c05.up.railway.app
 - Admin key: `yawye2024clear`, Webhook auth: `Jmaster1986!`
-- Google Play service account linking is BLOCKED until user has desktop access
-- User's subscription was charged by Google Play but NOT tracked in RevenueCat (service account not connected)
-- Promotional premium entitlement granted manually, expires May 3, 2026
+- Google Play Service Account JSON uploaded to RevenueCat on April 7, 2026
+- First real subscription CONFIRMED working (Status: Processed)
+- Apple review submitted April 7, 2026 - check status before doing anything
+- After Apple approval: need to add Shared Secret to RevenueCat for iOS
+- Audiobook ready but needs splitting into chapters before publishing
+- User wants to launch audiobook + media campaign simultaneously after Apple approval
