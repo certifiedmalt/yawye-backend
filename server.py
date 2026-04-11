@@ -2337,6 +2337,7 @@ CRITICAL RULES:
 4. Always add a brief disclaimer: "This is educational information - consult a healthcare professional for personal medical advice"
 5. Keep responses informative but concise (2-3 paragraphs max)
 6. Be helpful and educational - don't refuse legitimate questions about health topics
+7. ALWAYS include citations for health claims. Reference specific studies, organisations, or publications. Format citations as: (Source: [Organisation/Author, Year]) at the end of each key claim. Use well-known sources such as WHO, NHS, BMJ, The Lancet, Harvard School of Public Health, NOVA classification (Monteiro et al.), IARC, FDA, EFSA.
 
 WHAT YOU CAN DO (Educational):
 - Explain what conditions like diabetes, heart disease, Alzheimer's, cancer ARE
@@ -2952,7 +2953,7 @@ async def website_terms():
 
 @app.get("/support", response_class=HTMLResponse)
 async def website_support():
-    with open("/app/website-public/index.html", "r") as f:
+    with open("/app/website-public/support.html", "r") as f:
         return HTMLResponse(content=f.read())
 
 
