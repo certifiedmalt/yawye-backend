@@ -2730,13 +2730,23 @@ async def marketing_catalog():
         <p class="desc">Full book narration with dramatic pauses — OpenAI TTS HD, "Onyx" voice, 0.92x speed</p>
         <div style="max-width:700px;margin:0 auto;">
             <div style="background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;margin-bottom:16px;">
-                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">Full Audiobook (~60 minutes)</div>
-                <div style="font-size:13px;color:#888;margin-bottom:12px;">All 18 chapters with dramatic pauses — Prologue through The Beginning</div>
+                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">V1 — Full Audiobook (~45 minutes)</div>
+                <div style="font-size:13px;color:#888;margin-bottom:12px;">18 chapters — Dramatic, investigative deep-dive with shocking facts, industrial breakdowns, and emotional hooks</div>
                 <audio controls style="width:100%;margin-bottom:12px;" data-testid="audiobook-full-player">
                     <source src="/api/marketing/file/audiobook_full.mp3" type="audio/mpeg">
                 </audio>
                 <div style="display:flex;justify-content:flex-end;">
-                    <a class="btn save-btn" href="/api/marketing/file/audiobook_full.mp3" download style="font-size:13px;padding:8px 16px;">Download MP3 (60 MB)</a>
+                    <a class="btn save-btn" href="/api/marketing/file/audiobook_full.mp3" download style="font-size:13px;padding:8px 16px;">Download V1 MP3 (61 MB)</a>
+                </div>
+            </div>
+            <div style="background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;margin-bottom:16px;">
+                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">V2 — Revised Audiobook (~17 minutes)</div>
+                <div style="font-size:13px;color:#888;margin-bottom:12px;">11 chapters — Clean, science-first structure with practical family strategies, 30-day reset plan, and app integration</div>
+                <audio controls style="width:100%;margin-bottom:12px;" data-testid="audiobook-v2-player">
+                    <source src="/api/marketing/file/audiobook_v2.mp3" type="audio/mpeg">
+                </audio>
+                <div style="display:flex;justify-content:flex-end;">
+                    <a class="btn save-btn" href="/api/marketing/file/audiobook_v2.mp3" download style="font-size:13px;padding:8px 16px;">Download V2 MP3 (23 MB)</a>
                 </div>
             </div>
             <div style="background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;">
