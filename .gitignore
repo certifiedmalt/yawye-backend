@@ -145,3 +145,4 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
+backend/static/service-account.json
