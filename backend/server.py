@@ -2390,6 +2390,17 @@ async def delete_marketing_video(filename: str):
         return {"message": f"Deleted {safe_name}"}
     raise HTTPException(status_code=404, detail="File not found")
 
+@app.get("/api/marketing/debug-files")
+async def marketing_debug_files():
+    """Debug: list all files in marketing directory"""
+    import glob
+    files = {}
+    if os.path.exists(MARKETING_DIR):
+        for f in sorted(os.listdir(MARKETING_DIR)):
+            fp = os.path.join(MARKETING_DIR, f)
+            files[f] = round(os.path.getsize(fp) / (1024*1024), 2)
+    return {"marketing_dir": MARKETING_DIR, "files": files, "count": len(files)}
+
 @app.get("/api/marketing/file/{filename}")
 async def serve_marketing_file(filename: str):
     safe_name = os.path.basename(filename)
