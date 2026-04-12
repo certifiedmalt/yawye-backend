@@ -1,0 +1,70 @@
+
+[1/21] Generating section (198 chars)...
+  Chunk 1/1 done (236640 bytes)
+
+[2/21] Generating section (593 chars)...
+  Chunk 1/1 done (704640 bytes)
+
+[3/21] Generating section (1069 chars)...
+  Chunk 1/1 done (1380000 bytes)
+
+[4/21] Generating section (994 chars)...
+  Chunk 1/1 done (1248000 bytes)
+
+[5/21] Generating section (1063 chars)...
+  Chunk 1/1 done (1372320 bytes)
+
+[6/21] Generating section (1885 chars)...
+  Chunk 1/1 done (2661120 bytes)
+
+[7/21] Generating section (2046 chars)...
+  Chunk 1/1 done (2644800 bytes)
+
+[8/21] Generating section (2235 chars)...
+  Chunk 1/1 done (2864640 bytes)
+
+[9/21] Generating section (1642 chars)...
+  Chunk 1/1 done (2102400 bytes)
+
+[10/21] Generating section (1889 chars)...
+  Chunk 1/1 done (2437440 bytes)
+
+[11/21] Generating section (1338 chars)...
+  Chunk 1/1 done (1737600 bytes)
+
+[12/21] Generating section (1215 chars)...
+  Chunk 1/1 done (1569600 bytes)
+
+[13/21] Generating section (1783 chars)...
+  Chunk 1/1 done (2300160 bytes)
+
+[14/21] Generating section (1272 chars)...
+  Chunk 1/1 done (1598880 bytes)
+
+[15/21] Generating section (1097 chars)...
+  Chunk 1/1 done (1402080 bytes)
+
+[16/21] Generating section (975 chars)...
+  Chunk 1/1 done (1214400 bytes)
+
+[17/21] Generating section (974 chars)...
+  Chunk 1/1 done (1250400 bytes)
+
+[18/21] Generating section (964 chars)...
+  Chunk 1/1 done (1235520 bytes)
+
+[19/21] Generating section (1054 chars)...
+  Chunk 1/1 done (1352160 bytes)
+
+[20/21] Generating section (988 chars)...
+  Chunk 1/1 done (1224960 bytes)
+
+[21/21] Generating section (459 chars)...
+  Chunk 1/1 done (563520 bytes)
+
+==================================================
+COMBINED audiobook saved: /app/marketing/audiobook_combined.mp3
+  Size: 31.6 MB
+  vs audiobook_full.mp3: 61.5 MB
+  vs audiobook_v2.mp3: 23.2 MB
+==================================================

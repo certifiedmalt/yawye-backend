@@ -2729,8 +2729,21 @@ async def marketing_catalog():
         <h2>Audiobook</h2>
         <p class="desc">Full book narration with dramatic pauses — OpenAI TTS HD, "Onyx" voice, 0.92x speed</p>
         <div style="max-width:700px;margin:0 auto;">
+            <div style="background:#0d2818;border-radius:12px;padding:24px;border:1px solid #1b5e20;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="background:#4CAF50;color:#000;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;">FINAL</span>
+                    <span style="font-size:16px;font-weight:700;color:#fff;">Combined Audiobook (~25 minutes)</span>
+                </div>
+                <div style="font-size:13px;color:#aaa;margin-bottom:12px;">Best of both versions — Author intro, dramatic hooks, science foundation, industrial deep-dives, practical systems, 30-day reset, family strategies, and closing credits</div>
+                <audio controls style="width:100%;margin-bottom:12px;" data-testid="audiobook-combined-player">
+                    <source src="/api/marketing/file/audiobook_combined.mp3" type="audio/mpeg">
+                </audio>
+                <div style="display:flex;justify-content:flex-end;">
+                    <a class="btn save-btn" href="/api/marketing/file/audiobook_combined.mp3" download style="font-size:13px;padding:8px 16px;">Download Combined MP3 (32 MB)</a>
+                </div>
+            </div>
             <div style="background:#1a1a1a;border-radius:12px;padding:24px;border:1px solid #333;margin-bottom:16px;">
-                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">V1 — Full Audiobook (~45 minutes)</div>
+                <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">V1 — Original Audiobook (~45 minutes)</div>
                 <div style="font-size:13px;color:#888;margin-bottom:12px;">18 chapters — Dramatic, investigative deep-dive with shocking facts, industrial breakdowns, and emotional hooks</div>
                 <audio controls style="width:100%;margin-bottom:12px;" data-testid="audiobook-full-player">
                     <source src="/api/marketing/file/audiobook_full.mp3" type="audio/mpeg">
