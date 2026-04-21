@@ -585,6 +585,41 @@ export default function Result() {
           <Ionicons name="book-outline" size={20} color="#4CAF50" />
           <Text style={styles.viewResearchText}>View All Research Studies</Text>
         </TouchableOpacity>
+
+        {/* Static Sources & References — always visible for Apple Review compliance */}
+        <View style={styles.sourcesSection}>
+          <View style={styles.sourcesHeader}>
+            <Ionicons name="document-text-outline" size={20} color="#4CAF50" />
+            <Text style={styles.sourcesTitle}>Sources & References</Text>
+          </View>
+          <Text style={styles.sourcesIntro}>
+            Health assessments in this app are based on the following peer-reviewed sources and classification systems:
+          </Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/31105044/')}>
+            <Text style={styles.sourceLink}>Monteiro CA et al. (2019) "Ultra-processed foods: what they are and how to identify them." Public Health Nutrition, 20(5), 936-941. [NOVA Classification]</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://monographs.iarc.who.int/list-of-classifications')}>
+            <Text style={styles.sourceLink}>IARC Monographs on the Identification of Carcinogenic Hazards to Humans — World Health Organization</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/36543367/')}>
+            <Text style={styles.sourceLink}>Lane MM et al. (2024) "Ultra-processed food exposure and adverse health outcomes." BMJ, 383, e077310</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.who.int/news-room/fact-sheets/detail/healthy-diet')}>
+            <Text style={styles.sourceLink}>World Health Organization — Healthy Diet Fact Sheet</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/30742202/')}>
+            <Text style={styles.sourceLink}>Srour B et al. (2019) "Ultra-processed food intake and risk of cardiovascular disease." BMJ, 365, l1451</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.efsa.europa.eu/en/topics/topic/food-additives')}>
+            <Text style={styles.sourceLink}>European Food Safety Authority (EFSA) — Food Additives Database</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.hsph.harvard.edu/nutritionsource/')}>
+            <Text style={styles.sourceLink}>Harvard T.H. Chan School of Public Health — The Nutrition Source</Text>
+          </TouchableOpacity>
+          <Text style={styles.sourcesDisclaimer}>
+            Individual ingredient research summaries and study links are available in each ingredient's expandable "Research" section above. This app provides educational information only — consult a healthcare professional for personal medical advice.
+          </Text>
+        </View>
           </>
         ) : null}
 
@@ -1168,5 +1203,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  sourcesSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  sourcesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sourcesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  sourcesIntro: {
+    fontSize: 13,
+    color: '#aaa',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  sourceLink: {
+    fontSize: 13,
+    color: '#4CAF50',
+    lineHeight: 19,
+    marginBottom: 10,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: '#4CAF50',
+  },
+  sourcesDisclaimer: {
+    fontSize: 11,
+    color: '#666',
+    lineHeight: 16,
+    marginTop: 12,
+    fontStyle: 'italic',
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+    paddingTop: 12,
   },
 });

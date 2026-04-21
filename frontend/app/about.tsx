@@ -81,6 +81,62 @@ export default function About() {
           </Text>
         </View>
 
+        <View style={styles.sourcesCard}>
+          <Text style={styles.sourcesCardTitle}>Sources & References</Text>
+          <Text style={styles.sourcesCardIntro}>
+            Our health assessments are based on peer-reviewed scientific research and established classification systems:
+          </Text>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/31105044/')}>
+            <Text style={styles.sourceItem}>NOVA Food Classification — Monteiro CA et al. (2019), Public Health Nutrition</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://monographs.iarc.who.int/list-of-classifications')}>
+            <Text style={styles.sourceItem}>IARC Carcinogen Classifications — World Health Organization</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/36543367/')}>
+            <Text style={styles.sourceItem}>Ultra-processed food and adverse health outcomes — Lane MM et al. (2024), BMJ</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://pubmed.ncbi.nlm.nih.gov/30742202/')}>
+            <Text style={styles.sourceItem}>UPF intake and cardiovascular disease — Srour B et al. (2019), BMJ</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.who.int/news-room/fact-sheets/detail/healthy-diet')}>
+            <Text style={styles.sourceItem}>Healthy Diet — World Health Organization</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.efsa.europa.eu/en/topics/topic/food-additives')}>
+            <Text style={styles.sourceItem}>Food Additives Database — European Food Safety Authority (EFSA)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.hsph.harvard.edu/nutritionsource/')}>
+            <Text style={styles.sourceItem}>The Nutrition Source — Harvard T.H. Chan School of Public Health</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(18)31809-9/fulltext')}>
+            <Text style={styles.sourceItem}>Health effects of dietary risks — GBD 2017 Diet Collaborators, The Lancet (2019)</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.sourcesCardDisclaimer}>
+            Individual ingredient citations with links to PubMed studies are provided within each product analysis. This app provides educational information only — consult a healthcare professional for personal medical advice.
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Legal</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/terms-of-service')}>
+            <Text style={styles.legalLink}>Terms of Use</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/privacy-policy')}>
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/support')}>
+            <Text style={styles.legalLink}>Support</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.footer}>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
           <Text style={styles.copyright}>© 2026 You Are What You Eat</Text>
@@ -179,6 +235,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#aaa',
     lineHeight: 24,
+  },
+  sourcesCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  sourcesCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 8,
+  },
+  sourcesCardIntro: {
+    fontSize: 13,
+    color: '#aaa',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  sourceItem: {
+    fontSize: 13,
+    color: '#4CAF50',
+    lineHeight: 19,
+    marginBottom: 10,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: '#4CAF50',
+  },
+  sourcesCardDisclaimer: {
+    fontSize: 11,
+    color: '#666',
+    lineHeight: 16,
+    marginTop: 12,
+    fontStyle: 'italic',
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+    paddingTop: 12,
+  },
+  legalLink: {
+    fontSize: 14,
+    color: '#4CAF50',
+    lineHeight: 28,
+    textDecorationLine: 'underline',
   },
   footer: {
     alignItems: 'center',

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -304,13 +305,19 @@ export default function Main() {
 
         {user?.subscription_tier !== 'premium' && (
           <View style={styles.upgradeCard}>
-            <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
+            <Text style={styles.upgradeTitle}>YAWYE Premium</Text>
+            <Text style={styles.upgradeSubtitle}>Monthly Subscription</Text>
             <Text style={styles.upgradeText}>
               • Unlimited scans per day{"\n"}
               • Detailed ingredient analysis{"\n"}
               • Save favorites{"\n"}
               • Scan history
             </Text>
+            {offerings?.availablePackages?.[0]?.product?.priceString && (
+              <Text style={styles.upgradePriceText}>
+                {offerings.availablePackages[0].product.priceString}/month
+              </Text>
+            )}
             <TouchableOpacity 
               style={[styles.upgradeButton, purchaseInProgress && styles.upgradeButtonDisabled]} 
               disabled={purchaseInProgress}
@@ -319,12 +326,17 @@ export default function Main() {
                 
                 // Check if offerings exist
                 if (!offerings) {
-                  // Try to re-fetch offerings
+                  // Try to re-fetch offerings with a timeout
                   try {
-                    await initializeRevenueCat(user?.id);
-                  } catch (e) {}
+                    await Promise.race([
+                      initializeRevenueCat(user?.id),
+                      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+                    ]);
+                  } catch (e) {
+                    console.warn('Re-fetch offerings failed:', e);
+                  }
                   if (!offerings) {
-                    Alert.alert('Subscription Unavailable', 'Could not load subscription options. Please restart the app and try again.');
+                    Alert.alert('Subscription Unavailable', 'Could not load subscription options. Please check your internet connection and restart the app.');
                     return;
                   }
                 }
@@ -334,7 +346,7 @@ export default function Main() {
                 console.log('Available packages:', packages.length);
                 
                 if (packages.length === 0) {
-                  Alert.alert('Error', 'Subscription not available. Please try again later.');
+                  Alert.alert('Subscription Unavailable', 'No subscription packages found. Please try again later.');
                   return;
                 }
                 
@@ -345,7 +357,13 @@ export default function Main() {
                     (pkg: any) => pkg.identifier === '$rc_monthly' || pkg.identifier === 'Monthly' || pkg.identifier.toLowerCase().includes('monthly')
                   ) || packages[0];
                   
-                  await purchasePackage(monthlyPackage);
+                  // Add a 60-second timeout to avoid hanging indefinitely
+                  const purchasePromise = purchasePackage(monthlyPackage);
+                  const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Purchase timed out')), 60000)
+                  );
+                  
+                  await Promise.race([purchasePromise, timeoutPromise]);
                   
                   // Update backend to mark user as premium
                   try {
@@ -359,7 +377,9 @@ export default function Main() {
                   Alert.alert('Success!', 'Welcome to Premium! Enjoy unlimited scans.');
                   await refreshUser();
                 } catch (error: any) {
-                  if (!error.userCancelled) {
+                  if (error?.message === 'Purchase timed out') {
+                    Alert.alert('Purchase Timeout', 'The purchase is taking too long. Please check your subscriptions in Settings and try again.');
+                  } else if (!error.userCancelled) {
                     Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
                   }
                 } finally {
@@ -371,10 +391,17 @@ export default function Main() {
               </Text>
             </TouchableOpacity>
             <Text style={styles.trialText}>
-              {offerings?.availablePackages?.[0]?.product?.priceString 
-                ? `${offerings.availablePackages[0].product.priceString}/month. Cancel anytime.`
-                : 'Cancel anytime.'}
+              Auto-renews monthly. Cancel anytime.
             </Text>
+            <View style={styles.legalLinks}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/terms-of-service')}>
+                <Text style={styles.legalLinkText}>Terms of Use</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalSeparator}>|</Text>
+              <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/privacy-policy')}>
+                <Text style={styles.legalLinkText}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -589,12 +616,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFD700',
+    marginBottom: 4,
+  },
+  upgradeSubtitle: {
+    fontSize: 14,
+    color: '#ccc',
     marginBottom: 12,
   },
   upgradeText: {
     fontSize: 16,
     color: '#fff',
     lineHeight: 24,
+    marginBottom: 12,
+  },
+  upgradePriceText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    textAlign: 'center',
     marginBottom: 16,
   },
   upgradeButton: {
@@ -616,6 +655,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 8,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  legalLinkText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    color: '#555',
+    fontSize: 12,
+    marginHorizontal: 8,
   },
   gamificationCard: {
     backgroundColor: '#1a1a1a',
