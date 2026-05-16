@@ -55,7 +55,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       // Configure SDK only once (using ref to avoid async state race)
       if (!configuredRef.current) {
         console.log('[RC] Configuring SDK with key:', apiKey.substring(0, 8) + '...');
-        Purchases.configure({ apiKey });
+        await Promise.race([
+          Promise.resolve(Purchases.configure({ apiKey })),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('RC configure timeout')), 10000)),
+        ]);
         configuredRef.current = true;
         console.log('[RC] SDK configured successfully');
       }
@@ -64,18 +67,23 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (userId && loggedInUserRef.current !== userId) {
         try {
           console.log('[RC] Logging in as:', userId);
-          const { customerInfo } = await Purchases.logIn(userId);
+          const loginResult = await Promise.race([
+            Purchases.logIn(userId),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('RC login timeout')), 10000)),
+          ]) as any;
           loggedInUserRef.current = userId;
           console.log('[RC] Logged in successfully. Active entitlements:',
-            Object.keys(customerInfo?.entitlements?.active || {}));
+            Object.keys(loginResult?.customerInfo?.entitlements?.active || {}));
         } catch (loginErr) {
           console.warn('[RC] logIn failed:', loginErr);
-          // Continue anyway - offerings should still work for anonymous users
         }
       }
 
-      // Fetch offerings
-      await fetchOfferings();
+      // Fetch offerings with timeout
+      await Promise.race([
+        fetchOfferings(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('RC offerings timeout')), 10000)),
+      ]);
     } catch (e) {
       console.error('[RC] Init error:', e);
     }

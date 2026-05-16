@@ -22,6 +22,18 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
+let presentSubscriptionStore: ((groupID: string) => Promise<void>) | null = null;
+let isSubscriptionStoreAvailable: (() => boolean) | null = null;
+if (Platform.OS === 'ios') {
+  try {
+    const mod = require('expo-subscription-store');
+    presentSubscriptionStore = mod.presentSubscriptionStore;
+    isSubscriptionStoreAvailable = mod.isSubscriptionStoreAvailable;
+  } catch (e) {
+    console.log('SubscriptionStoreView not available:', e);
+  }
+}
+
 const APP_VERSION = Constants.expoConfig?.version || '1.0.25';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-production-66c05.up.railway.app';
@@ -95,7 +107,7 @@ export default function Main() {
         // Cancel any old schedules
         await Notifications.cancelAllScheduledNotificationsAsync();
 
-        // Schedule daily reminder at 6pm (works on both iOS and Android)
+        // Schedule daily reminder at 6pm
         await Notifications.scheduleNotificationAsync({
           content: {
             title: 'Shopping today?',
@@ -103,9 +115,9 @@ export default function Main() {
             ...(Platform.OS === 'android' ? { channelId: 'daily-reminders' } : {}),
           },
           trigger: {
+            type: 'daily',
             hour: 18,
             minute: 0,
-            repeats: true,
           },
         });
 
@@ -313,20 +325,37 @@ export default function Main() {
               • Save favorites{"\n"}
               • Scan history
             </Text>
-            {offerings?.availablePackages?.[0]?.product?.priceString && (
-              <Text style={styles.upgradePriceText}>
-                {offerings.availablePackages[0].product.priceString}/month
-              </Text>
-            )}
+            <Text style={styles.upgradePriceText}>
+              {offerings?.availablePackages?.[0]?.product?.priceString 
+                ? `${offerings.availablePackages[0].product.priceString}/month`
+                : '$4.99/month'}
+            </Text>
             <TouchableOpacity 
               style={[styles.upgradeButton, purchaseInProgress && styles.upgradeButtonDisabled]} 
               disabled={purchaseInProgress}
               onPress={async () => {
-                console.log('Offerings:', JSON.stringify(offerings, null, 2));
-                
-                // Check if offerings exist
+                // iOS: Use native Apple SubscriptionStoreView
+                if (Platform.OS === 'ios' && presentSubscriptionStore && isSubscriptionStoreAvailable?.()) {
+                  try {
+                    setPurchaseInProgress(true);
+                    await presentSubscriptionStore('21978502');
+                    // After dismissal, refresh user to check if they subscribed
+                    try {
+                      await axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                    } catch (e) {}
+                    await refreshUser();
+                  } catch (error: any) {
+                    console.warn('SubscriptionStoreView error:', error);
+                  } finally {
+                    setPurchaseInProgress(false);
+                  }
+                  return;
+                }
+
+                // Android / fallback: Use RevenueCat
                 if (!offerings) {
-                  // Try to re-fetch offerings with a timeout
                   try {
                     await Promise.race([
                       initializeRevenueCat(user?.id),
@@ -341,10 +370,7 @@ export default function Main() {
                   }
                 }
                 
-                // Get available packages
                 const packages = offerings.availablePackages || [];
-                console.log('Available packages:', packages.length);
-                
                 if (packages.length === 0) {
                   Alert.alert('Subscription Unavailable', 'No subscription packages found. Please try again later.');
                   return;
@@ -352,20 +378,15 @@ export default function Main() {
                 
                 try {
                   setPurchaseInProgress(true);
-                  // Find the monthly package
                   const monthlyPackage = packages.find(
                     (pkg: any) => pkg.identifier === '$rc_monthly' || pkg.identifier === 'Monthly' || pkg.identifier.toLowerCase().includes('monthly')
                   ) || packages[0];
                   
-                  // Add a 60-second timeout to avoid hanging indefinitely
-                  const purchasePromise = purchasePackage(monthlyPackage);
-                  const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Purchase timed out')), 60000)
-                  );
+                  await Promise.race([
+                    purchasePackage(monthlyPackage),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Purchase timed out')), 60000)),
+                  ]);
                   
-                  await Promise.race([purchasePromise, timeoutPromise]);
-                  
-                  // Update backend to mark user as premium
                   try {
                     await axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
                       headers: { Authorization: `Bearer ${token}` }
