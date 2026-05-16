@@ -328,7 +328,7 @@ export default function Main() {
             <Text style={styles.upgradePriceText}>
               {offerings?.availablePackages?.[0]?.product?.priceString 
                 ? `${offerings.availablePackages[0].product.priceString}/month`
-                : '$4.99/month'}
+                : '£1.99/month'}
             </Text>
             <TouchableOpacity 
               style={[styles.upgradeButton, purchaseInProgress && styles.upgradeButtonDisabled]} 
