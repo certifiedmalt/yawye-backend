@@ -29,12 +29,24 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-producti
 
 export default function Main() {
   const { user, logout, refreshUser, token } = useAuth();
-  const { products, purchaseSubscription, isLoading: subscriptionLoading, priceString, isConnected } = useSubscription();
+  const { purchaseSubscription, isLoading: subscriptionLoading, priceString, isConnected, purchaseSuccess } = useSubscription();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [purchaseInProgress, setPurchaseInProgress] = useState(false);
 
   // No RevenueCat initialization needed — native IAP connects automatically
+
+  // Auto-upgrade when purchase completes successfully
+  useEffect(() => {
+    if (purchaseSuccess && token) {
+      axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(() => {
+        refreshUser();
+        Alert.alert('Success!', 'Welcome to Premium! Enjoy unlimited scans.');
+      }).catch((e: any) => console.warn('Backend upgrade failed:', e));
+    }
+  }, [purchaseSuccess]);
 
   // Register push token with backend for server-side notifications
   useEffect(() => {

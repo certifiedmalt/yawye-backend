@@ -1,143 +1,93 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 
-// Native IAP
-let IAP: any = null;
+let useIAP: any = null;
 try {
-  IAP = require('react-native-iap');
+  const iapModule = require('expo-iap');
+  useIAP = iapModule.useIAP;
 } catch (e) {
-  console.log('[IAP] react-native-iap not available');
+  console.log('[IAP] expo-iap not available (expected on web)');
 }
 
-const PRODUCT_IDS = Platform.select({
-  ios: ['yawye_premium_monthly'],
-  android: ['yawye_premium_monthly'],
-  default: [],
-}) as string[];
+const PRODUCT_ID = 'yawye_premium_monthly';
 
 interface SubscriptionContextType {
-  products: any[];
-  purchaseSubscription: (productId?: string) => Promise<void>;
+  purchaseSubscription: () => Promise<void>;
+  restorePurchases: () => Promise<any[]>;
   isLoading: boolean;
-  restorePurchases: () => Promise<void>;
   priceString: string | null;
   isConnected: boolean;
+  purchaseSuccess: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+// Inner component that uses the hook
+function SubscriptionProviderInner({ children }: { children: React.ReactNode }) {
   const [priceString, setPriceString] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const purchaseListenerRef = useRef<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+
+  const {
+    connected,
+    products,
+    fetchProducts,
+    requestPurchase,
+    finishTransaction,
+    getAvailablePurchases,
+  } = useIAP({
+    onPurchaseSuccess: async (purchase: any) => {
+      try {
+        console.log('[IAP] Purchase success:', purchase.productId);
+        await finishTransaction({ purchase, isConsumable: false });
+        setPurchaseSuccess(true);
+        console.log('[IAP] Transaction finished');
+      } catch (err) {
+        console.warn('[IAP] finishTransaction error:', err);
+      }
+    },
+    onPurchaseError: (error: any) => {
+      console.warn('[IAP] Purchase error:', error);
+    },
+  });
 
   useEffect(() => {
-    if (!IAP || __DEV__) {
-      console.log('[IAP] Skipping init - IAP:', !!IAP, 'DEV:', __DEV__);
-      return;
-    }
-
-    const init = async () => {
-      try {
-        // Setup StoreKit 2 mode on iOS
-        if (Platform.OS === 'ios') {
-          await IAP.setup({ storekitMode: 'STOREKIT2_MODE' });
-        }
-
-        const connected = await IAP.initConnection();
-        console.log('[IAP] Connection result:', connected);
-        setIsConnected(true);
-
-        // Fetch subscription products
-        try {
-          const subs = await IAP.getSubscriptions({ skus: PRODUCT_IDS });
-          console.log('[IAP] Subscriptions loaded:', subs?.length || 0);
-          if (subs && subs.length > 0) {
-            setProducts(subs);
-            // Extract price string
-            const sub = subs[0];
-            const price = sub.localizedPrice || sub.price || null;
-            if (price) {
-              setPriceString(`${price}/month`);
-            }
-          }
-        } catch (subErr) {
-          console.warn('[IAP] getSubscriptions failed:', subErr);
-        }
-      } catch (e) {
-        console.error('[IAP] Init error:', e);
-      }
-    };
-
-    init();
-
-    // Listen for purchase updates
-    if (IAP.purchaseUpdatedListener) {
-      purchaseListenerRef.current = IAP.purchaseUpdatedListener(async (purchase: any) => {
-        console.log('[IAP] Purchase updated:', purchase.productId);
-        try {
-          // Finish the transaction
-          if (Platform.OS === 'ios') {
-            await IAP.finishTransaction({ purchase, isConsumable: false });
-          } else {
-            // Android: acknowledge the purchase
-            if (purchase.purchaseToken) {
-              await IAP.acknowledgePurchaseAndroid({ token: purchase.purchaseToken });
-            }
-            await IAP.finishTransaction({ purchase, isConsumable: false });
-          }
-          console.log('[IAP] Transaction finished successfully');
-        } catch (err) {
-          console.warn('[IAP] finishTransaction error:', err);
-        }
+    if (connected) {
+      console.log('[IAP] Connected, fetching products');
+      fetchProducts([PRODUCT_ID]).then(() => {
+        console.log('[IAP] Products fetched');
+      }).catch((err: any) => {
+        console.warn('[IAP] fetchProducts error:', err);
       });
     }
+  }, [connected]);
 
-    return () => {
-      if (purchaseListenerRef.current) {
-        purchaseListenerRef.current.remove();
+  useEffect(() => {
+    if (products && products.length > 0) {
+      const p = products[0];
+      const price = p.localizedPrice || p.price || null;
+      if (price) {
+        setPriceString(`${price}/month`);
       }
-      IAP?.endConnection();
-    };
-  }, []);
+      console.log('[IAP] Product loaded:', p.productId, 'price:', price);
+    }
+  }, [products]);
 
-  const purchaseSubscription = async (productId?: string) => {
-    if (!IAP) throw new Error('IAP not available');
+  const purchaseSubscription = async () => {
     setIsLoading(true);
     try {
-      const sku = productId || PRODUCT_IDS[0];
-
-      if (Platform.OS === 'ios') {
-        await IAP.requestSubscription({ sku });
-      } else {
-        // Android subscription request
-        const sub = products.find((p: any) => p.productId === sku);
-        if (sub?.subscriptionOfferDetails?.length > 0) {
-          await IAP.requestSubscription({
-            sku,
-            subscriptionOffers: [{
-              sku,
-              offerToken: sub.subscriptionOfferDetails[0].offerToken,
-            }],
-          });
-        } else {
-          await IAP.requestSubscription({ sku });
-        }
-      }
+      await requestPurchase({ productId: PRODUCT_ID });
     } finally {
       setIsLoading(false);
     }
   };
 
   const restorePurchases = async () => {
-    if (!IAP) return;
     setIsLoading(true);
     try {
-      const purchases = await IAP.getAvailablePurchases();
+      const purchases = await getAvailablePurchases();
       console.log('[IAP] Restored purchases:', purchases?.length || 0);
-      return purchases;
+      return purchases || [];
     } finally {
       setIsLoading(false);
     }
@@ -145,16 +95,41 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   return (
     <SubscriptionContext.Provider value={{
-      products,
       purchaseSubscription,
-      isLoading,
       restorePurchases,
+      isLoading,
       priceString,
-      isConnected,
+      isConnected: connected,
+      purchaseSuccess,
     }}>
       {children}
     </SubscriptionContext.Provider>
   );
+}
+
+// Fallback for web/environments without IAP
+function SubscriptionProviderFallback({ children }: { children: React.ReactNode }) {
+  const value: SubscriptionContextType = {
+    purchaseSubscription: async () => { throw new Error('IAP not available'); },
+    restorePurchases: async () => [],
+    isLoading: false,
+    priceString: null,
+    isConnected: false,
+    purchaseSuccess: false,
+  };
+
+  return (
+    <SubscriptionContext.Provider value={value}>
+      {children}
+    </SubscriptionContext.Provider>
+  );
+}
+
+export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
+  if (!useIAP || Platform.OS === 'web') {
+    return <SubscriptionProviderFallback>{children}</SubscriptionProviderFallback>;
+  }
+  return <SubscriptionProviderInner>{children}</SubscriptionProviderInner>;
 }
 
 export function useSubscription() {
