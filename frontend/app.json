@@ -38,6 +38,17 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.0"
+          },
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-camera",
