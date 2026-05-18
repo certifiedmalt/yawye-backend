@@ -372,24 +372,6 @@ export default function Main() {
             </View>
           </View>
         )}
-              <Text style={styles.upgradeButtonText}>
-                {purchaseInProgress ? 'Processing...' : 'Subscribe Now'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={styles.trialText}>
-              Auto-renews monthly. Cancel anytime.
-            </Text>
-            <View style={styles.legalLinks}>
-              <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/terms-of-service')}>
-                <Text style={styles.legalLinkText}>Terms of Use</Text>
-              </TouchableOpacity>
-              <Text style={styles.legalSeparator}>|</Text>
-              <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/privacy-policy')}>
-                <Text style={styles.legalLinkText}>Privacy Policy</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* Account Settings */}
         <View style={styles.settingsSection}>
