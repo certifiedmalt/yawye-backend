@@ -334,27 +334,32 @@ export default function Main() {
               style={[styles.upgradeButton, purchaseInProgress && styles.upgradeButtonDisabled]} 
               disabled={purchaseInProgress}
               onPress={async () => {
-                // iOS: Use native Apple SubscriptionStoreView
-                if (Platform.OS === 'ios' && presentSubscriptionStore && isSubscriptionStoreAvailable?.()) {
+                // iOS: Try native SubscriptionStoreView first
+                if (Platform.OS === 'ios' && presentSubscriptionStore) {
                   try {
-                    setPurchaseInProgress(true);
-                    await presentSubscriptionStore('21978502');
-                    // After dismissal, refresh user to check if they subscribed
-                    try {
-                      await axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
-                        headers: { Authorization: `Bearer ${token}` }
-                      });
-                    } catch (e) {}
-                    await refreshUser();
+                    const available = isSubscriptionStoreAvailable?.() ?? false;
+                    if (available) {
+                      setPurchaseInProgress(true);
+                      await presentSubscriptionStore('21978502');
+                      // After dismissal, refresh user to check if they subscribed
+                      try {
+                        await axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
+                      } catch (e) {}
+                      await refreshUser();
+                      setPurchaseInProgress(false);
+                      return;
+                    }
                   } catch (error: any) {
                     console.warn('SubscriptionStoreView error:', error);
+                    // Fall through to RevenueCat
                   } finally {
                     setPurchaseInProgress(false);
                   }
-                  return;
                 }
 
-                // Android / fallback: Use RevenueCat
+                // iOS fallback + Android: Use RevenueCat
                 if (!offerings) {
                   try {
                     await Promise.race([
@@ -364,15 +369,17 @@ export default function Main() {
                   } catch (e) {
                     console.warn('Re-fetch offerings failed:', e);
                   }
-                  if (!offerings) {
-                    Alert.alert('Subscription Unavailable', 'Could not load subscription options. Please check your internet connection and restart the app.');
-                    return;
-                  }
                 }
                 
-                const packages = offerings.availablePackages || [];
+                const packages = offerings?.availablePackages || [];
+                
                 if (packages.length === 0) {
-                  Alert.alert('Subscription Unavailable', 'No subscription packages found. Please try again later.');
+                  // On iOS: never show error — direct to App Store subscription management instead
+                  if (Platform.OS === 'ios') {
+                    Linking.openURL('https://apps.apple.com/account/subscriptions');
+                    return;
+                  }
+                  Alert.alert('Subscription Unavailable', 'Could not load subscription options. Please check your internet connection and restart the app.');
                   return;
                 }
                 
@@ -401,7 +408,12 @@ export default function Main() {
                   if (error?.message === 'Purchase timed out') {
                     Alert.alert('Purchase Timeout', 'The purchase is taking too long. Please check your subscriptions in Settings and try again.');
                   } else if (!error.userCancelled) {
-                    Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
+                    // On iOS: redirect to subscriptions page instead of showing error
+                    if (Platform.OS === 'ios') {
+                      Linking.openURL('https://apps.apple.com/account/subscriptions');
+                    } else {
+                      Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
+                    }
                   }
                 } finally {
                   setPurchaseInProgress(false);
@@ -415,11 +427,11 @@ export default function Main() {
               Auto-renews monthly. Cancel anytime.
             </Text>
             <View style={styles.legalLinks}>
-              <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/terms-of-service')}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/terms-of-service')}>
                 <Text style={styles.legalLinkText}>Terms of Use</Text>
               </TouchableOpacity>
               <Text style={styles.legalSeparator}>|</Text>
-              <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/privacy-policy')}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/privacy-policy')}>
                 <Text style={styles.legalLinkText}>Privacy Policy</Text>
               </TouchableOpacity>
             </View>

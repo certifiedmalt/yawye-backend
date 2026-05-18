@@ -126,13 +126,13 @@ export default function About() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Legal</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/terms-of-service')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/terms-of-service')}>
             <Text style={styles.legalLink}>Terms of Use</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/privacy-policy')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/privacy-policy')}>
             <Text style={styles.legalLink}>Privacy Policy</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Linking.openURL('https://yawye.app/support')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/support')}>
             <Text style={styles.legalLink}>Support</Text>
           </TouchableOpacity>
         </View>
