@@ -39,3 +39,4 @@ push-to-github.sh
 GIT-SETUP-INSTRUCTIONS.md
 PLAY_STORE_LISTING.md
 PRODUCTION-LAUNCH-GUIDE.md
+frontend/.metro-cache/
