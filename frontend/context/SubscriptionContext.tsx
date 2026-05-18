@@ -1,105 +1,130 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
-const REVENUECAT_ENABLED = !__DEV__;
-
-let Purchases: any = null;
+// Native IAP
+let IAP: any = null;
 try {
-  Purchases = require('react-native-purchases').default;
+  IAP = require('react-native-iap');
 } catch (e) {
-  console.log('RevenueCat not available');
+  console.log('[IAP] react-native-iap not available');
 }
 
+const PRODUCT_IDS = Platform.select({
+  ios: ['yawye_premium_monthly'],
+  android: ['yawye_premium_monthly'],
+  default: [],
+}) as string[];
+
 interface SubscriptionContextType {
-  offerings: any;
-  purchasePackage: (pkg: any) => Promise<void>;
+  products: any[];
+  purchaseSubscription: (productId?: string) => Promise<void>;
   isLoading: boolean;
   restorePurchases: () => Promise<void>;
-  initializeRevenueCat: (userId?: string) => Promise<void>;
+  priceString: string | null;
+  isConnected: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const [offerings, setOfferings] = useState<any>(null);
+  const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const configuredRef = useRef(false);
-  const loggedInUserRef = useRef<string | null>(null);
+  const [priceString, setPriceString] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const purchaseListenerRef = useRef<any>(null);
 
-  const apiKey = Platform.OS === 'ios'
-    ? 'appl_qDwlqIUvHJHGuewqEExfpAgaCpw'
-    : 'goog_sSuefaqGfyQKJvmIkNrWEyVElTx';
-
-  const fetchOfferings = async () => {
-    try {
-      const result = await Purchases.getOfferings();
-      console.log('[RC] Offerings fetched, current:', result?.current ? 'YES' : 'NO',
-        'packages:', result?.current?.availablePackages?.length || 0);
-      if (result?.current) {
-        setOfferings(result.current);
-        return true;
-      }
-    } catch (e) {
-      console.warn('[RC] getOfferings failed:', e);
-    }
-    return false;
-  };
-
-  const initializeRevenueCat = async (userId?: string) => {
-    if (!REVENUECAT_ENABLED || !Purchases) {
-      console.log('[RC] Skipping init - enabled:', REVENUECAT_ENABLED, 'Purchases:', !!Purchases);
+  useEffect(() => {
+    if (!IAP || __DEV__) {
+      console.log('[IAP] Skipping init - IAP:', !!IAP, 'DEV:', __DEV__);
       return;
     }
 
-    try {
-      // Configure SDK only once (using ref to avoid async state race)
-      if (!configuredRef.current) {
-        console.log('[RC] Configuring SDK with key:', apiKey.substring(0, 8) + '...');
-        await Promise.race([
-          Promise.resolve(Purchases.configure({ apiKey })),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('RC configure timeout')), 10000)),
-        ]);
-        configuredRef.current = true;
-        console.log('[RC] SDK configured successfully');
-      }
-
-      // Log in when we have a userId
-      if (userId && loggedInUserRef.current !== userId) {
-        try {
-          console.log('[RC] Logging in as:', userId);
-          const loginResult = await Promise.race([
-            Purchases.logIn(userId),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('RC login timeout')), 10000)),
-          ]) as any;
-          loggedInUserRef.current = userId;
-          console.log('[RC] Logged in successfully. Active entitlements:',
-            Object.keys(loginResult?.customerInfo?.entitlements?.active || {}));
-        } catch (loginErr) {
-          console.warn('[RC] logIn failed:', loginErr);
+    const init = async () => {
+      try {
+        // Setup StoreKit 2 mode on iOS
+        if (Platform.OS === 'ios') {
+          await IAP.setup({ storekitMode: 'STOREKIT2_MODE' });
         }
+
+        const connected = await IAP.initConnection();
+        console.log('[IAP] Connection result:', connected);
+        setIsConnected(true);
+
+        // Fetch subscription products
+        try {
+          const subs = await IAP.getSubscriptions({ skus: PRODUCT_IDS });
+          console.log('[IAP] Subscriptions loaded:', subs?.length || 0);
+          if (subs && subs.length > 0) {
+            setProducts(subs);
+            // Extract price string
+            const sub = subs[0];
+            const price = sub.localizedPrice || sub.price || null;
+            if (price) {
+              setPriceString(`${price}/month`);
+            }
+          }
+        } catch (subErr) {
+          console.warn('[IAP] getSubscriptions failed:', subErr);
+        }
+      } catch (e) {
+        console.error('[IAP] Init error:', e);
       }
+    };
 
-      // Fetch offerings with timeout
-      await Promise.race([
-        fetchOfferings(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('RC offerings timeout')), 10000)),
-      ]);
-    } catch (e) {
-      console.error('[RC] Init error:', e);
+    init();
+
+    // Listen for purchase updates
+    if (IAP.purchaseUpdatedListener) {
+      purchaseListenerRef.current = IAP.purchaseUpdatedListener(async (purchase: any) => {
+        console.log('[IAP] Purchase updated:', purchase.productId);
+        try {
+          // Finish the transaction
+          if (Platform.OS === 'ios') {
+            await IAP.finishTransaction({ purchase, isConsumable: false });
+          } else {
+            // Android: acknowledge the purchase
+            if (purchase.purchaseToken) {
+              await IAP.acknowledgePurchaseAndroid({ token: purchase.purchaseToken });
+            }
+            await IAP.finishTransaction({ purchase, isConsumable: false });
+          }
+          console.log('[IAP] Transaction finished successfully');
+        } catch (err) {
+          console.warn('[IAP] finishTransaction error:', err);
+        }
+      });
     }
-  };
 
-  useEffect(() => {
-    initializeRevenueCat();
+    return () => {
+      if (purchaseListenerRef.current) {
+        purchaseListenerRef.current.remove();
+      }
+      IAP?.endConnection();
+    };
   }, []);
 
-  const purchasePackage = async (pkg: any) => {
-    if (!Purchases) throw new Error('Purchases not available');
+  const purchaseSubscription = async (productId?: string) => {
+    if (!IAP) throw new Error('IAP not available');
     setIsLoading(true);
     try {
-      const { customerInfo } = await Purchases.purchasePackage(pkg);
-      if (customerInfo.entitlements.active['premium']) {
-        console.log('[RC] Purchase successful - premium active');
+      const sku = productId || PRODUCT_IDS[0];
+
+      if (Platform.OS === 'ios') {
+        await IAP.requestSubscription({ sku });
+      } else {
+        // Android subscription request
+        const sub = products.find((p: any) => p.productId === sku);
+        if (sub?.subscriptionOfferDetails?.length > 0) {
+          await IAP.requestSubscription({
+            sku,
+            subscriptionOffers: [{
+              sku,
+              offerToken: sub.subscriptionOfferDetails[0].offerToken,
+            }],
+          });
+        } else {
+          await IAP.requestSubscription({ sku });
+        }
       }
     } finally {
       setIsLoading(false);
@@ -107,10 +132,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   };
 
   const restorePurchases = async () => {
-    if (!Purchases) return;
+    if (!IAP) return;
     setIsLoading(true);
     try {
-      await Purchases.restorePurchases();
+      const purchases = await IAP.getAvailablePurchases();
+      console.log('[IAP] Restored purchases:', purchases?.length || 0);
+      return purchases;
     } finally {
       setIsLoading(false);
     }
@@ -118,11 +145,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   return (
     <SubscriptionContext.Provider value={{
-      offerings,
-      purchasePackage,
+      products,
+      purchaseSubscription,
       isLoading,
       restorePurchases,
-      initializeRevenueCat,
+      priceString,
+      isConnected,
     }}>
       {children}
     </SubscriptionContext.Provider>
