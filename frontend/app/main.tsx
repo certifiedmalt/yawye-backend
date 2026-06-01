@@ -389,12 +389,10 @@ export default function Main() {
             <TouchableOpacity
               style={styles.settingsItem}
               onPress={() => {
-                import('react-native').then(({ Linking, Platform }) => {
-                  const url = Platform.OS === 'ios'
-                    ? 'https://apps.apple.com/account/subscriptions'
-                    : 'https://play.google.com/store/account/subscriptions';
-                  Linking.openURL(url);
-                });
+                const url = Platform.OS === 'ios'
+                  ? 'https://apps.apple.com/account/subscriptions'
+                  : 'https://play.google.com/store/account/subscriptions';
+                Linking.openURL(url);
               }}
             >
               <Ionicons name="card-outline" size={20} color="#4CAF50" />
