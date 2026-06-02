@@ -384,21 +384,14 @@ export default function Main() {
             <Text style={styles.settingsItemText}>About</Text>
           </TouchableOpacity>
 
-          {/* Manage Subscription - only show if premium */}
-          {user?.subscription_tier === 'premium' && (
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const url = Platform.OS === 'ios'
-                  ? 'https://apps.apple.com/account/subscriptions'
-                  : 'https://play.google.com/store/account/subscriptions';
-                Linking.openURL(url);
-              }}
-            >
-              <Ionicons name="card-outline" size={20} color="#4CAF50" />
-              <Text style={styles.settingsItemText}>Manage Subscription</Text>
-            </TouchableOpacity>
-          )}
+          {/* Manage Subscription - show for all users */}
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => router.push('/manage-subscription')}
+          >
+            <Ionicons name="card-outline" size={20} color="#4CAF50" />
+            <Text style={styles.settingsItemText}>Manage Subscription</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity
             style={styles.settingsItem}
