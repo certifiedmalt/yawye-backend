@@ -150,6 +150,7 @@ export default function RootLayout() {
             <Stack.Screen name="quiz" options={{ title: 'Daily Quiz' }} />
             <Stack.Screen name="library" options={{ title: 'My Library' }} />
             <Stack.Screen name="about" options={{ title: 'About' }} />
+            <Stack.Screen name="manage-subscription" options={{ title: 'Manage Subscription' }} />
           </Stack>
         </AuthProvider>
       </SubscriptionProvider>

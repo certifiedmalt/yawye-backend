@@ -21,7 +21,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const { purchaseSubscription, priceString, isLoading: purchaseLoading } = useSubscription();
+  const { purchaseSubscription, restorePurchases, priceString, isLoading: purchaseLoading } = useSubscription();
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -111,6 +111,21 @@ export default function Login() {
           <Text style={styles.legalSep}>|</Text>
           <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/privacy-policy')}>
             <Text style={styles.legalText}>Privacy</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalSep}>|</Text>
+          <TouchableOpacity onPress={async () => {
+            try {
+              const purchases = await restorePurchases();
+              if (purchases && purchases.length > 0) {
+                Alert.alert('Restored', 'Your subscription has been restored.');
+              } else {
+                Alert.alert('No Purchases Found', 'No active subscriptions found.');
+              }
+            } catch (e) {
+              Alert.alert('Error', 'Could not restore purchases.');
+            }
+          }}>
+            <Text style={styles.legalText}>Restore Purchases</Text>
           </TouchableOpacity>
         </View>
 
