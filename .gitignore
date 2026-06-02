@@ -147,3 +147,4 @@ android-sdk/ -e
 *.env.*
 backend/static/service-account.json
 frontend/.metro-cache/
+frontend/\001*
