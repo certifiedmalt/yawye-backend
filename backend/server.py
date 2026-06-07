@@ -1686,9 +1686,10 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
     
     # Run fresh AI analysis
     if ingredients:
-        analysis = await analyze_ingredients(ingredients, product_name)
+        analysis = await analyze_ingredients_with_ai(product_name, ingredients)
     else:
-        analysis = await analyze_product_by_name(AsyncOpenAI(api_key=OPENAI_API_KEY), product_name)
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        analysis = await analyze_product_by_name(client, product_name)
     
     # Update cache with new analysis
     await product_cache_collection.update_one(
