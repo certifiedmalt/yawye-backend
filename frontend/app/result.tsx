@@ -299,6 +299,29 @@ export default function Result() {
               <Ionicons name="share-social" size={22} color="#fff" />
               <Text style={styles.shareButtonText}>Share Result</Text>
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.rescanButton} 
+              onPress={async () => {
+                try {
+                  setAnalysisLoading(true);
+                  const res = await axios.post(`${BACKEND_URL}/api/scan/rescan`, { barcode }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  });
+                  if (res.data?.analysis) {
+                    setAnalysis(res.data.analysis);
+                  }
+                } catch (e: any) {
+                  console.warn('Rescan error:', e);
+                } finally {
+                  setAnalysisLoading(false);
+                }
+              }}
+              disabled={analysisLoading}
+              data-testid="rescan-btn"
+            >
+              <Ionicons name="refresh" size={22} color="#4CAF50" />
+              <Text style={styles.rescanButtonText}>Re-scan</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -727,6 +750,22 @@ const styles = StyleSheet.create({
   },
   shareButtonText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  rescanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  rescanButtonText: {
+    color: '#4CAF50',
     fontSize: 15,
     fontWeight: '600',
     marginLeft: 8,

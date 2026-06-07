@@ -1660,6 +1660,60 @@ async def scan_status(barcode: str, current_user = Depends(get_current_user)):
     
     return {"status": "analyzing"}
 
+
+@app.post("/api/scan/rescan")
+async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
+    """
+    Force re-analysis of a product by clearing its cache and running AI analysis again.
+    Does not count as a new scan against the user's limit.
+    """
+    barcode = scan_req.barcode.strip()
+    logger.info(f"Re-scan requested for barcode: {barcode}")
+    
+    # Get existing cached product data (we need the ingredients)
+    cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
+    if not cached:
+        raise HTTPException(status_code=404, detail="Product not found. Please scan the barcode first.")
+    
+    product_name = cached.get("product_name", "Unknown")
+    ingredients = cached.get("ingredients_text", "")
+    
+    # Clear the analysis from cache
+    await product_cache_collection.update_one(
+        {"barcode": barcode},
+        {"$unset": {"analysis": "", "analysis_error": ""}}
+    )
+    
+    # Run fresh AI analysis
+    if ingredients:
+        analysis = await analyze_ingredients(ingredients, product_name)
+    else:
+        analysis = await analyze_product_by_name(AsyncOpenAI(api_key=OPENAI_API_KEY), product_name)
+    
+    # Update cache with new analysis
+    await product_cache_collection.update_one(
+        {"barcode": barcode},
+        {"$set": {"analysis": analysis, "cached_at": datetime.utcnow()}}
+    )
+    
+    # Also update any scan history entries for this barcode
+    await scans_collection.update_many(
+        {"barcode": barcode},
+        {"$set": {"analysis": analysis}}
+    )
+    
+    logger.info(f"Re-scan complete for {barcode}: score {analysis.get('overall_score')}")
+    
+    return {
+        "status": "complete",
+        "product_name": product_name,
+        "brands": cached.get("brands", ""),
+        "ingredients_text": ingredients,
+        "image_url": cached.get("image_url", ""),
+        "analysis": analysis,
+        "source": cached.get("source", "rescan")
+    }
+
 @app.get("/api/analytics/scans")
 async def get_scan_analytics():
     """Get scan analytics summary for monitoring"""
