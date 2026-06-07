@@ -815,7 +815,14 @@ RULE 6 — ALCOHOL ALWAYS 1/10:
 - All alcohol products = 1/10. Group 1 carcinogen.
 
 RULE 7 — PROCESSED MEAT ALWAYS 1/10:
-- All processed meat = 1/10. Group 1 carcinogen (nitrosamines)."""
+- All processed meat = 1/10. Group 1 carcinogen (nitrosamines).
+
+RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
+- If a product has 1-3 ingredients AND all ingredients are recognisable natural foods (no industrial additives, no emulsifiers, no artificial sweeteners, no preservatives, no modified starches) AND no carcinogens found = MINIMUM score 8/10.
+- This overrides the NOVA 3 cap. Example: tinned fruit in juice (fruit + juice + citric acid) = 8-10/10, NOT 5/10.
+- Score within 8-10 based on nutritional value: fresh whole food = 10, tinned/frozen natural food = 9, minimal processing with natural preservative like citric acid = 8-9.
+- This rule does NOT apply if ANY ingredient is an industrial additive, emulsifier, artificial sweetener, or other NOVA 4 marker.
+- Rules 1, 6, and 7 (carcinogens, alcohol, processed meat) ALWAYS take priority over this rule."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
@@ -833,7 +840,21 @@ RULE 7 — PROCESSED MEAT ALWAYS 1/10:
         # ENFORCE SCORING RULES IN CODE (don't trust AI to follow them)
         carcinogens = result.get("carcinogens_found", [])
         category = result.get("processing_category", "").lower()
+        harmful = result.get("harmful_ingredients", [])
         score = result.get("overall_score", 5)
+        
+        # Count actual ingredients from the input
+        ingredient_count = len([i.strip() for i in ingredients.split(",") if i.strip()]) if ingredients else 0
+        
+        # Check if any harmful/industrial ingredients were found
+        has_industrial_additives = any(
+            h.get("severity", "").lower() == "high" or 
+            "emulsifier" in h.get("name", "").lower() or
+            "artificial" in h.get("name", "").lower() or
+            "modified" in h.get("name", "").lower() or
+            h.get("processing_level", "") == "NOVA 4"
+            for h in harmful
+        )
         
         # Rule 1: Any carcinogen = score 1
         if carcinogens and len(carcinogens) > 0:
@@ -841,6 +862,9 @@ RULE 7 — PROCESSED MEAT ALWAYS 1/10:
         # Rule 2: Ultra-Processed (NOVA 4) = max 3
         elif "ultra" in category:
             result["overall_score"] = min(score, 3)
+        # Rule 8: Clean short ingredient list (1-3 natural ingredients, no harmful) = minimum 8
+        elif ingredient_count <= 3 and ingredient_count > 0 and not has_industrial_additives and len(harmful) == 0:
+            result["overall_score"] = max(score, 8)
         # Rule 3: Processed (NOVA 3) = max 5
         elif "processed" in category and "minimally" not in category:
             result["overall_score"] = min(score, 5)
