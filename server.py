@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import stripe
 import resend
 import urllib.parse
 import base64
@@ -159,6 +160,14 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Cache settings
 CACHE_EXPIRY_DAYS = 30  # Cache products for 30 days
+
+# Stripe configuration
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://web-production-66c05.up.railway.app")
+
 
 # Analytics tracking
 async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None):
@@ -1124,10 +1133,10 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     subscription_tier = current_user.get("subscription_tier", "free")
     total_scans = current_user.get("total_scans", 0)
     
-    if subscription_tier == "free" and total_scans >= 10:
+    if subscription_tier == "free" and total_scans >= 5:
         raise HTTPException(
             status_code=403,
-            detail="Free scan limit reached (10 scans). Upgrade to premium for unlimited scans."
+            detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans."
         )
     
     # STEP 1: Check cache first for instant results
@@ -3047,6 +3056,145 @@ async def list_marketing_videos():
                 size_mb = round(os.path.getsize(os.path.join(marketing_dir, f)) / (1024*1024), 1)
                 videos.append({"filename": f, "size_mb": size_mb, "url": f"/api/marketing/video/{f}"})
     return {"videos": videos}
+
+# ============ STRIPE WEB SUBSCRIPTION ============
+@app.post("/api/stripe/create-checkout-session")
+async def create_stripe_checkout(request: Request):
+    """Create a Stripe Checkout Session for web subscription"""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    body = await request.json()
+    email = body.get("email", "")
+    
+    try:
+        # Create or find customer
+        customers = stripe.Customer.list(email=email, limit=1)
+        if customers.data:
+            customer = customers.data[0]
+        else:
+            customer = stripe.Customer.create(email=email)
+        
+        # Create a Stripe price if not exists (£1.99/month)
+        # In production, use a pre-created price ID from Stripe Dashboard
+        prices = stripe.Price.list(lookup_keys=["yawye_premium_monthly"], limit=1)
+        if prices.data:
+            price_id = prices.data[0].id
+        else:
+            product = stripe.Product.create(
+                name="YAWYE Premium",
+                description="Unlimited food scans, detailed ingredient analysis, scan history",
+            )
+            price = stripe.Price.create(
+                product=product.id,
+                unit_amount=199,
+                currency="gbp",
+                recurring={"interval": "month"},
+                lookup_key="yawye_premium_monthly",
+            )
+            price_id = price.id
+        
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            customer=customer.id,
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=f"{FRONTEND_BASE_URL}/subscribe/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{FRONTEND_BASE_URL}/subscribe",
+            metadata={"email": email},
+        )
+        
+        return {"sessionId": session.id, "url": session.url}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events for web subscriptions"""
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload=payload,
+            sig_header=sig_header,
+            secret=STRIPE_WEBHOOK_SECRET,
+        )
+    except Exception as e:
+        logger.error(f"Stripe webhook verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    event_type = event["type"]
+    data_object = event["data"]["object"]
+    logger.info(f"Stripe webhook: {event_type}")
+    
+    if event_type == "checkout.session.completed":
+        customer_id = data_object.get("customer")
+        email = data_object.get("metadata", {}).get("email")
+        subscription_id = data_object.get("subscription")
+        
+        if email:
+            await users_collection.update_one(
+                {"email": email},
+                {"$set": {
+                    "subscription_tier": "premium",
+                    "stripe_customer_id": customer_id,
+                    "stripe_subscription_id": subscription_id,
+                    "subscription_source": "web_stripe",
+                }},
+            )
+            logger.info(f"Stripe: upgraded {email} to premium via web checkout")
+    
+    elif event_type == "invoice.payment_failed":
+        customer_id = data_object.get("customer")
+        if customer_id:
+            user = await users_collection.find_one({"stripe_customer_id": customer_id})
+            if user:
+                await users_collection.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"subscription_tier": "free"}},
+                )
+                logger.info(f"Stripe: downgraded {user.get('email')} due to payment failure")
+    
+    elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
+        status = data_object.get("status")
+        customer_id = data_object.get("customer")
+        if customer_id and status in ("canceled", "unpaid", "incomplete_expired"):
+            user = await users_collection.find_one({"stripe_customer_id": customer_id})
+            if user:
+                await users_collection.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"subscription_tier": "free"}},
+                )
+                logger.info(f"Stripe: subscription {status} for {user.get('email')}")
+    
+    return {"status": "success"}
+
+@app.get("/subscribe", response_class=HTMLResponse)
+async def subscribe_page():
+    """Web subscription page"""
+    with open("/app/website-public/subscribe.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/subscribe/success", response_class=HTMLResponse)
+async def subscribe_success_page():
+    """Subscription success page"""
+    html = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Welcome to YAWYE Premium!</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#050505;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+    .card{background:#111;border-radius:20px;padding:48px 32px;text-align:center;max-width:480px;border:1px solid #1f1f1f}
+    h1{font-size:28px;margin-bottom:16px;color:#00e676}p{color:#aaa;font-size:16px;line-height:1.6;margin-bottom:24px}
+    .btn{display:inline-block;background:#00e676;color:#000;padding:14px 28px;border-radius:999px;font-weight:700;font-size:16px;text-decoration:none}
+    .step{background:#0a0a0a;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #222;text-align:left}
+    .step-num{color:#00e676;font-weight:700;font-size:14px;margin-bottom:4px}.step-text{color:#ccc;font-size:14px}</style></head>
+    <body><div class="card">
+    <h1>Welcome to Premium!</h1>
+    <p>Your subscription is active. Now download the app and log in with the same email to unlock unlimited scans.</p>
+    <div class="step"><div class="step-num">Step 1</div><div class="step-text">Download the app from the App Store or Google Play</div></div>
+    <div class="step"><div class="step-num">Step 2</div><div class="step-text">Create an account using the same email you subscribed with</div></div>
+    <div class="step"><div class="step-num">Step 3</div><div class="step-text">Start scanning — you have unlimited scans!</div></div>
+    <br><a href="/" class="btn">Back to Home</a>
+    </div></body></html>"""
+    return HTMLResponse(content=html)
+
 
 # ============ WEBSITE PAGES ============
 @app.get("/", response_class=HTMLResponse)

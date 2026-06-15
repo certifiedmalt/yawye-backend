@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Subscribe to YAWYE Premium</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #050505; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 440px; width: 100%; }
+    .back { color: #888; font-size: 14px; margin-bottom: 24px; display: inline-block; }
+    .back:hover { color: #fff; }
+    .card { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 20px; padding: 36px 28px; }
+    .card-header { text-align: center; margin-bottom: 28px; }
+    .card-header h1 { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+    .card-header .price { font-size: 36px; font-weight: 900; color: #ffd700; }
+    .card-header .price span { font-size: 16px; font-weight: 500; color: #666; }
+    .card-header .note { font-size: 13px; color: #555; margin-top: 4px; }
+    .features { list-style: none; margin-bottom: 28px; }
+    .features li { font-size: 14px; color: #aaa; padding: 8px 0; border-bottom: 1px solid #111; display: flex; align-items: center; gap: 10px; }
+    .features li::before { content: "✓"; color: #00e676; font-weight: 700; font-size: 16px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { font-size: 13px; color: #888; display: block; margin-bottom: 6px; font-weight: 500; }
+    .form-group input { width: 100%; background: #111; border: 1px solid #222; border-radius: 10px; padding: 14px 16px; color: #fff; font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+    .form-group input:focus { border-color: #00e676; }
+    .form-group input::placeholder { color: #444; }
+    .btn-pay { width: 100%; background: #ffd700; color: #000; border: none; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; font-family: inherit; margin-top: 8px; }
+    .btn-pay:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,215,0,0.2); }
+    .btn-pay:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .legal { text-align: center; margin-top: 16px; font-size: 12px; color: #444; }
+    .legal a { color: #555; }
+    .error { background: rgba(255,82,82,0.1); border: 1px solid rgba(255,82,82,0.2); color: #ff5252; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 16px; display: none; }
+    .powered { text-align: center; margin-top: 20px; font-size: 12px; color: #333; }
+    .powered svg { vertical-align: middle; margin-right: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back">← Back to home</a>
+    <div class="card">
+      <div class="card-header">
+        <h1>YAWYE Premium</h1>
+        <div class="price">£1.99 <span>/month</span></div>
+        <div class="note">Cancel anytime. Auto-renews monthly.</div>
+      </div>
+
+      <ul class="features">
+        <li>Unlimited food scans</li>
+        <li>Full AI ingredient analysis</li>
+        <li>Scan history & favourites</li>
+        <li>Re-scan with updated AI</li>
+        <li>Healthier alternative suggestions</li>
+        <li>Medical source citations</li>
+      </ul>
+
+      <div class="error" id="error-msg"></div>
+
+      <div class="form-group">
+        <label>Email address</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+      </div>
+
+      <button class="btn-pay" id="subscribe-btn" onclick="handleSubscribe()">
+        Subscribe — £1.99/month
+      </button>
+
+      <div class="legal">
+        By subscribing you agree to our
+        <a href="/terms-of-service">Terms</a> &
+        <a href="/privacy-policy">Privacy Policy</a>
+      </div>
+    </div>
+    <div class="powered">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#666"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Payments secured by Stripe
+    </div>
+  </div>
+
+  <script>
+    async function handleSubscribe() {
+      const email = document.getElementById('email').value.trim();
+      const btn = document.getElementById('subscribe-btn');
+      const errorEl = document.getElementById('error-msg');
+      errorEl.style.display = 'none';
+
+      if (!email || !email.includes('@')) {
+        errorEl.textContent = 'Please enter a valid email address.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Redirecting to payment...';
+
+      try {
+        const res = await fetch('/api/stripe/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await res.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else if (data.detail) {
+          throw new Error(data.detail);
+        } else {
+          throw new Error('Could not create checkout session');
+        }
+      } catch (err) {
+        errorEl.textContent = err.message || 'Something went wrong. Please try again.';
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Subscribe — £1.99/month';
+      }
+    }
+
+    // Allow Enter key to submit
+    document.getElementById('email').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') handleSubscribe();
+    });
+  </script>
+</body>
+</html>
