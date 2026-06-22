@@ -3,9 +3,8 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
   Alert,
   ScrollView,
@@ -55,7 +54,6 @@ export default function Login() {
     } catch (error: any) {
       if (!error?.userCancelled && error?.code !== 'E_USER_CANCELLED') {
         console.warn('Purchase error:', error);
-        // Show the native App Store subscription page as fallback
         if (Platform.OS === 'ios') {
           Alert.alert(
             'Subscribe',
@@ -72,11 +70,13 @@ export default function Login() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <ScrollView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      bounces={false}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={styles.inner}>
         <View style={styles.header}>
           <Ionicons name="scan-outline" size={80} color="#4CAF50" />
           <Text style={styles.title}>You Are What You Eat</Text>
@@ -84,8 +84,12 @@ export default function Login() {
         </View>
 
         {/* Premium subscription — available without login */}
-        <TouchableOpacity
-          style={[styles.premiumButton, purchaseLoading && styles.premiumButtonDisabled]}
+        <Pressable
+          style={({ pressed }) => [
+            styles.premiumButton,
+            purchaseLoading && styles.premiumButtonDisabled,
+            pressed && { opacity: 0.8 },
+          ]}
           onPress={handleSubscribeWithoutAccount}
           disabled={purchaseLoading}
         >
@@ -100,20 +104,20 @@ export default function Login() {
               </Text>
             </View>
           </View>
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.premiumNote}>
           No account required. Auto-renews monthly. Cancel anytime.
         </Text>
         <View style={styles.legalRow}>
-          <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/terms-of-service')}>
+          <Pressable onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/terms-of-service')}>
             <Text style={styles.legalText}>Terms</Text>
-          </TouchableOpacity>
+          </Pressable>
           <Text style={styles.legalSep}>|</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/privacy-policy')}>
+          <Pressable onPress={() => Linking.openURL('https://web-production-66c05.up.railway.app/privacy-policy')}>
             <Text style={styles.legalText}>Privacy</Text>
-          </TouchableOpacity>
+          </Pressable>
           <Text style={styles.legalSep}>|</Text>
-          <TouchableOpacity onPress={async () => {
+          <Pressable onPress={async () => {
             try {
               const purchases = await restorePurchases();
               if (purchases && purchases.length > 0) {
@@ -126,7 +130,7 @@ export default function Login() {
             }
           }}>
             <Text style={styles.legalText}>Restore Purchases</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         <View style={styles.divider}>
@@ -145,6 +149,7 @@ export default function Login() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
+            data-testid="login-email-input"
           />
 
           <Text style={styles.label}>Password</Text>
@@ -155,34 +160,41 @@ export default function Login() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            onSubmitEditing={handleLogin}
+            data-testid="login-password-input"
           />
 
-          <TouchableOpacity
-            style={styles.button}
+          <Pressable
+            style={({ pressed }) => [
+              styles.button,
+              loading && { opacity: 0.5 },
+              pressed && { opacity: 0.8 },
+            ]}
             onPress={handleLogin}
             disabled={loading}
+            data-testid="login-submit-button"
           >
             <Text style={styles.buttonText}>
               {loading ? 'Logging in...' : 'Login'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
 
-          <TouchableOpacity
-            style={styles.forgotButton}
+          <Pressable
+            style={({ pressed }) => [styles.forgotButton, pressed && { opacity: 0.7 }]}
             onPress={() => router.push('/auth/forgot-password')}
           >
             <Text style={styles.forgotText}>Forgot your password?</Text>
-          </TouchableOpacity>
+          </Pressable>
 
-          <TouchableOpacity
-            style={styles.linkButton}
+          <Pressable
+            style={({ pressed }) => [styles.linkButton, pressed && { opacity: 0.7 }]}
             onPress={() => router.push('/auth/register')}
           >
             <Text style={styles.linkText}>Don't have an account? Sign up</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -195,6 +207,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+  },
+  inner: {
+    maxWidth: 480,
+    width: '100%',
+    alignSelf: 'center',
   },
   header: {
     alignItems: 'center',
