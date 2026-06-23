@@ -3,7 +3,7 @@ fastapi
 httpx
 motor
 openai
-passlib
+passlib[bcrypt]
 pydantic[email]
 PyJWT
 pymongo
