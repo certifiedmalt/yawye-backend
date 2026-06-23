@@ -54,17 +54,6 @@ export default function Login() {
     } catch (error: any) {
       if (!error?.userCancelled && error?.code !== 'E_USER_CANCELLED') {
         console.warn('Purchase error:', error);
-        if (Platform.OS === 'ios') {
-          Alert.alert(
-            'Subscribe',
-            'Opening subscription options...',
-            [
-              { text: 'OK', onPress: () => Linking.openURL('https://apps.apple.com/account/subscriptions') },
-            ]
-          );
-        } else {
-          Alert.alert('Purchase Error', 'Unable to start purchase. Please try again.');
-        }
       }
     }
   };

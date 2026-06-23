@@ -22,7 +22,6 @@ interface SubscriptionContextType {
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-// Inner component that uses the hook
 function SubscriptionProviderInner({ children }: { children: React.ReactNode }) {
   const [priceString, setPriceString] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +29,7 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
 
   const {
     connected,
-    products,
+    subscriptions,
     fetchProducts,
     requestPurchase,
     finishTransaction,
@@ -53,9 +52,9 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (connected) {
-      console.log('[IAP] Connected, fetching products');
-      fetchProducts([PRODUCT_ID]).then(() => {
-        console.log('[IAP] Products fetched');
+      console.log('[IAP] Connected, fetching subscription products');
+      fetchProducts({ skus: [PRODUCT_ID], type: 'subs' }).then(() => {
+        console.log('[IAP] Subscription products fetched');
       }).catch((err: any) => {
         console.warn('[IAP] fetchProducts error:', err);
       });
@@ -63,20 +62,26 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
   }, [connected]);
 
   useEffect(() => {
-    if (products && products.length > 0) {
-      const p = products[0];
+    if (subscriptions && subscriptions.length > 0) {
+      const p = subscriptions[0];
       const price = p.localizedPrice || p.price || null;
       if (price) {
         setPriceString(`${price}/month`);
       }
-      console.log('[IAP] Product loaded:', p.productId, 'price:', price);
+      console.log('[IAP] Subscription loaded:', p.productId, 'price:', price);
     }
-  }, [products]);
+  }, [subscriptions]);
 
   const purchaseSubscription = async () => {
     setIsLoading(true);
     try {
-      await requestPurchase({ productId: PRODUCT_ID });
+      await requestPurchase({
+        type: 'subs',
+        request: {
+          apple: { sku: PRODUCT_ID },
+          google: { sku: PRODUCT_ID },
+        },
+      });
     } finally {
       setIsLoading(false);
     }
@@ -85,9 +90,8 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
   const restorePurchases = async () => {
     setIsLoading(true);
     try {
-      const purchases = await getAvailablePurchases();
-      console.log('[IAP] Restored purchases:', purchases?.length || 0);
-      return purchases || [];
+      await getAvailablePurchases();
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +111,6 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
   );
 }
 
-// Fallback for web/environments without IAP
 function SubscriptionProviderFallback({ children }: { children: React.ReactNode }) {
   const value: SubscriptionContextType = {
     purchaseSubscription: async () => { throw new Error('IAP not available'); },
