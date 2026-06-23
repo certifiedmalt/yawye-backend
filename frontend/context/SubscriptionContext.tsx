@@ -66,7 +66,11 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
       const p = subscriptions[0];
       const price = p.localizedPrice || p.price || null;
       if (price) {
-        setPriceString(`${price}/month`);
+        // Format price properly - avoid floating point display issues
+        const formatted = typeof price === 'number' 
+          ? `£${price.toFixed(2)}` 
+          : String(price);
+        setPriceString(`${formatted}/month`);
       }
       console.log('[IAP] Subscription loaded:', p.productId, 'price:', price);
     }
