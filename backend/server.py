@@ -10,7 +10,7 @@ import requests
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 import jwt
-from passlib.context import CryptContext
+from passlib.context import CryptContext  # kept for backward compat import
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 import asyncio
@@ -90,7 +90,7 @@ product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 
 # Security
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt as _bcrypt
 security = HTTPBearer()
 SECRET_KEY = os.getenv("SECRET_KEY", "yawye-prod-secret-k3y-2026-x9m2p7q4")
 ALGORITHM = "HS256"
@@ -539,10 +539,10 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    return _bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password)
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode('utf-8'), _bcrypt.gensalt()).decode('utf-8')
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
