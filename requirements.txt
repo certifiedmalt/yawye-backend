@@ -4,7 +4,7 @@ httpx
 motor
 openai
 passlib
-pydantic
+pydantic[email]
 PyJWT
 pymongo
 python-dotenv
@@ -13,3 +13,4 @@ requests
 resend
 stripe
 uvicorn
+email-validator
