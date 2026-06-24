@@ -2,7 +2,7 @@
   "expo": {
     "name": "You Are What You Eat",
     "slug": "you-are-what-you-eat",
-    "version": "1.0.42",
+    "version": "1.0.43",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -15,7 +15,7 @@
         "NSCameraUsageDescription": "Scan product barcodes to analyze ingredients",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "43"
+      "buildNumber": "44"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +23,7 @@
         "backgroundColor": "#000000"
       },
       "package": "com.youarewhatyoueat.app",
-      "versionCode": 43,
+      "versionCode": 44,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",
