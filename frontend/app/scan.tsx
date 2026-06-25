@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-producti
 export default function Scan() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
+  const scannedRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const [showManualInput, setShowManualInput] = useState(false);
@@ -89,8 +90,8 @@ export default function Scan() {
   };
 
   const handleBarCodeScanned = async ({ data }: BarcodeScanningResult) => {
-    if (scanned || loading) return;
-    
+    if (scannedRef.current || loading) return;
+    scannedRef.current = true;
     setScanned(true);
     setScannedBarcode(data);
     setLoading(true);
@@ -164,6 +165,7 @@ export default function Scan() {
           {
             text: 'Try Again',
             onPress: () => {
+              scannedRef.current = false;
               setScanned(false);
               setScannedBarcode('');
               setLoading(false);
