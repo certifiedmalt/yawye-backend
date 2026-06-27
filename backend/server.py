@@ -1343,6 +1343,28 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     # Update daily quest progress
     user_id = str(current_user["_id"])
     gamification = await db["gamification"].find_one({"user_id": user_id})
+    if not gamification:
+        # Create gamification record if it doesn't exist
+        gamification = {
+            "user_id": user_id,
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_scan_date": None,
+            "total_scans": 0,
+            "level": 1,
+            "xp": 0,
+            "badges": [],
+            "daily_quests": {
+                "scan_3_products": {"completed": False, "progress": 0, "xp": 10},
+                "find_healthy_product": {"completed": False, "progress": 0, "xp": 25},
+                "use_assistant": {"completed": False, "progress": 0, "xp": 20},
+            },
+            "last_quest_reset": datetime.utcnow(),
+            "quiz_streak": 0,
+            "quiz_correct_answers": 0,
+            "quiz_total_answers": 0,
+        }
+        await db["gamification"].insert_one(gamification)
     if gamification:
         daily_quests = gamification.get("daily_quests", {})
         xp_earned = 0
