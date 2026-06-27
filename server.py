@@ -1829,8 +1829,8 @@ async def get_healthier_swaps(scan_req: ScanRequest, current_user = Depends(get_
                     "role": "user",
                     "content": f"""Given the product "{product_name}" which scored {current_score}/10 in a health analysis, suggest exactly 3 healthier alternative products that are commonly available in UK supermarkets. 
                     
-Return ONLY a JSON array of objects with "product_name", "brands" (if applicable), and "why_better" (one sentence). Example:
-[{{"product_name": "Plain Greek Yogurt", "brands": "Fage", "why_better": "No added sugar or starch, just milk and cultures"}}]"""
+Return a JSON object with an "alternatives" key containing an array of objects with "product_name", "brands" (if applicable), and "why_better" (one sentence). Example:
+{{"alternatives": [{{"product_name": "Plain Greek Yogurt", "brands": "Fage", "why_better": "No added sugar or starch, just milk and cultures"}}]}}"""
                 }],
                 response_format={"type": "json_object"},
                 temperature=0.3,
@@ -1839,7 +1839,7 @@ Return ONLY a JSON array of objects with "product_name", "brands" (if applicable
             
             import json
             ai_result = json.loads(resp.choices[0].message.content)
-            ai_swaps = ai_result if isinstance(ai_result, list) else ai_result.get("alternatives", ai_result.get("swaps", []))
+            ai_swaps = ai_result.get("alternatives", ai_result.get("swaps", []))
             
             for s in ai_swaps[:3]:
                 swaps.append({
