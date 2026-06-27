@@ -405,7 +405,7 @@ export default function Scan() {
       <CameraView
         style={styles.camera}
         facing="back"
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        onBarcodeScanned={scanned || scannedRef.current ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{
           barcodeTypes: [
             'ean13',

@@ -1320,25 +1320,32 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     product_data["analysis"] = analysis
     await cache_product(barcode, product_data)
     
-    # STEP 7: Save to user's scan history
-    scan_doc = {
-        "user_id": str(current_user["_id"]),
+    # STEP 7: Save to user's scan history (dedup: skip if same barcode scanned within last 5 seconds)
+    user_id_str = str(current_user["_id"])
+    recent_dup = await scans_collection.find_one({
+        "user_id": user_id_str,
         "barcode": barcode,
-        "product_name": product_data.get("product_name"),
-        "brands": product_data.get("brands"),
-        "ingredients_text": ingredients_text,
-        "image_url": product_data.get("image_url"),
-        "analysis": analysis,
-        "scanned_at": datetime.utcnow(),
-        "source": source
-    }
-    await scans_collection.insert_one(scan_doc)
-    
-    # Update user's total scan count
-    await users_collection.update_one(
-        {"_id": current_user["_id"]},
-        {"$inc": {"total_scans": 1}}
-    )
+        "scanned_at": {"$gte": datetime.utcnow() - timedelta(seconds=5)}
+    })
+    if not recent_dup:
+        scan_doc = {
+            "user_id": user_id_str,
+            "barcode": barcode,
+            "product_name": product_data.get("product_name"),
+            "brands": product_data.get("brands"),
+            "ingredients_text": ingredients_text,
+            "image_url": product_data.get("image_url"),
+            "analysis": analysis,
+            "scanned_at": datetime.utcnow(),
+            "source": source
+        }
+        await scans_collection.insert_one(scan_doc)
+        
+        # Update user's total scan count
+        await users_collection.update_one(
+            {"_id": current_user["_id"]},
+            {"$inc": {"total_scans": 1}}
+        )
     
     # Update daily quest progress
     user_id = str(current_user["_id"])
