@@ -96,6 +96,8 @@ export default function Result() {
   const params = useLocalSearchParams();
   const [productData, setProductData] = useState<ProductData | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [swaps, setSwaps] = useState<any[]>([]);
+  const [swapsLoading, setSwapsLoading] = useState(false);
   const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
   const scoreAnim = useRef(new Animated.Value(0)).current;
   const { token } = useAuth();
@@ -200,6 +202,26 @@ export default function Result() {
     // Start polling after 3 seconds
     setTimeout(poll, 3000);
   };
+
+
+  // Fetch healthier swaps after analysis loads
+  useEffect(() => {
+    const barcode = params.barcode as string;
+    if (analysis && barcode && token && analysis.overall_score <= 7) {
+      setSwapsLoading(true);
+      axios.post(`${BACKEND_URL}/api/scan/swaps`, { barcode }, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 15000,
+      })
+      .then(res => {
+        if (res.data?.swaps?.length > 0) {
+          setSwaps(res.data.swaps);
+        }
+      })
+      .catch(() => {}) // Silently fail — swaps are optional
+      .finally(() => setSwapsLoading(false));
+    }
+  }, [analysis]);
 
   const getNovaColor = (level?: string) => {
     if (!level) return '#2196F3';
@@ -608,6 +630,47 @@ export default function Result() {
           <Ionicons name="book-outline" size={20} color="#4CAF50" />
           <Text style={styles.viewResearchText}>View All Research Studies</Text>
         </TouchableOpacity>
+
+        {/* Healthier Swaps — loads async, never blocks main result */}
+        {swaps.length > 0 && (
+          <View style={styles.swapsSection}>
+            <View style={styles.swapsHeader}>
+              <Ionicons name="swap-horizontal" size={22} color="#00e676" />
+              <Text style={styles.swapsTitle}>Healthier Swaps</Text>
+            </View>
+            {swaps.map((swap: any, idx: number) => (
+              <View key={idx} style={styles.swapCard}>
+                {swap.image_url ? (
+                  <Image source={{ uri: swap.image_url }} style={styles.swapImage} />
+                ) : (
+                  <View style={[styles.swapImage, styles.swapImagePlaceholder]}>
+                    <Ionicons name="leaf" size={20} color="#00e676" />
+                  </View>
+                )}
+                <View style={styles.swapInfo}>
+                  <Text style={styles.swapName} numberOfLines={2}>{swap.product_name}</Text>
+                  {swap.brands ? <Text style={styles.swapBrand}>{swap.brands}</Text> : null}
+                  {swap.why_better ? <Text style={styles.swapWhy}>{swap.why_better}</Text> : null}
+                  {swap.ingredient_count ? (
+                    <Text style={styles.swapDetail}>{swap.ingredient_count} ingredients</Text>
+                  ) : null}
+                </View>
+                {swap.score ? (
+                  <View style={styles.swapScore}>
+                    <Text style={styles.swapScoreText}>{swap.score}</Text>
+                    <Text style={styles.swapScoreLabel}>/10</Text>
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        )}
+        {swapsLoading && (
+          <View style={styles.swapsLoading}>
+            <ActivityIndicator size="small" color="#00e676" />
+            <Text style={styles.swapsLoadingText}>Finding healthier alternatives...</Text>
+          </View>
+        )}
 
         {/* Static Sources & References — always visible for Apple Review compliance */}
         <View style={styles.sourcesSection}>
@@ -1242,6 +1305,95 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  swapsSection: {
+    backgroundColor: '#0d1a0d',
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#00e676',
+  },
+  swapsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  swapsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#00e676',
+    marginLeft: 8,
+  },
+  swapCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+  },
+  swapImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
+  },
+  swapImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swapInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  swapName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  swapBrand: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  swapWhy: {
+    fontSize: 12,
+    color: '#aaa',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  swapDetail: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
+  },
+  swapScore: {
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  swapScoreText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#00e676',
+  },
+  swapScoreLabel: {
+    fontSize: 10,
+    color: '#666',
+  },
+  swapsLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginTop: 16,
+  },
+  swapsLoadingText: {
+    color: '#666',
+    fontSize: 13,
+    marginLeft: 8,
   },
   sourcesSection: {
     backgroundColor: '#1a1a1a',

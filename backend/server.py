@@ -212,6 +212,7 @@ async def cache_product(barcode: str, product_data: Dict[str, Any]):
             "brands": product_data.get("brands"),
             "ingredients_text": product_data.get("ingredients_text"),
             "image_url": product_data.get("image_url"),
+            "categories_tags": product_data.get("categories_tags", []),
             "analysis": product_data.get("analysis"),
             "cached_at": datetime.utcnow(),
             "source": product_data.get("source", "openfoodfacts")
@@ -264,6 +265,7 @@ def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
                     "brands": product.get("brands", "Unknown Brand"),
                     "ingredients_text": product.get("ingredients_text", ""),
                     "image_url": product.get("image_url", ""),
+                    "categories_tags": product.get("categories_tags", []),
                     "source": "openfoodfacts",
                     "fetch_time": time.time() - start_time
                 }
@@ -1723,6 +1725,140 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
         "analysis": analysis,
         "source": cached.get("source", "rescan")
     }
+
+
+@app.post("/api/scan/swaps")
+async def get_healthier_swaps(scan_req: ScanRequest, current_user = Depends(get_current_user)):
+    """
+    Find healthier alternative products in the same category.
+    Loads async after main scan result — failure here never affects the scan flow.
+    """
+    barcode = scan_req.barcode.strip()
+    
+    # Get the scanned product from cache to find its category and score
+    cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
+    if not cached:
+        return {"swaps": []}
+    
+    current_score = cached.get("analysis", {}).get("overall_score", 10)
+    categories = cached.get("categories_tags", [])
+    product_name = cached.get("product_name", "")
+    
+    # Only suggest swaps for products scoring 7 or below
+    if current_score > 7:
+        return {"swaps": []}
+    
+    # Try OpenFoodFacts category search
+    swaps = []
+    
+    if categories:
+        # Use the most specific category (last in the list is usually most specific)
+        for cat in reversed(categories[:5]):
+            try:
+                cat_name = cat.replace("en:", "")
+                search_url = (
+                    f"https://world.openfoodfacts.org/api/v2/search"
+                    f"?categories_tags_en={cat_name}"
+                    f"&fields=code,product_name,brands,ingredients_text,image_url,categories_tags"
+                    f"&page_size=20"
+                    f"&countries_tags_en=united-kingdom"
+                )
+                resp = requests.get(search_url, timeout=8, headers={"User-Agent": "YAWYE/1.0"})
+                if resp.status_code == 200:
+                    data = resp.json()
+                    products = data.get("products", [])
+                    
+                    for p in products:
+                        p_barcode = p.get("code", "")
+                        p_name = p.get("product_name", "")
+                        p_ingredients = p.get("ingredients_text", "")
+                        
+                        # Skip the same product, products without names, or without ingredients
+                        if p_barcode == barcode or not p_name or not p_ingredients:
+                            continue
+                        
+                        # Quick ingredient count check — fewer ingredients = likely healthier
+                        ingredient_count = len([i.strip() for i in p_ingredients.split(",") if i.strip()])
+                        
+                        # Check if this product is already cached with a score
+                        p_cached = await product_cache_collection.find_one(
+                            {"barcode": p_barcode, "analysis.overall_score": {"$exists": True}},
+                            {"_id": 0}
+                        )
+                        
+                        if p_cached and p_cached.get("analysis", {}).get("overall_score", 0) > current_score + 2:
+                            swaps.append({
+                                "product_name": p_cached.get("product_name", p_name),
+                                "brands": p_cached.get("brands", p.get("brands", "")),
+                                "barcode": p_barcode,
+                                "score": p_cached["analysis"]["overall_score"],
+                                "image_url": p_cached.get("image_url", p.get("image_url", "")),
+                                "ingredient_count": ingredient_count,
+                            })
+                        elif ingredient_count <= 5 and not p_cached:
+                            # Product looks promising but hasn't been scored yet
+                            # Estimate score based on ingredient count
+                            estimated_score = 8 if ingredient_count <= 3 else 7
+                            if estimated_score > current_score + 2:
+                                swaps.append({
+                                    "product_name": p_name,
+                                    "brands": p.get("brands", ""),
+                                    "barcode": p_barcode,
+                                    "score": estimated_score,
+                                    "estimated": True,
+                                    "image_url": p.get("image_url", ""),
+                                    "ingredient_count": ingredient_count,
+                                })
+                        
+                        if len(swaps) >= 3:
+                            break
+                    
+                    if swaps:
+                        break
+            except Exception as e:
+                logger.warning(f"Swaps category search error for {cat}: {e}")
+                continue
+    
+    # If no swaps from DB, ask AI for generic suggestions
+    if not swaps and product_name:
+        try:
+            client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+            resp = await client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{
+                    "role": "user",
+                    "content": f"""Given the product "{product_name}" which scored {current_score}/10 in a health analysis, suggest exactly 3 healthier alternative products that are commonly available in UK supermarkets. 
+                    
+Return ONLY a JSON array of objects with "product_name", "brands" (if applicable), and "why_better" (one sentence). Example:
+[{{"product_name": "Plain Greek Yogurt", "brands": "Fage", "why_better": "No added sugar or starch, just milk and cultures"}}]"""
+                }],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                max_tokens=300,
+            )
+            
+            import json
+            ai_result = json.loads(resp.choices[0].message.content)
+            ai_swaps = ai_result if isinstance(ai_result, list) else ai_result.get("alternatives", ai_result.get("swaps", []))
+            
+            for s in ai_swaps[:3]:
+                swaps.append({
+                    "product_name": s.get("product_name", ""),
+                    "brands": s.get("brands", ""),
+                    "barcode": None,
+                    "score": None,
+                    "why_better": s.get("why_better", ""),
+                    "ai_suggested": True,
+                    "image_url": "",
+                    "ingredient_count": None,
+                })
+        except Exception as e:
+            logger.warning(f"AI swaps suggestion error: {e}")
+    
+    # Sort by score descending, limit to 3
+    swaps.sort(key=lambda x: x.get("score") or 8, reverse=True)
+    
+    return {"swaps": swaps[:3]}
 
 @app.get("/api/analytics/scans")
 async def get_scan_analytics():
