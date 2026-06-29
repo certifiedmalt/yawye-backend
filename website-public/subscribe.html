@@ -5,6 +5,14 @@
   <title>Subscribe to YAWYE Premium</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18007960189"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'AW-18007960189');
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', system-ui, sans-serif; background: #050505; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; -webkit-font-smoothing: antialiased; }
@@ -103,6 +111,8 @@
         const data = await res.json();
 
         if (data.url) {
+          gtag('event', 'conversion', {send_to: 'AW-18007960189/web_subscribe'});
+          gtag('event', 'begin_checkout', {currency: 'GBP', value: 1.99});
           window.location.href = data.url;
         } else if (data.detail) {
           throw new Error(data.detail);
