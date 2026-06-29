@@ -1372,31 +1372,56 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "quiz_total_answers": 0,
         }
         await db["gamification"].insert_one(gamification)
+    
+    # Always update quests regardless of dedup (quests should track every scan attempt)
     if gamification:
+        # Reset quests if it's a new day
+        last_reset = gamification.get("last_quest_reset", datetime.utcnow())
+        if isinstance(last_reset, str):
+            last_reset = datetime.fromisoformat(last_reset)
+        if datetime.utcnow() - last_reset > timedelta(days=1):
+            gamification["daily_quests"] = {
+                "scan_3_products": {"completed": False, "progress": 0, "xp": 10},
+                "find_healthy_product": {"completed": False, "progress": 0, "xp": 25},
+                "use_assistant": {"completed": False, "progress": 0, "xp": 20},
+            }
+            gamification["last_quest_reset"] = datetime.utcnow()
+
         daily_quests = gamification.get("daily_quests", {})
         xp_earned = 0
         
         # Quest 1: Scan 3 products
-        if "scan_3_products" in daily_quests and not daily_quests["scan_3_products"]["completed"]:
-            current_progress = daily_quests["scan_3_products"].get("progress", 0) + 1
-            daily_quests["scan_3_products"]["progress"] = current_progress
+        scan_quest = daily_quests.get("scan_3_products", {})
+        if not scan_quest.get("completed", False):
+            current_progress = scan_quest.get("progress", 0) + 1
+            scan_quest["progress"] = current_progress
             if current_progress >= 3:
-                daily_quests["scan_3_products"]["completed"] = True
-                xp_earned += daily_quests["scan_3_products"]["xp"]
+                scan_quest["completed"] = True
+                xp_earned += scan_quest.get("xp", 10)
+            daily_quests["scan_3_products"] = scan_quest
         
         # Quest 2: Find a healthy product (8+/10)
-        if "find_healthy_product" in daily_quests and not daily_quests["find_healthy_product"]["completed"]:
-            overall_score = analysis.get("overall_score", 0)
+        healthy_quest = daily_quests.get("find_healthy_product", {})
+        if not healthy_quest.get("completed", False):
+            overall_score = analysis.get("overall_score", 0) if analysis else 0
             if overall_score >= 8:
-                daily_quests["find_healthy_product"]["completed"] = True
-                daily_quests["find_healthy_product"]["progress"] = 1
-                xp_earned += daily_quests["find_healthy_product"]["xp"]
+                healthy_quest["completed"] = True
+                healthy_quest["progress"] = 1
+                xp_earned += healthy_quest.get("xp", 25)
+            daily_quests["find_healthy_product"] = healthy_quest
         
         # Update gamification data
+        update_fields = {
+            "daily_quests": daily_quests,
+            "total_scans": gamification.get("total_scans", 0) + 1,
+        }
+        if gamification.get("last_quest_reset") != last_reset:
+            update_fields["last_quest_reset"] = gamification["last_quest_reset"]
+        
         await db["gamification"].update_one(
             {"user_id": user_id},
             {
-                "$set": {"daily_quests": daily_quests},
+                "$set": update_fields,
                 "$inc": {"xp": xp_earned}
             }
         )

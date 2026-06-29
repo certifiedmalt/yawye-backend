@@ -326,7 +326,8 @@ export default function Result() {
               onPress={async () => {
                 try {
                   setAnalysisLoading(true);
-                  const res = await axios.post(`${BACKEND_URL}/api/scan/rescan`, { barcode }, {
+                  const bc = params.barcode as string;
+                  const res = await axios.post(`${BACKEND_URL}/api/scan/rescan`, { barcode: bc }, {
                     headers: { Authorization: `Bearer ${token}` }
                   });
                   if (res.data?.analysis) {
@@ -334,6 +335,7 @@ export default function Result() {
                   }
                 } catch (e: any) {
                   console.warn('Rescan error:', e);
+                  Alert.alert('Re-scan Failed', 'Could not re-analyse this product. Please try again.');
                 } finally {
                   setAnalysisLoading(false);
                 }
