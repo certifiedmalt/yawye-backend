@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Camera, CameraView } from 'expo-camera';
@@ -293,47 +295,56 @@ export default function Scan() {
   // Manual input UI
   if (showManualInput) {
     return (
-      <View style={styles.container}>
-        <Ionicons name="create-outline" size={80} color="#4CAF50" />
-        <Text style={styles.text}>Manual Barcode Entry</Text>
-        {scannedBarcode && (
-          <Text style={[styles.text, { fontSize: 14, marginTop: 8, color: '#888' }]}>
-            Scanned: {scannedBarcode}
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
+      >
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }} keyboardShouldPersistTaps="handled">
+          <Ionicons name="create-outline" size={80} color="#4CAF50" />
+          <Text style={styles.text}>Manual Barcode Entry</Text>
+          {scannedBarcode && (
+            <Text style={[styles.text, { fontSize: 14, marginTop: 8, color: '#888' }]}>
+              Scanned: {scannedBarcode}
+            </Text>
+          )}
+          <Text style={[styles.text, { fontSize: 14, marginTop: 16 }]}>
+            Correct the barcode if needed:
           </Text>
-        )}
-        <Text style={[styles.text, { fontSize: 14, marginTop: 16 }]}>
-          Correct the barcode if needed:
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter barcode"
-          placeholderTextColor="#666"
-          value={manualBarcode}
-          onChangeText={setManualBarcode}
-          keyboardType="numeric"
-          autoFocus
-        />
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={() => handleManualEntry(manualBarcode)}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? 'Searching...' : 'Search Product'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.button, { backgroundColor: '#333', marginTop: 16 }]} 
-          onPress={() => {
-            setShowManualInput(false);
-            setScanned(false);
-            setScannedBarcode('');
-            setManualBarcode('');
-          }}
-        >
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter barcode"
+            placeholderTextColor="#666"
+            value={manualBarcode}
+            onChangeText={setManualBarcode}
+            keyboardType="numeric"
+            autoFocus
+            returnKeyType="search"
+            onSubmitEditing={() => handleManualEntry(manualBarcode)}
+          />
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={() => handleManualEntry(manualBarcode)}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'Searching...' : 'Search Product'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: '#333', marginTop: 16 }]} 
+            onPress={() => {
+              setShowManualInput(false);
+              scannedRef.current = false;
+              setScanned(false);
+              setScannedBarcode('');
+              setManualBarcode('');
+            }}
+          >
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 

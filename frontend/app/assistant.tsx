@@ -142,7 +142,7 @@ export default function Assistant() {
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
         <View style={styles.header}>
           <Ionicons name="chatbubbles" size={24} color="#4CAF50" />
