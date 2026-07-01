@@ -82,6 +82,8 @@ export default function Achievements() {
       scanner_10: { name: 'Scanner Rookie', icon: '📱' },
       scanner_50: { name: 'Scan Expert', icon: '🎯' },
       scanner_100: { name: 'Scan Master', icon: '👑' },
+      quiz_3: { name: 'Quiz Streak 3', icon: '🧠' },
+      quiz_7: { name: 'Quiz Week', icon: '📚' },
     };
     return badges[badgeId] || { name: badgeId, icon: '🏆' };
   };

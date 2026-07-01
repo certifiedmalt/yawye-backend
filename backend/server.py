@@ -2348,6 +2348,8 @@ async def get_gamification_stats(current_user = Depends(get_current_user)):
     
     # Reset daily quests if needed
     last_reset = gamification.get("last_quest_reset", datetime.utcnow())
+    if isinstance(last_reset, str):
+        last_reset = datetime.fromisoformat(last_reset)
     if datetime.utcnow() - last_reset > timedelta(days=1):
         gamification["daily_quests"] = {
             "scan_3_products": {"completed": False, "progress": 0, "xp": 10},
@@ -2362,10 +2364,48 @@ async def get_gamification_stats(current_user = Depends(get_current_user)):
     
     # Calculate level from XP
     xp = gamification.get("xp", 0)
-    level = 1 + (xp // 100)  # Level up every 100 XP
+    level = 1 + (xp // 100)
+    
+    # DERIVE badges from actual stats — single source of truth
+    current_streak = gamification.get("current_streak", 0)
+    longest_streak = gamification.get("longest_streak", 0)
+    total_scans = gamification.get("total_scans", 0)
+    quiz_streak = gamification.get("quiz_streak", 0)
+    
+    # Use longest_streak for badge checks (earned once, kept forever)
+    best_streak = max(current_streak, longest_streak)
+    
+    computed_badges = []
+    # Streak badges
+    if best_streak >= 3:
+        computed_badges.append("streak_3")
+    if best_streak >= 7:
+        computed_badges.append("streak_7")
+    if best_streak >= 30:
+        computed_badges.append("streak_30")
+    # Scan count badges
+    if total_scans >= 10:
+        computed_badges.append("scanner_10")
+    if total_scans >= 50:
+        computed_badges.append("scanner_50")
+    if total_scans >= 100:
+        computed_badges.append("scanner_100")
+    # Quiz badges
+    if quiz_streak >= 3:
+        computed_badges.append("quiz_3")
+    if quiz_streak >= 7:
+        computed_badges.append("quiz_7")
+    
+    # Update stored badges to match computed (keeps DB in sync)
+    if set(computed_badges) != set(gamification.get("badges", [])):
+        await db["gamification"].update_one(
+            {"user_id": user_id},
+            {"$set": {"badges": computed_badges}}
+        )
     
     gamification["_id"] = str(gamification["_id"])
     gamification["level"] = level
+    gamification["badges"] = computed_badges
     
     return gamification
 
