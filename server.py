@@ -1526,7 +1526,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 {"barcode": barcode},
                 {"$unset": {"analysis": ""}}
             )
-            # Fall through to re-fetch and re-analyze
+            cached = None  # force full re-fetch + background re-analysis below
         else:
             # Only count as a new scan if user hasn't scanned this barcode in the last 5 minutes
             recent_scan = await scans_collection.find_one({
@@ -1559,7 +1559,9 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
             }
     
     # If product data is cached but analysis is still pending, return analyzing
-    if cached and cached.get("product_name") and not cached.get("analysis_error"):
+    # Only if the entry is fresh (<2 min) — older means the background task died; re-analyze
+    cache_is_fresh = bool(cached and cached.get("cached_at") and (datetime.utcnow() - cached["cached_at"]) < timedelta(minutes=2))
+    if cached and cached.get("product_name") and not cached.get("analysis_error") and cache_is_fresh:
         logger.info(f"Cache hit (pending analysis) for {barcode}")
         return {
             "status": "analyzing",
