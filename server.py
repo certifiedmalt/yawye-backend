@@ -854,6 +854,13 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         harmful = result.get("harmful_ingredients", [])
         score = result.get("overall_score", 5)
         
+        # Parse UPF percentage from AI response
+        upf_str = str(result.get("upf_score", "")).replace("%", "").replace("~", "").replace("<", "").strip()
+        try:
+            upf_pct = float(upf_str)
+        except (ValueError, TypeError):
+            upf_pct = -1  # Unknown
+        
         # Count actual ingredients from the input
         ingredient_count = len([i.strip() for i in ingredients.split(",") if i.strip()]) if ingredients else 0
         
@@ -876,20 +883,37 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # Rule 8: Clean short ingredient list (1-3 natural ingredients, no harmful) = minimum 8
         elif ingredient_count <= 3 and ingredient_count > 0 and not has_industrial_additives and len(harmful) == 0:
             result["overall_score"] = max(score, 8)
-        # Rule 3: Processed (NOVA 3) = max 5
-        elif "processed" in category and "minimally" not in category:
-            result["overall_score"] = min(score, 5)
+        # Rule 3: Processed (NOVA 3) = max 5 — BUT not if UPF is genuinely 0-10%
+        elif "processed" in category and "minimally" not in category and "whole" not in category:
+            if upf_pct >= 0 and upf_pct <= 10:
+                # UPF 0-10% contradicts "Processed" — trust the UPF score, boost it
+                result["overall_score"] = max(score, 7)
+            else:
+                result["overall_score"] = min(score, 5)
+        
+        # Rule 9: Zero/Low UPF safety net — 0% UPF must score at least 7
+        # Fires AFTER all other rules as a final sanity check
+        if upf_pct >= 0 and upf_pct <= 10 and not has_industrial_additives:
+            if not (carcinogens and len(carcinogens) > 0) and "ultra" not in category:
+                result["overall_score"] = max(result["overall_score"], 7)
+        
+        # Rule 10: Whole Food / Minimally Processed floor = 7
+        if ("whole" in category or "minimally" in category) and not (carcinogens and len(carcinogens) > 0):
+            result["overall_score"] = max(result["overall_score"], 7)
+        
+        logger.info(f"Scoring enforced: product={product_name}, ai_score={score}, final_score={result['overall_score']}, upf={upf_pct}%, category={category}")
         
         return result
     except Exception as e:
-        print(f"AI Analysis error: {e}")
+        logger.error(f"AI Analysis error: {e}")
         return {
             "harmful_ingredients": [],
             "beneficial_ingredients": [],
-            "overall_score": 5,
-            "upf_score": "0%",
+            "overall_score": 0,
+            "upf_score": "Unknown",
             "processing_category": "Unknown",
-            "recommendation": "Unable to analyze ingredients at this time."
+            "recommendation": "Unable to analyze ingredients at this time. Please try scanning again.",
+            "analysis_error": True
         }
 
 # Routes
@@ -1310,10 +1334,11 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         analysis = {
             "harmful_ingredients": [],
             "beneficial_ingredients": [],
-            "overall_score": 5,
-            "recommendation": "Analysis temporarily unavailable. Please try again.",
-            "nova_group": None,
-            "additives": []
+            "overall_score": 0,
+            "upf_score": "Unknown",
+            "processing_category": "Unknown",
+            "recommendation": "Analysis temporarily unavailable. Please try scanning again.",
+            "analysis_error": True
         }
     
     # STEP 6.5: Cache the result for future lookups
