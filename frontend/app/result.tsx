@@ -207,7 +207,8 @@ export default function Result() {
   // Fetch healthier swaps after analysis loads
   useEffect(() => {
     const barcode = params.barcode as string;
-    if (analysis && barcode && token && analysis.overall_score <= 7) {
+    const currentAnalysis = productData?.analysis;
+    if (currentAnalysis && barcode && token && currentAnalysis.overall_score <= 7) {
       setSwapsLoading(true);
       axios.post(`${BACKEND_URL}/api/scan/swaps`, { barcode }, {
         headers: { Authorization: `Bearer ${token}` },
@@ -221,7 +222,7 @@ export default function Result() {
       .catch(() => {}) // Silently fail — swaps are optional
       .finally(() => setSwapsLoading(false));
     }
-  }, [analysis]);
+  }, [productData?.analysis]);
 
   const getNovaColor = (level?: string) => {
     if (!level) return '#2196F3';
