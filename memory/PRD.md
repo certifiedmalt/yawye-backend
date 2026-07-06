@@ -35,6 +35,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - Rule 10: Whole Food / Minimally Processed floor = 7
 
 ## What's Been Implemented
+- (Jun 2026) FIXED & DEPLOYED: 0% UPF → 5/10 score bug. Root causes: (1) fix commits were never pushed to GitHub/Railway; (2) scan/quick cache-invalidation branch hung — after unsetting bad analysis it hit the "pending analysis" branch and returned "analyzing" forever without re-analyzing. Fixes: pushed all commits, set cached=None after invalidation to force re-fetch + background re-analysis, time-bounded pending branch (2 min freshness, stale = re-analyze). Verified LIVE on Railway: Peter's Yard crackers (5060198820052, 5060198821219) now score 8/10.
 - Apple App Store Approval (LIVE)
 - expo-iap replacing RevenueCat
 - Scan race condition fix
