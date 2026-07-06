@@ -1,0 +1,21 @@
+{
+  "summary": "Full frontend verification of the YAWYE redesigned marketing site at https://youarewhatyoueat.store (GitHub Pages). All requested features verified: hero copy, official logo, three YouTube (nocookie) embeds with correct video IDs, NOVA 4-level chart, nav anchors, iOS/Android download CTAs with gtag AW-18007960189, £0/£1.99 pricing cards, /subscribe /support /privacy-policy /terms-of-service all return 200, mobile 390x844 renders without horizontal overflow and NOVA cards stack vertically. No console/page errors, Unsplash scan image returns 200.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Note (out of scope for this iteration): Stripe /subscribe checkout POST is known-broken (STRIPE_SECRET_KEY not configured on Railway) - page loads but purchase will fail if a user clicks subscribe."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Live site is on GitHub Pages (repo certifiedmalt/yawye-website). /app/website-public/index.html is the source. All data-testids verified: hero-headline, nav-logo-img, truth-video-doac, education-video-zoe, education-video-spector, nova-chart, nova-level-1..4, hero/final ios/android download btns, pricing-free-card, pricing-premium-card. Stripe checkout POST is expected to fail until env var configured on Railway - do not treat as bug for this site test.",
+  "rca of the issue": "N/A - all functional checks passed."
+}
