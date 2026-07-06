@@ -1,0 +1,35 @@
+{
+  "summary": "Verified live public marketing website at https://youarewhatyoueat.store on GitHub Pages. All requested checks passed: HTTPS with valid cert, correct page title, www subdomain works (redirects/serves same page), all nav pages load (/privacy-policy, /terms-of-service, /support, /subscribe), App Store + Google Play links present, subscribe form fires POST to correct absolute Railway URL with proper CORS headers. Expected 500 'Stripe not configured' returned as documented known limitation. No mixed-content or JS page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Known limitation confirmed: Railway backend returns 500 'Stripe not configured' on /api/stripe/create-checkout-session because STRIPE_SECRET_KEY is not set in Railway prod env. CORS headers are correctly set (access-control-allow-origin: https://youarewhatyoueat.store)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Live site fully operational on GitHub Pages custom domain. Apex + www both serve landing page (200 OK, correct title). All extensionless routes (/privacy-policy, /terms-of-service, /support, /subscribe) serve correct HTML pages. Subscribe form POSTs to https://web-production-66c05.up.railway.app/api/stripe/create-checkout-session with proper CORS; response 500 is expected until STRIPE_SECRET_KEY is configured on Railway. No console page errors; only expected 500 network log.",
+  "verification_details": {
+    "apex": {"status": 200, "title": "You Are What You Eat – Know What's Really In Your Food"},
+    "www": {"status": 200, "resolved_url": "https://youarewhatyoueat.store/"},
+    "pages": {
+      "/privacy-policy": 200,
+      "/terms-of-service": 200,
+      "/support": 200,
+      "/subscribe": 200
+    },
+    "app_store_link": true,
+    "google_play_link": true,
+    "subscribe_request_url": "https://web-production-66c05.up.railway.app/api/stripe/create-checkout-session",
+    "subscribe_response_status": 500,
+    "cors_allow_origin": "https://youarewhatyoueat.store"
+  }
+}
