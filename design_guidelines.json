@@ -1,0 +1,131 @@
+{
+  "project_context": {
+    "domain": "Health & Nutrition",
+    "app_name": "YAWYE (You Are What You Eat)",
+    "target_audience": "Mobile-first, Google Ads traffic",
+    "architecture_constraints": "Static HTML/CSS/JS ONLY. Use Tailwind via CDN (<script src=\"https://cdn.tailwindcss.com\"></script>). NO React, NO build tooling, NO Shadcn UI framework dependencies."
+  },
+  "theme_and_archetype": {
+    "theme": "Dark",
+    "archetype": "Archetype 4 (Swiss & High-Contrast)",
+    "reasoning": "The landing page makes bold, life-or-death claims ('poor diet has overtaken smoking as the leading cause of death'). It requires absolute authority, truth, and stark contrast to agitate the problem of UPFs, leading seamlessly into the solution (the app). A deep dark theme with bright green accents matches the existing brand app icon."
+  },
+  "colors": {
+    "background": {
+      "primary": "#0A0A0A",
+      "surface": "#171717",
+      "surface_glass": "rgba(10, 10, 10, 0.6)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A3A3A3",
+      "inverse": "#000000"
+    },
+    "brand": {
+      "primary": "#4CAF50",
+      "primary_hover": "#45A049",
+      "dark_green": "#1B4332",
+      "warning_red": "#FF3B30"
+    },
+    "border": {
+      "default": "rgba(255, 255, 255, 0.1)",
+      "hover": "rgba(255, 255, 255, 0.2)"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "'Outfit', sans-serif",
+      "body": "'Manrope', sans-serif"
+    },
+    "import_code": "<link href=\"https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Outfit:wght@300;400;700;900&display=swap\" rel=\"stylesheet\">",
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl font-black tracking-tighter leading-none text-white",
+      "h2": "text-3xl sm:text-4xl font-bold tracking-tight text-white",
+      "h3": "text-xl sm:text-2xl font-bold tracking-tight text-white",
+      "body": "text-base sm:text-lg font-normal leading-relaxed text-[#A3A3A3]",
+      "label": "text-xs font-bold tracking-[0.2em] uppercase text-[#4CAF50]"
+    }
+  },
+  "layout_and_spacing": {
+    "philosophy": "Generous vertical spacing to allow the narrative to breathe. Mobile-first grid collapsing.",
+    "section_padding": "py-20 md:py-32 px-4 md:px-8 max-w-7xl mx-auto",
+    "grid_system": {
+      "bento": "grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8",
+      "card_span": "md:col-span-4 lg:col-span-6"
+    }
+  },
+  "motion": {
+    "philosophy": "Functional and crisp. No heavy JS libraries since it is pure HTML. Use Tailwind transition classes.",
+    "hover_card": "transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(76,175,80,0.15)] hover:border-white/30",
+    "hover_button": "transition-all duration-200 ease-in-out hover:scale-105 active:scale-95"
+  },
+  "components": {
+    "navbar": "fixed top-0 w-full z-50 backdrop-blur-xl bg-black/60 border-b border-white/10. Include the reconstructed Logo on left, and 'Download App' CTA on right.",
+    "logo_reconstruction": "A flex container (rounded-xl bg-black p-2 border border-[#4CAF50]/30). Inside, small text 'YOU ARE WHAT YOU EAT' stacked, where 'YOU/WHAT/YOU' are text-white and 'ARE/EAT' are text-[#4CAF50]. Add a couple of dark green small circles as decoration to mimic the description.",
+    "buttons": {
+      "primary_cta": "bg-[#4CAF50] text-black font-bold text-lg rounded-full px-8 py-4 flex items-center justify-center gap-2",
+      "store_badge": "bg-black border border-white/20 text-white rounded-lg px-4 py-2 flex items-center gap-3 hover:bg-white/5 transition-colors"
+    },
+    "cards": {
+      "base": "bg-[#171717] border border-white/10 rounded-3xl p-6 lg:p-10",
+      "glass": "backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6"
+    },
+    "video_embed": "iframe class='w-full aspect-video rounded-2xl border border-white/10 shadow-lg'"
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1595079676601-f1adf5be5dee?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwxfHxzbWFydHBob25lJTIwc2Nhbm5pbmclMjBiYXJjb2RlfGVufDB8fHx8MTc4MjgyMjkxNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Smartphone scanning a barcode. Use this in the 'How YAWYE Works / Scanning' section.",
+        "category": "feature_showcase"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1615380547239-45634678986c",
+        "description": "Ultra-processed food (Junk Food Burger). Use this in the problem-agitation section.",
+        "category": "problem_illustration"
+      },
+      {
+        "url": "https://images.pexels.com/photos/15880830/pexels-photo-15880830.jpeg",
+        "description": "Fresh avocados (Healthy whole foods). Use this in the solution/results section to contrast with the UPFs.",
+        "category": "solution_illustration"
+      }
+    ],
+    "videos": [
+      {
+        "youtube_id": "dzUDhstqXbg",
+        "title": "Diary of a CEO with Chris van Tulleken",
+        "context": "Use this as the primary hero/agitation video ('This Food Is Worse Than Smoking')."
+      },
+      {
+        "youtube_id": "BAxkGg8nk3w",
+        "title": "ZOE van Tulleken & Spector",
+        "context": "Use in the education section about the hidden dangers of UPFs."
+      },
+      {
+        "youtube_id": "zO7tyleoxwE",
+        "title": "Tim Spector UPF explained",
+        "context": "Use in the 'What are UPFs?' knowledge section."
+      }
+    ]
+  },
+  "narrative_flow": [
+    "1. HERO: Stark, high-impact headline. 'Poor diet has overtaken smoking as the leading cause of death.' App store download buttons. Dark overlay, gritty texture.",
+    "2. AGITATION (The Truth): Embed the Diary of a CEO video (dzUDhstqXbg). Big typography outlining the stats on UPF-related mortality.",
+    "3. EDUCATION: Bento grid with the other two YouTube videos (BAxkGg8nk3w, zO7tyleoxwE) explaining what UPFs actually are and why they are hidden in everyday foods.",
+    "4. SOLUTION: Introduce YAWYE app. 'You Are What You Eat'. Feature the barcode scanning image. Explain the AI health score and how it penalizes UPFs.",
+    "5. PRICING & CTA: £1.99/mo subscription. Bold, simple pricing card. Final push to download via App Store/Google Play.",
+    "6. FOOTER: Support, privacy policy, terms of service links."
+  ],
+  "accessibility_and_testing": {
+    "testing": "All interactive elements MUST include a `data-testid` attribute (e.g., data-testid='hero-download-btn', data-testid='nav-pricing-link').",
+    "contrast": "Ensure white text on `#0A0A0A` and `#171717` meets APCA/WCAG standards. The green CTA button (`#4CAF50`) must have black text (`#000000`) for accessibility."
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL constraints: DO NOT build a React app. DO NOT install Shadcn or npm packages. The final output must be pure static HTML files (index.html, subscribe.html, etc.) that run in a browser with zero build steps.",
+    "Use Tailwind CSS via CDN script: <script src=\"https://cdn.tailwindcss.com\"></script>. Configure the Tailwind object in the head to match the colors and fonts defined above.",
+    "Use HTML, regular CSS, and vanilla JS (if needed for simple mobile menu toggle).",
+    "Build the brand logo using pure HTML/CSS flexbox as instructed in components.logo_reconstruction.",
+    "Ensure the Google Ads conversion tracking remains conceptually intact (or add placeholder script tags for it).",
+    "Follow the narrative_flow exactly to build the single-page scroll journey on index.html."
+  ]
+}
