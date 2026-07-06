@@ -1144,6 +1144,9 @@ async def admin_send_notification(request: Request, key: str = ""):
     
     logger.info(f"Push notification sent: {sent} recipients, {len(errors)} errors")
     return {"status": "ok", "sent": sent, "total_tokens": len(tokens), "errors": errors}
+
+
+@app.post("/api/scan/full")
 async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
     Improved barcode scanning with:
@@ -1168,23 +1171,39 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     # STEP 1: Check cache first for instant results
     cached = await get_cached_product(barcode)
     if cached and cached.get("analysis"):
-        response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, "cache", response_time)
-        # Increment scan count
-        await users_collection.update_one(
-            {"_id": current_user["_id"]},
-            {"$inc": {"total_scans": 1}}
+        cached_analysis = cached["analysis"]
+        # GUARD: Don't serve cached error results — they have score 5/0, category Unknown
+        # These were cached by a bug in earlier versions. Invalidate and re-analyze.
+        is_error_result = (
+            cached_analysis.get("analysis_error") or
+            cached_analysis.get("processing_category", "").lower() == "unknown" or
+            (cached_analysis.get("overall_score") in [0, 5] and cached_analysis.get("upf_score") in ["0%", "Unknown", None])
         )
-        result = {
-            "product_name": cached.get("product_name", "Unknown"),
-            "brands": cached.get("brands", ""),
-            "ingredients_text": cached.get("ingredients_text", ""),
-            "image_url": cached.get("image_url", ""),
-            "analysis": cached["analysis"],
-            "source": "cache",
-            "response_time_ms": int(response_time * 1000)
-        }
-        return {k: v for k, v in result.items() if k != "_id"}
+        if not is_error_result:
+            response_time = time.time() - start_time
+            await log_scan_analytics(barcode, True, "cache", response_time)
+            # Increment scan count
+            await users_collection.update_one(
+                {"_id": current_user["_id"]},
+                {"$inc": {"total_scans": 1}}
+            )
+            result = {
+                "product_name": cached.get("product_name", "Unknown"),
+                "brands": cached.get("brands", ""),
+                "ingredients_text": cached.get("ingredients_text", ""),
+                "image_url": cached.get("image_url", ""),
+                "analysis": cached["analysis"],
+                "source": "cache",
+                "response_time_ms": int(response_time * 1000)
+            }
+            return {k: v for k, v in result.items() if k != "_id"}
+        else:
+            # Cached result is a stale error — clear the analysis and fall through to re-analyze
+            logger.info(f"CACHE INVALIDATED (error result): {barcode} — re-analyzing")
+            await product_cache_collection.update_one(
+                {"barcode": barcode},
+                {"$unset": {"analysis": ""}}
+            )
     
     # STEP 2: Parallel API calls with smart routing based on barcode prefix
     # UK/EU barcodes start with 50/40-44, US barcodes start with 0
@@ -1341,9 +1360,16 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             "analysis_error": True
         }
     
-    # STEP 6.5: Cache the result for future lookups
+    # STEP 6.5: Cache the result — but ONLY if the analysis actually succeeded
     product_data["analysis"] = analysis
-    await cache_product(barcode, product_data)
+    if not analysis.get("analysis_error"):
+        await cache_product(barcode, product_data)
+    else:
+        # Still cache the product data (name, ingredients, image) but WITHOUT the failed analysis
+        # so next scan can retry AI without re-fetching from food databases
+        product_data_no_analysis = {k: v for k, v in product_data.items() if k != "analysis"}
+        await cache_product(barcode, product_data_no_analysis)
+        logger.warning(f"NOT caching failed analysis for {barcode} — will retry on next scan")
     
     # STEP 7: Save to user's scan history (dedup: skip if same barcode scanned within last 5 seconds)
     user_id_str = str(current_user["_id"])
@@ -1487,35 +1513,50 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     # Check cache first - if ANY data exists (with or without analysis), use it
     cached = await product_cache_collection.find_one({"barcode": barcode}, {"_id": 0})
     if cached and cached.get("analysis"):
-        # Only count as a new scan if user hasn't scanned this barcode in the last 5 minutes
-        recent_scan = await scans_collection.find_one({
-            "user_id": str(current_user["_id"]),
-            "barcode": barcode,
-            "scanned_at": {"$gte": datetime.utcnow() - timedelta(minutes=5)}
-        })
-        if not recent_scan:
-            await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
-            await scans_collection.insert_one({
+        cached_analysis = cached["analysis"]
+        # GUARD: Don't serve cached error results — invalidate and re-analyze
+        is_error_result = (
+            cached_analysis.get("analysis_error") or
+            cached_analysis.get("processing_category", "").lower() == "unknown" or
+            (cached_analysis.get("overall_score") in [0, 5] and cached_analysis.get("upf_score") in ["0%", "Unknown", None])
+        )
+        if is_error_result:
+            logger.info(f"CACHE INVALIDATED (error result) in quick scan: {barcode}")
+            await product_cache_collection.update_one(
+                {"barcode": barcode},
+                {"$unset": {"analysis": ""}}
+            )
+            # Fall through to re-fetch and re-analyze
+        else:
+            # Only count as a new scan if user hasn't scanned this barcode in the last 5 minutes
+            recent_scan = await scans_collection.find_one({
                 "user_id": str(current_user["_id"]),
                 "barcode": barcode,
-                "product_name": cached.get("product_name", "Unknown"),
+                "scanned_at": {"$gte": datetime.utcnow() - timedelta(minutes=5)}
+            })
+            if not recent_scan:
+                await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+                await scans_collection.insert_one({
+                    "user_id": str(current_user["_id"]),
+                    "barcode": barcode,
+                    "product_name": cached.get("product_name", "Unknown"),
+                    "brands": cached.get("brands", ""),
+                    "ingredients_text": cached.get("ingredients_text", ""),
+                    "image_url": cached.get("image_url", ""),
+                    "analysis": cached.get("analysis"),
+                    "scanned_at": datetime.utcnow(),
+                    "source": "cache"
+                })
+            logger.info(f"Cache hit (complete) for {barcode}")
+            return {
+                "status": "complete",
+                "product_name": cached.get("product_name"),
                 "brands": cached.get("brands", ""),
                 "ingredients_text": cached.get("ingredients_text", ""),
                 "image_url": cached.get("image_url", ""),
                 "analysis": cached.get("analysis"),
-                "scanned_at": datetime.utcnow(),
-                "source": "cache"
-            })
-        logger.info(f"Cache hit (complete) for {barcode}")
-        return {
-            "status": "complete",
-            "product_name": cached.get("product_name"),
-            "brands": cached.get("brands", ""),
-            "ingredients_text": cached.get("ingredients_text", ""),
-            "image_url": cached.get("image_url", ""),
-            "analysis": cached.get("analysis"),
-            "source": cached.get("source", "cache")
-        }
+                "source": cached.get("source", "cache")
+            }
     
     # If product data is cached but analysis is still pending, return analyzing
     if cached and cached.get("product_name") and not cached.get("analysis_error"):
