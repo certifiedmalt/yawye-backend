@@ -12,6 +12,10 @@
 - PAT: stored in git remote config
 - Repo: `certifiedmalt/yawye-backend`
 
+## Railway
+- Account API token: `0ad736ba-f717-4b65-956c-8ca81e0323bd`
+- Use with `Authorization: Bearer` against `https://backboard.railway.app/graphql/v2`
+
 ## EAS / Expo
 - Account: `certifiedmalt` / `youarewhatyoueat.sup@aol.com`
 
