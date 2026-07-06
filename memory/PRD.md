@@ -35,6 +35,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - Rule 10: Whole Food / Minimally Processed floor = 7
 
 ## What's Been Implemented
+- (Jun 2026) WEBSITE MIGRATED TO GITHUB PAGES + CUSTOM DOMAIN LIVE: https://youarewhatyoueat.store (and www) now serves the marketing site from GitHub Pages repo `certifiedmalt/yawye-website` with valid SSL (https_enforced). Railway SSL issuance was stuck for hours, so site hosting was moved off Railway; API/mobile backend remains on Railway unchanged. DNS at Namecheap: 4 A records (@ -> 185.199.108-111.153), www CNAME -> certifiedmalt.github.io. subscribe.html calls Railway API absolutely (CORS OK). Dead yawye.app custom domain removed from Railway. Testing agent verified all pages/links 100%. KNOWN GAP: /api/stripe/create-checkout-session returns 500 "Stripe not configured" — STRIPE_SECRET_KEY not set in Railway env (pre-existing).
 - (Jun 2026) FIXED & DEPLOYED: 0% UPF → 5/10 score bug. Root causes: (1) fix commits were never pushed to GitHub/Railway; (2) scan/quick cache-invalidation branch hung — after unsetting bad analysis it hit the "pending analysis" branch and returned "analyzing" forever without re-analyzing. Fixes: pushed all commits, set cached=None after invalidation to force re-fetch + background re-analysis, time-bounded pending branch (2 min freshness, stale = re-analyze). Verified LIVE on Railway: Peter's Yard crackers (5060198820052, 5060198821219) now score 8/10.
 - Apple App Store Approval (LIVE)
 - expo-iap replacing RevenueCat
