@@ -19,6 +19,7 @@ interface User {
   name: string;
   subscription_tier: string;
   total_scans: number;
+  created_at?: string;
 }
 
 interface AuthContextType {

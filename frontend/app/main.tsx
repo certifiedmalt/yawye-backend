@@ -125,6 +125,67 @@ export default function Main() {
     setupNotifications();
   }, []);
 
+  // Day-2 re-engagement nudge: scheduled on-device at 6pm local, 2 days after signup.
+  useEffect(() => {
+    const scheduleDay2Nudge = async () => {
+      try {
+        if (!user?.id || !token || !user?.created_at) return;
+        const handled = await AsyncStorage.getItem('day2_nudge_handled');
+        if (handled === 'true') return;
+
+        const accountAgeMs = Date.now() - new Date(user.created_at).getTime();
+        const isNewAccount = accountAgeMs < 24 * 60 * 60 * 1000;
+        if (!isNewAccount || (user.total_scans || 0) >= 5) {
+          await AsyncStorage.setItem('day2_nudge_handled', 'true');
+          return;
+        }
+
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') return; // retry on a later visit once permission granted
+
+        const fireDate = new Date(new Date(user.created_at).getTime() + 2 * 24 * 60 * 60 * 1000);
+        fireDate.setHours(18, 0, 0, 0); // 6pm in the user's local timezone
+        if (fireDate.getTime() <= Date.now()) return;
+
+        const notifId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Your cupboard is hiding something 👀',
+            body: "Most 'healthy' foods score under 5/10. Scan 3 products and see for yourself.",
+            ...(Platform.OS === 'android' ? { channelId: 'daily-reminders' } : {}),
+          },
+          trigger: { type: 'date', date: fireDate } as any,
+        });
+        await AsyncStorage.setItem('day2_nudge_id', notifId);
+        await AsyncStorage.setItem('day2_nudge_handled', 'true');
+
+        // Tell the server this user is handled locally (prevents duplicate server push)
+        axios.post(`${BACKEND_URL}/api/auth/day2-local-scheduled`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      } catch (e) {
+        console.log('Day-2 nudge scheduling error', e);
+      }
+    };
+    scheduleDay2Nudge();
+  }, [user?.id, token]);
+
+  // Cancel the day-2 nudge once the user hits 5 scans — they don't need it.
+  useEffect(() => {
+    const cancelIfActive = async () => {
+      try {
+        if ((user?.total_scans || 0) < 5) return;
+        const notifId = await AsyncStorage.getItem('day2_nudge_id');
+        if (notifId) {
+          await Notifications.cancelScheduledNotificationAsync(notifId);
+          await AsyncStorage.removeItem('day2_nudge_id');
+        }
+      } catch (e) {
+        console.log('Day-2 nudge cancel error', e);
+      }
+    };
+    cancelIfActive();
+  }, [user?.total_scans]);
+
   const [gamificationLoading, setGamificationLoading] = useState(false);
   const [gamificationError, setGamificationError] = useState<string | null>(null);
   const [gamification, setGamification] = useState<any | null>(null);

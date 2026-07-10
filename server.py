@@ -1077,8 +1077,18 @@ async def get_me(current_user = Depends(get_current_user)):
         "email": current_user["email"],
         "name": current_user["name"],
         "subscription_tier": current_user.get("subscription_tier", "free"),
-        "total_scans": current_user.get("total_scans", 0)
+        "total_scans": current_user.get("total_scans", 0),
+        "created_at": current_user["created_at"].isoformat() if current_user.get("created_at") else None
     }
+
+@app.post("/api/auth/day2-local-scheduled")
+async def day2_local_scheduled(current_user = Depends(get_current_user)):
+    """App scheduled the day-2 nudge locally on-device; server must not duplicate it"""
+    await users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"day2_nudge_sent": True, "day2_nudge_local": True}}
+    )
+    return {"status": "ok"}
 
 @app.post("/api/auth/push-token")
 async def register_push_token(request: Request, current_user = Depends(get_current_user)):
@@ -1150,11 +1160,14 @@ DAY2_NUDGE_TITLE = "Your cupboard is hiding something 👀"
 DAY2_NUDGE_BODY = "Most 'healthy' foods score under 5/10. Scan 3 products and see for yourself."
 
 async def run_day2_nudge(dry_run: bool = False):
-    """Send a one-time re-engagement push to users 24-72h after signup with <=2 scans"""
+    """Send a one-time re-engagement push to users 24-72h after signup with <=4 scans.
+    Real sends only fire 16:00-21:00 UTC (afternoon/evening UK, daytime USA)."""
     now = datetime.utcnow()
+    if not dry_run and not (16 <= now.hour < 21):
+        return {"skipped": "outside send window (16-21 UTC)", "sent": 0}
     query = {
         "created_at": {"$gte": now - timedelta(hours=72), "$lte": now - timedelta(hours=24)},
-        "total_scans": {"$lte": 2},
+        "total_scans": {"$lte": 4},
         "push_token": {"$exists": True, "$ne": ""},
         "day2_nudge_sent": {"$ne": True},
     }
