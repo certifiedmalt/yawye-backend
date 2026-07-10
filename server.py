@@ -1146,6 +1146,79 @@ async def admin_send_notification(request: Request, key: str = ""):
     return {"status": "ok", "sent": sent, "total_tokens": len(tokens), "errors": errors}
 
 
+DAY2_NUDGE_TITLE = "Your cupboard is hiding something 👀"
+DAY2_NUDGE_BODY = "Most 'healthy' foods score under 5/10. Scan 3 products and see for yourself."
+
+async def run_day2_nudge(dry_run: bool = False):
+    """Send a one-time re-engagement push to users 24-72h after signup with <=2 scans"""
+    now = datetime.utcnow()
+    query = {
+        "created_at": {"$gte": now - timedelta(hours=72), "$lte": now - timedelta(hours=24)},
+        "total_scans": {"$lte": 2},
+        "push_token": {"$exists": True, "$ne": ""},
+        "day2_nudge_sent": {"$ne": True},
+    }
+    eligible = []
+    async for u in users_collection.find(query, {"push_token": 1, "email": 1}):
+        token = u.get("push_token", "")
+        if token.startswith("ExponentPushToken[") or token.startswith("ExpoPushToken["):
+            eligible.append(u)
+
+    if dry_run:
+        return {"dry_run": True, "eligible": len(eligible), "emails": [u.get("email") for u in eligible]}
+
+    sent = 0
+    errors = []
+    for i in range(0, len(eligible), 100):
+        batch = eligible[i:i+100]
+        messages = [{
+            "to": u["push_token"],
+            "sound": "default",
+            "title": DAY2_NUDGE_TITLE,
+            "body": DAY2_NUDGE_BODY,
+        } for u in batch]
+        try:
+            requests.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=messages,
+                headers={"Content-Type": "application/json"},
+                timeout=15,
+            )
+            sent += len(batch)
+        except Exception as e:
+            errors.append(str(e))
+            continue
+        await users_collection.update_many(
+            {"_id": {"$in": [u["_id"] for u in batch]}},
+            {"$set": {"day2_nudge_sent": True, "day2_nudge_sent_at": now}}
+        )
+    if sent or errors:
+        logger.info(f"Day-2 nudge: sent {sent}, errors {len(errors)}")
+    return {"eligible": len(eligible), "sent": sent, "errors": errors}
+
+
+@app.post("/api/admin/run_day2_nudge")
+async def admin_run_day2_nudge(key: str = "", dry_run: bool = False):
+    """Manually trigger (or dry-run preview) the day-2 re-engagement nudge"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    return await run_day2_nudge(dry_run=dry_run)
+
+
+async def _day2_nudge_scheduler():
+    while True:
+        try:
+            await run_day2_nudge()
+        except Exception as e:
+            logger.error(f"Day-2 nudge scheduler error: {e}")
+        await asyncio.sleep(6 * 3600)
+
+
+@app.on_event("startup")
+async def _start_day2_nudge_scheduler():
+    asyncio.create_task(_day2_nudge_scheduler())
+
+
 @app.post("/api/scan/full")
 async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
