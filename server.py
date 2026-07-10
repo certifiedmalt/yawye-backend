@@ -2101,6 +2101,46 @@ async def admin_user_stats(key: str = ""):
         "premium_user_details": premium_list
     }
 
+@app.get("/api/admin/funnel_stats")
+async def admin_funnel_stats(key: str = "", days: int = 30):
+    """Conversion funnel analytics: download -> activation -> limit -> premium"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    async def funnel(match):
+        total = await users_collection.count_documents(match)
+        activated = await users_collection.count_documents({**match, "total_scans": {"$gte": 1}})
+        hit_full_limit = await users_collection.count_documents({**match, "total_scans": {"$gte": 5}})
+        hit_quick_limit = await users_collection.count_documents({**match, "total_scans": {"$gte": 10}})
+        premium = await users_collection.count_documents({**match, "subscription_tier": "premium"})
+        pct = lambda n, d: round(n / d * 100, 1) if d else 0.0
+        return {
+            "registered": total,
+            "activated_1plus_scans": activated,
+            "activation_rate_pct": pct(activated, total),
+            "hit_5_scan_paywall": hit_full_limit,
+            "paywall_reach_rate_pct": pct(hit_full_limit, total),
+            "hit_10_scan_hard_limit": hit_quick_limit,
+            "premium": premium,
+            "premium_conversion_pct": pct(premium, total),
+            "paywall_to_premium_pct": pct(premium, hit_full_limit),
+        }
+
+    buckets = {}
+    for label, q in [("0_scans", {"total_scans": {"$in": [0, None]}}),
+                     ("1_2_scans", {"total_scans": {"$gte": 1, "$lte": 2}}),
+                     ("3_4_scans", {"total_scans": {"$gte": 3, "$lte": 4}}),
+                     ("5_9_scans", {"total_scans": {"$gte": 5, "$lte": 9}}),
+                     ("10_plus_scans", {"total_scans": {"$gte": 10}})]:
+        buckets[label] = await users_collection.count_documents(q)
+
+    return {
+        "all_time": await funnel({}),
+        f"last_{days}_days_cohort": await funnel({"created_at": {"$gte": cutoff}}),
+        "scan_distribution": buckets,
+    }
+
 @app.get("/api/admin/search_users")
 async def admin_search_users(key: str = "", q: str = ""):
     """Search users by name or email"""
