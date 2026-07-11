@@ -2227,6 +2227,38 @@ async def admin_funnel_stats(key: str = "", days: int = 30):
         "scan_distribution": buckets,
     }
 
+@app.get("/api/admin/geo_estimate")
+async def admin_geo_estimate(key: str = ""):
+    """Estimate user regions from barcode prefixes of their scans (US: 0/1, UK: 50)"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    pipeline = [
+        {"$match": {"user_id": {"$ne": None}}},
+        {"$group": {"_id": "$user_id", "barcodes": {"$push": "$barcode"}}},
+    ]
+    us_users, uk_users, other_users = [], [], []
+    async for doc in scans_collection.aggregate(pipeline):
+        codes = [str(b) for b in doc.get("barcodes", []) if b]
+        if not codes:
+            continue
+        us = sum(1 for c in codes if len(c) >= 12 and c[:1] in ("0", "1") or len(c) == 12)
+        uk = sum(1 for c in codes if c.startswith("50"))
+        total = len(codes)
+        entry = {"user_id": str(doc["_id"]), "scans": total, "us_prefix": us, "uk_prefix": uk}
+        if us / total > 0.6:
+            us_users.append(entry)
+        elif uk / total > 0.4:
+            uk_users.append(entry)
+        else:
+            other_users.append(entry)
+    return {
+        "likely_us_users": len(us_users),
+        "likely_uk_users": len(uk_users),
+        "mixed_or_other": len(other_users),
+        "us_user_details": us_users[:20],
+        "note": "Estimated from scanned barcode GS1 prefixes; UPC(0/1)=US, 50=UK",
+    }
+
 @app.get("/api/admin/search_users")
 async def admin_search_users(key: str = "", q: str = ""):
     """Search users by name or email"""
