@@ -926,8 +926,42 @@ async def download_icon():
 async def health_check():
     return {"status": "healthy"}
 
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+def _resolve_country(ip: str) -> str:
+    try:
+        r = requests.get(f"http://ip-api.com/json/{ip}?fields=status,countryCode", timeout=4)
+        d = r.json()
+        if d.get("status") == "success":
+            return d.get("countryCode", "")
+    except Exception:
+        pass
+    return ""
+
+async def capture_user_country(user_id, ip: str):
+    """Best-effort IP->country lookup, stored once per user"""
+    try:
+        if not ip or ip.startswith(("10.", "192.168.", "127.", "172.")):
+            return
+        existing = await users_collection.find_one({"_id": user_id}, {"country": 1})
+        if existing and existing.get("country"):
+            return
+        loop = asyncio.get_event_loop()
+        country = await loop.run_in_executor(None, _resolve_country, ip)
+        if country:
+            await users_collection.update_one(
+                {"_id": user_id},
+                {"$set": {"country": country, "country_detected_at": datetime.utcnow()}}
+            )
+    except Exception as e:
+        logger.warning(f"Country capture failed: {e}")
+
 @app.post("/api/auth/register")
-async def register(user: UserRegister):
+async def register(user: UserRegister, request: Request):
     # Check if user exists
     existing_user = await users_collection.find_one({"email": user.email})
     if existing_user:
@@ -944,6 +978,7 @@ async def register(user: UserRegister):
         "created_at": datetime.utcnow()
     }
     result = await users_collection.insert_one(user_doc)
+    asyncio.create_task(capture_user_country(result.inserted_id, _client_ip(request)))
     
     # Create token
     token = create_access_token({"sub": str(result.inserted_id)})
@@ -959,7 +994,7 @@ async def register(user: UserRegister):
     }
 
 @app.post("/api/auth/login")
-async def login(user: UserLogin):
+async def login(user: UserLogin, request: Request):
     # Rate limiting
     if not check_rate_limit(f"login:{user.email}"):
         raise HTTPException(status_code=429, detail="Too many login attempts. Please wait 5 minutes.")
@@ -968,6 +1003,7 @@ async def login(user: UserLogin):
     db_user = await users_collection.find_one({"email": user.email})
     if not db_user or not verify_password(user.password, db_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    asyncio.create_task(capture_user_country(db_user["_id"], _client_ip(request)))
     
     # Create token
     token = create_access_token({"sub": str(db_user["_id"])})
@@ -2225,6 +2261,17 @@ async def admin_funnel_stats(key: str = "", days: int = 30):
         "all_time": await funnel({}),
         f"last_{days}_days_cohort": await funnel({"created_at": {"$gte": cutoff}}),
         "scan_distribution": buckets,
+        "by_country": [
+            {"country": d["_id"] or "unknown", "users": d["users"], "premium": d["premium"]}
+            async for d in users_collection.aggregate([
+                {"$group": {
+                    "_id": {"$ifNull": ["$country", "unknown"]},
+                    "users": {"$sum": 1},
+                    "premium": {"$sum": {"$cond": [{"$eq": ["$subscription_tier", "premium"]}, 1, 0]}},
+                }},
+                {"$sort": {"users": -1}},
+            ])
+        ],
     }
 
 @app.get("/api/admin/geo_estimate")
