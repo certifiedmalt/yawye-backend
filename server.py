@@ -266,6 +266,7 @@ def fetch_from_openfoodfacts(barcode: str) -> Optional[Dict[str, Any]]:
                     "ingredients_text": product.get("ingredients_text", ""),
                     "image_url": product.get("image_url", ""),
                     "categories_tags": product.get("categories_tags", []),
+                    "nova_group": product.get("nova_group"),
                     "source": "openfoodfacts",
                     "fetch_time": time.time() - start_time
                 }
@@ -469,6 +470,7 @@ def fetch_from_off_uk(barcode: str) -> Optional[Dict[str, Any]]:
                         "brands": product.get("brands", "Unknown Brand"),
                         "ingredients_text": product.get("ingredients_text", ""),
                         "image_url": product.get("image_url", ""),
+                        "nova_group": product.get("nova_group"),
                         "source": "openfoodfacts_uk",
                         "fetch_time": time.time() - start_time
                     }
@@ -697,7 +699,7 @@ Respond with JSON only:
             "analysis_note": "Analysis failed - no ingredient data available"
         }
 
-async def analyze_ingredients_with_ai(product_name: str, ingredients: str) -> dict:
+async def analyze_ingredients_with_ai(product_name: str, ingredients: str, off_nova_group: int = None) -> dict:
     """Analyze ingredients using OpenAI GPT-4o with focus on ultra-processed foods (UPFs)"""
     try:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
@@ -874,6 +876,15 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
             for h in harmful
         )
         
+        # Rule 0: NOVA 4 consistency — if OpenFoodFacts (authoritative DB) classifies the
+        # product as NOVA 4, or the AI itself flagged a NOVA 4 marker ingredient, the whole
+        # product IS Ultra-Processed by NOVA methodology. Never allow "Processed" + NOVA 4 additive.
+        ai_flagged_nova4 = any(h.get("processing_level") == "NOVA 4" for h in harmful)
+        if (off_nova_group == 4 or ai_flagged_nova4) and "ultra" not in category:
+            logger.info(f"Rule 0: coercing '{category}' -> Ultra-Processed for {product_name} (off_nova={off_nova_group}, ai_nova4_ingredient={ai_flagged_nova4})")
+            result["processing_category"] = "Ultra-Processed"
+            category = "ultra-processed"
+
         # Rule 1: Any carcinogen = score 1
         if carcinogens and len(carcinogens) > 0:
             result["overall_score"] = 1
@@ -1419,7 +1430,8 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         try:
             analysis = await analyze_ingredients_with_ai(
                 product_data.get("product_name", "Unknown"),
-                ""  # Empty ingredients triggers product-by-name analysis
+                "",  # Empty ingredients triggers product-by-name analysis
+                off_nova_group=product_data.get("nova_group")
             )
         except Exception as e:
             logger.error(f"AI name-based analysis failed: {e}")
@@ -1468,7 +1480,8 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     try:
         analysis = await analyze_ingredients_with_ai(
             product_data.get("product_name", "Unknown"),
-            ingredients_text
+            ingredients_text,
+            off_nova_group=product_data.get("nova_group")
         )
     except Exception as e:
         logger.error(f"AI analysis failed: {e}")
@@ -1831,6 +1844,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 cache_data = {
                     "barcode": barcode,
                     "product_name": product_name,
+                    "nova_group": product_data.get("nova_group"),
                     "brands": product_data.get("brands", ""),
                     "ingredients_text": ingredients_text,
                     "image_url": product_data.get("image_url", ""),
@@ -1941,7 +1955,7 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
     
     # Run fresh AI analysis
     if ingredients:
-        analysis = await analyze_ingredients_with_ai(product_name, ingredients)
+        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=cached.get("nova_group"))
     else:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         analysis = await analyze_product_by_name(client, product_name)
