@@ -1946,6 +1946,22 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
     
     product_name = cached.get("product_name", "Unknown")
     ingredients = cached.get("ingredients_text", "")
+
+    # Refresh authoritative NOVA classification from OpenFoodFacts (older cache entries lack it)
+    off_nova = cached.get("nova_group")
+    if off_nova is None:
+        try:
+            loop = asyncio.get_event_loop()
+            fresh = await loop.run_in_executor(None, fetch_from_openfoodfacts, barcode)
+            if fresh:
+                off_nova = fresh.get("nova_group")
+                refresh_update = {"nova_group": off_nova}
+                if not ingredients and fresh.get("ingredients_text"):
+                    ingredients = fresh["ingredients_text"]
+                    refresh_update["ingredients_text"] = ingredients
+                await product_cache_collection.update_one({"barcode": barcode}, {"$set": refresh_update})
+        except Exception as e:
+            logger.warning(f"Rescan OFF refresh failed for {barcode}: {e}")
     
     # Clear the analysis from cache
     await product_cache_collection.update_one(
@@ -1955,7 +1971,7 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
     
     # Run fresh AI analysis
     if ingredients:
-        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=cached.get("nova_group"))
+        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=off_nova)
     else:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         analysis = await analyze_product_by_name(client, product_name)
