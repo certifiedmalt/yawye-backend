@@ -884,6 +884,10 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
             logger.info(f"Rule 0: coercing '{category}' -> Ultra-Processed for {product_name} (off_nova={off_nova_group}, ai_nova4_ingredient={ai_flagged_nova4})")
             result["processing_category"] = "Ultra-Processed"
             category = "ultra-processed"
+            if 0 <= upf_pct <= 10:
+                # AI's low UPF% contradicts the NOVA 4 classification — don't display it
+                result["upf_score"] = "unknown"
+                upf_pct = -1
 
         # Rule 1: Any carcinogen = score 1
         if carcinogens and len(carcinogens) > 0:
