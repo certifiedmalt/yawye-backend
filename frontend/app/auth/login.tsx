@@ -11,11 +11,13 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function Login() {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,8 +54,11 @@ export default function Login() {
         ]
       );
     } catch (error: any) {
-      if (!error?.userCancelled && error?.code !== 'E_USER_CANCELLED') {
+      const msg = String(error?.message || '');
+      const cancelled = error?.userCancelled || error?.code === 'E_USER_CANCELLED' || msg.toLowerCase().includes('cancel');
+      if (!cancelled) {
         console.warn('Purchase error:', error);
+        Alert.alert('Purchase Failed', msg || 'Something went wrong. Please try again.');
       }
     }
   };
@@ -61,7 +66,7 @@ export default function Login() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + 40 }]}
       keyboardShouldPersistTaps="handled"
       bounces={false}
     >

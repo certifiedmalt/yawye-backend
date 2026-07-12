@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 
 let useIAP: any = null;
 try {
@@ -47,6 +47,11 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
     },
     onPurchaseError: (error: any) => {
       console.warn('[IAP] Purchase error:', error);
+      const msg = String(error?.message || '');
+      const cancelled = error?.code === 'E_USER_CANCELLED' || msg.toLowerCase().includes('cancel');
+      if (!cancelled) {
+        Alert.alert('Purchase Failed', msg || 'Something went wrong. Please try again.');
+      }
     },
   });
 
@@ -79,11 +84,18 @@ function SubscriptionProviderInner({ children }: { children: React.ReactNode }) 
   const purchaseSubscription = async () => {
     setIsLoading(true);
     try {
+      // Android (Google Play Billing 5+) requires an offerToken for subscriptions
+      const googleRequest: any = { skus: [PRODUCT_ID] };
+      const sub: any = (subscriptions || []).find((s: any) => s.productId === PRODUCT_ID) || (subscriptions || [])[0];
+      const androidOffers = sub?.subscriptionOfferDetailsAndroid;
+      if (Platform.OS === 'android' && androidOffers?.length) {
+        googleRequest.subscriptionOffers = [{ sku: PRODUCT_ID, offerToken: androidOffers[0].offerToken }];
+      }
       await requestPurchase({
         type: 'subs',
         request: {
           apple: { sku: PRODUCT_ID },
-          google: { sku: PRODUCT_ID },
+          google: googleRequest,
         },
       });
     } finally {
