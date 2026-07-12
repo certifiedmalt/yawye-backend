@@ -1,0 +1,25 @@
+{
+  "summary": "Backend-only production tests for NOVA 4 Rule 0 fix on Railway. All 5 tests pass: Philadelphia coerced to Ultra-Processed score 3, Babybel Light 9/Processed (no regression), Peter's Yard 8/Processed, Welch's 1/Ultra-Processed, and 1 rescan call confirmed determinism (score=3, category=ultra-processed, upf_score=unknown — proving Rule 0 masked the contradictory low UPF%).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_production_nova4_fix.py",
+    "/app/test_reports/pytest/prod_nova4.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Rule 0 correctly positioned at line 883 BEFORE Rule 1/2 chain (line 892+); upf_pct is parsed at line 862 before Rule 0 reads it — control flow correct.",
+    "/app/server.py is byte-identical to /app/backend/server.py (diff -q returned no output).",
+    "Rule 0 uses both off_nova_group==4 (authoritative OpenFoodFacts data) AND ai_flagged_nova4 (marker-additive detection) as OR conditions — robust dual signal.",
+    "server.py is 3766 lines — consider splitting into modules (routes, scoring, off_client, cache) for maintainability.",
+    "Rule 9 UPF safety net (line 911) correctly gated on 'ultra' not in category, so it cannot override the Rule 0 coercion."
+  ],
+  "updated_files": ["/app/backend/tests/test_production_nova4_fix.py"],
+  "success_rate": {"backend": "100%", "frontend": "not tested (out of scope)"},
+  "test_credentials": "jpsaila1986@gmail.com / hello123 against https://web-production-66c05.up.railway.app",
+  "seed_data_creation": "none — used existing production cache entries",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Rule 0 (NOVA 4 coercion) is verified working on prod. Rescan endpoint costs OpenAI money — limit to 1 call per test run. Test file /app/backend/tests/test_production_nova4_fix.py is reusable regression suite.",
+  "rca of the issue": "Original bug: AI returned processing_category='Processed' AND flagged guar gum as NOVA 4 in harmful_ingredients — self-contradictory. Rule 2 (min score 3) only fired on category='ultra-processed' string, so contradictory AI output escaped the cap. Fix (Rule 0) forces category to 'Ultra-Processed' when either OFF nova_group==4 or AI flags any NOVA 4 additive, THEN Rule 2 applies the score cap. Verified: rescan of Philadelphia yields score=3, category=ultra-processed, upf_score='unknown' (masked because AI's low UPF% contradicted the NOVA 4 classification)."
+}
