@@ -2340,6 +2340,55 @@ async def admin_geo_estimate(key: str = ""):
         "note": "Estimated from scanned barcode GS1 prefixes; UPC(0/1)=US, 50=UK",
     }
 
+@app.get("/api/admin/cohort_diagnostics")
+async def admin_cohort_diagnostics(key: str = "", days: int = 7):
+    """Per-user scan outcomes for recent signups + global lookup failure stats"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    users = []
+    async for u in users_collection.find(
+        {"created_at": {"$gte": cutoff}},
+        {"email": 1, "name": 1, "total_scans": 1, "created_at": 1, "push_token": 1, "country": 1}
+    ).sort("created_at", -1):
+        uid = str(u["_id"])
+        scans = []
+        async for s in scans_collection.find({"user_id": uid}).sort("scanned_at", -1).limit(15):
+            a = s.get("analysis") or {}
+            pd = s.get("product_data") or {}
+            scans.append({
+                "barcode": s.get("barcode"),
+                "product": pd.get("product_name") or s.get("product_name"),
+                "score": a.get("overall_score"),
+                "analysis_error": bool(a.get("analysis_error")),
+                "at": s["scanned_at"].isoformat() if isinstance(s.get("scanned_at"), datetime) else s.get("scanned_at"),
+            })
+        users.append({
+            "email": u.get("email"), "name": u.get("name"),
+            "created_at": u["created_at"].isoformat() if u.get("created_at") else None,
+            "total_scans": u.get("total_scans", 0),
+            "has_push_token": bool(u.get("push_token")),
+            "country": u.get("country"),
+            "scan_records": scans,
+        })
+
+    total_attempts = await scan_analytics_collection.count_documents({"timestamp": {"$gte": cutoff}})
+    failed = await scan_analytics_collection.count_documents({"timestamp": {"$gte": cutoff}, "success": False})
+    recent_failures = []
+    async for f in scan_analytics_collection.find(
+        {"timestamp": {"$gte": cutoff}, "success": False}, {"_id": 0}
+    ).sort("timestamp", -1).limit(40):
+        f["timestamp"] = f["timestamp"].isoformat() if isinstance(f.get("timestamp"), datetime) else f.get("timestamp")
+        recent_failures.append(f)
+
+    return {
+        "cohort_users": users,
+        "scan_attempts_in_window": total_attempts,
+        "failed_lookups_in_window": failed,
+        "recent_failures": recent_failures,
+    }
+
 @app.get("/api/admin/search_users")
 async def admin_search_users(key: str = "", q: str = ""):
     """Search users by name or email"""
