@@ -18,6 +18,7 @@ import { BarcodeScanningResult } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-production-66c05.up.railway.app';
 
@@ -33,6 +34,42 @@ export default function Scan() {
   const [confirmBarcode, setConfirmBarcode] = useState<string>('');
   const [confirmNeedsAnalysis, setConfirmNeedsAnalysis] = useState(false);
   const { token } = useAuth();
+  const { purchaseSubscription, priceString } = useSubscription();
+
+  const isLimitError = (error: any) =>
+    error?.response?.status === 403 &&
+    String(error?.response?.data?.detail || '').toLowerCase().includes('limit');
+
+  const showPaywall = () => {
+    setLoading(false);
+    Alert.alert(
+      "You've used all your free scans 🎉",
+      `You're clearly serious about knowing what's in your food. Unlock unlimited scans for ${priceString || '£1.99/month'}.`,
+      [
+        {
+          text: `Unlock Unlimited — ${priceString || '£1.99/mo'}`,
+          onPress: async () => {
+            try {
+              await purchaseSubscription();
+              try {
+                await axios.post(`${BACKEND_URL}/api/subscription/upgrade`, {}, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+              } catch (e) {
+                console.warn('Backend upgrade call failed:', e);
+              }
+            } catch (e: any) {
+              const msg = String(e?.message || '');
+              if (!msg.toLowerCase().includes('cancel')) {
+                console.warn('Paywall purchase error:', e);
+              }
+            }
+          },
+        },
+        { text: 'Maybe later', style: 'cancel', onPress: () => router.back() },
+      ]
+    );
+  };
   const router = useRouter();
 
   useEffect(() => {
@@ -119,7 +156,12 @@ export default function Scan() {
 
     } catch (error: any) {
       console.error('Scan error:', error.response?.data);
-      
+
+      if (isLimitError(error)) {
+        showPaywall();
+        return;
+      }
+
       // If quick scan returns 404, fall back to full scan
       if (error.response?.status === 404) {
         try {
@@ -137,6 +179,10 @@ export default function Scan() {
           return;
         } catch (fallbackError: any) {
           console.error('Fallback scan also failed:', fallbackError.response?.data);
+          if (isLimitError(fallbackError)) {
+            showPaywall();
+            return;
+          }
           const fallbackDetail = fallbackError.response?.data?.detail;
           const fallbackMessage = typeof fallbackDetail === 'object'
             ? `${fallbackDetail.message}${fallbackDetail.suggestion ? '\n\n' + fallbackDetail.suggestion : ''}`
@@ -216,6 +262,11 @@ export default function Scan() {
       setShowManualInput(false);
       setLoading(false);
     } catch (error: any) {
+      if (isLimitError(error)) {
+        setShowManualInput(false);
+        showPaywall();
+        return;
+      }
       const detail = error.response?.data?.detail;
       const errorMessage = typeof detail === 'object'
         ? `${detail.message}${detail.suggestion ? '\n\n' + detail.suggestion : ''}`

@@ -52,11 +52,11 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - Google Ads tracking
 - Python 3.13 Railway deploy fixes
 - **Feb 2026**: Fixed 0% UPF scoring bug (products with 0% UPF were getting score 5 instead of 7+)
+- **Jun 2026**: Scan-limit paywall fix (Build 50). iOS Build 50 submitted to App Store Connect via EAS Submit. Android Build 50 AAB delivered to user for Play Console upload.
 
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)
-- P1: Custom domain migration (youarewhatyoueat.store DNS propagation)
-- P1: Google Play Store app outdated (user needs to upload AAB build 47)
+- P1: Google Play Store: user needs to upload AAB Build 50
 - P2: Stripe webhook configuration pending
 
 ## Upcoming Tasks
