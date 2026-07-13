@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YAWYE — Founder Dashboard</title>
+  <meta name="robots" content="noindex, nofollow">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { ink:'#0A0A0A', surface:'#171717', brand:'#4CAF50', warn:'#FF3B30', muted:'#A3A3A3' },
+      fontFamily: { heading:['Outfit','sans-serif'], body:['Manrope','sans-serif'] }
+    }}}
+  </script>
+  <style>body{background:#0A0A0A;font-family:'Manrope',sans-serif}</style>
+</head>
+<body class="text-white antialiased">
+  <div id="gate" class="min-h-screen flex items-center justify-center px-4">
+    <div class="bg-surface border border-white/10 rounded-3xl p-8 w-full max-w-sm">
+      <h1 class="font-heading font-black text-2xl">Founder Dashboard</h1>
+      <p class="text-muted text-sm mt-2">Private — enter your admin password.</p>
+      <input id="pw" type="password" placeholder="Password" data-testid="dashboard-password-input"
+        class="w-full mt-6 bg-black border border-white/20 rounded-xl px-4 py-3 text-white outline-none focus:border-brand">
+      <button onclick="unlock()" data-testid="dashboard-unlock-btn"
+        class="w-full mt-4 bg-brand text-black font-bold rounded-xl px-4 py-3 hover:opacity-90">Unlock</button>
+      <p id="gate-err" class="text-warn text-sm mt-3 hidden" data-testid="dashboard-error-msg">Wrong password.</p>
+    </div>
+  </div>
+
+  <div id="dash" class="hidden max-w-7xl mx-auto px-4 md:px-8 py-10">
+    <div class="flex items-center justify-between flex-wrap gap-4">
+      <h1 class="font-heading font-black text-3xl">YAWYE <span class="text-brand">Dashboard</span></h1>
+      <div class="flex items-center gap-3">
+        <select id="days" onchange="loadAll()" class="bg-surface border border-white/20 rounded-xl px-3 py-2 text-sm" data-testid="dashboard-days-select">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+        <button onclick="logout()" class="text-muted text-sm hover:text-white" data-testid="dashboard-logout-btn">Lock</button>
+      </div>
+    </div>
+
+    <div id="cards" class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8" data-testid="dashboard-stat-cards"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div class="bg-surface border border-white/10 rounded-3xl p-6">
+        <h2 class="font-heading font-bold text-lg">Conversion Funnel <span class="text-muted text-sm" id="funnel-label"></span></h2>
+        <div id="funnel" class="mt-4 flex flex-col gap-3" data-testid="dashboard-funnel"></div>
+      </div>
+      <div class="bg-surface border border-white/10 rounded-3xl p-6">
+        <h2 class="font-heading font-bold text-lg">Scan Distribution (all users)</h2>
+        <div id="dist" class="mt-4 flex flex-col gap-3" data-testid="dashboard-distribution"></div>
+        <h2 class="font-heading font-bold text-lg mt-6">Countries</h2>
+        <div id="countries" class="mt-3 flex flex-wrap gap-2 text-sm" data-testid="dashboard-countries"></div>
+      </div>
+    </div>
+
+    <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
+      <h2 class="font-heading font-bold text-lg">Recent Signups <span class="text-muted text-sm" id="cohort-label"></span></h2>
+      <div class="overflow-x-auto mt-4">
+        <table class="w-full text-sm" data-testid="dashboard-users-table">
+          <thead><tr class="text-muted text-left border-b border-white/10">
+            <th class="py-2 pr-4">Joined</th><th class="py-2 pr-4">Email</th><th class="py-2 pr-4">Name</th>
+            <th class="py-2 pr-4">Scans</th><th class="py-2 pr-4">Push</th><th class="py-2 pr-4">Country</th><th class="py-2">Recent scans</th>
+          </tr></thead>
+          <tbody id="users"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="text-muted text-xs mt-8">Live data from production. Revenue estimate = premium users × £1.99/mo. Store-level download counts live in App Store Connect / Play Console.</p>
+  </div>
+
+<script>
+const API = 'https://web-production-66c05.up.railway.app';
+let KEY = sessionStorage.getItem('yawye_admin_key') || '';
+
+async function api(path){
+  const r = await fetch(`${API}${path}${path.includes('?')?'&':'?'}key=${encodeURIComponent(KEY)}`);
+  if (r.status === 403) throw new Error('forbidden');
+  return r.json();
+}
+
+async function unlock(){
+  KEY = document.getElementById('pw').value.trim();
+  try {
+    await api('/api/admin/user_stats');
+    sessionStorage.setItem('yawye_admin_key', KEY);
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('dash').classList.remove('hidden');
+    loadAll();
+  } catch(e) {
+    document.getElementById('gate-err').classList.remove('hidden');
+  }
+}
+function logout(){ sessionStorage.removeItem('yawye_admin_key'); location.reload(); }
+
+function card(label, value, accent){
+  return `<div class="bg-surface border border-white/10 rounded-2xl p-4">
+    <div class="text-muted text-xs uppercase tracking-wider">${label}</div>
+    <div class="font-heading font-black text-3xl mt-1 ${accent||''}">${value}</div></div>`;
+}
+function bar(label, n, total, color){
+  const pct = total ? Math.round(n/total*100) : 0;
+  return `<div><div class="flex justify-between text-sm"><span>${label}</span><span class="text-muted">${n} (${pct}%)</span></div>
+    <div class="bg-black rounded-full h-2 mt-1"><div class="h-2 rounded-full ${color}" style="width:${Math.max(pct,2)}%"></div></div></div>`;
+}
+
+async function loadAll(){
+  const days = document.getElementById('days').value;
+  const [funnel, diag] = await Promise.all([
+    api(`/api/admin/funnel_stats?days=${days}`),
+    api(`/api/admin/cohort_diagnostics?days=${days}`),
+  ]);
+  const all = funnel.all_time;
+  const cohort = funnel[`last_${days}_days_cohort`];
+  const revenue = (all.premium * 1.99).toFixed(0);
+
+  document.getElementById('cards').innerHTML =
+    card('Total users', all.registered) +
+    card('Premium', all.premium, 'text-brand') +
+    card('Est. revenue/mo', '£'+revenue, 'text-brand') +
+    card(`Signups (${days}d)`, cohort.registered) +
+    card(`Premium conv (${days}d)`, cohort.premium_conversion_pct+'%');
+
+  document.getElementById('funnel-label').textContent = `— last ${days} days`;
+  document.getElementById('funnel').innerHTML =
+    bar('Registered', cohort.registered, cohort.registered, 'bg-white/60') +
+    bar('Scanned ≥1 product', cohort.activated_1plus_scans, cohort.registered, 'bg-brand') +
+    bar('Hit 5-scan paywall', cohort.hit_5_scan_paywall, cohort.registered, 'bg-yellow-500') +
+    bar('Premium', cohort.premium, cohort.registered, 'bg-brand');
+
+  const dist = funnel.scan_distribution;
+  const dtot = Object.values(dist).reduce((a,b)=>a+b,0);
+  document.getElementById('dist').innerHTML =
+    bar('0 scans', dist['0_scans'], dtot, 'bg-warn') +
+    bar('1–2 scans', dist['1_2_scans'], dtot, 'bg-yellow-500') +
+    bar('3–4 scans', dist['3_4_scans'], dtot, 'bg-yellow-300') +
+    bar('5–9 scans', dist['5_9_scans'], dtot, 'bg-brand') +
+    bar('10+ scans', dist['10_plus_scans'], dtot, 'bg-brand');
+
+  document.getElementById('countries').innerHTML = (funnel.by_country||[]).map(c =>
+    `<span class="bg-black border border-white/15 rounded-full px-3 py-1">${c.country}: ${c.users}${c.premium?` (⭐${c.premium})`:''}</span>`).join('');
+
+  document.getElementById('cohort-label').textContent = `— ${diag.cohort_users.length} in last ${days} days`;
+  document.getElementById('users').innerHTML = diag.cohort_users.map(u => {
+    const recent = (u.scan_records||[]).slice(0,3).map(r =>
+      `<span class="${r.analysis_error||r.score==null?'text-warn':''}">${(r.product||r.barcode||'').toString().slice(0,20)} <b>${r.score??'ERR'}</b></span>`).join(' · ');
+    return `<tr class="border-b border-white/5">
+      <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(5,16).replace('T',' ')}</td>
+      <td class="py-2 pr-4">${u.email||''}</td>
+      <td class="py-2 pr-4 text-muted">${u.name||''}</td>
+      <td class="py-2 pr-4 font-bold ${u.total_scans===0?'text-warn':u.total_scans>=5?'text-brand':''}">${u.total_scans}</td>
+      <td class="py-2 pr-4">${u.has_push_token?'✅':'—'}</td>
+      <td class="py-2 pr-4 text-muted">${u.country||'?'}</td>
+      <td class="py-2 text-muted">${recent||'<span class="text-warn">never scanned</span>'}</td></tr>`;
+  }).join('');
+}
+
+document.getElementById('pw').addEventListener('keydown', e => { if(e.key==='Enter') unlock(); });
+if (KEY) unlock();
+</script>
+</body>
+</html>
