@@ -1162,12 +1162,21 @@ async def admin_send_notification(request: Request, key: str = ""):
     body = await request.json()
     title = body.get("title", "You Are What You Eat")
     message = body.get("message", "Time to scan!")
-    
-    # Collect all push tokens
+    max_scans = body.get("max_scans")
+    dry_run = body.get("dry_run", False)
+
+    query = {"push_token": {"$exists": True, "$ne": ""}}
+    if max_scans is not None:
+        query["$or"] = [{"total_scans": {"$lte": int(max_scans)}}, {"total_scans": {"$exists": False}}]
+
     tokens = []
-    async for u in users_collection.find({"push_token": {"$exists": True, "$ne": ""}}, {"push_token": 1, "email": 1}):
+    async for u in users_collection.find(query, {"push_token": 1, "email": 1}):
         tokens.append({"token": u["push_token"], "email": u.get("email", "?")})
-    
+
+    if dry_run:
+        valid = [t for t in tokens if t["token"].startswith("ExponentPushToken[") or t["token"].startswith("ExpoPushToken[")]
+        return {"dry_run": True, "eligible": len(valid), "emails": [t["email"] for t in valid]}
+
     if not tokens:
         return {"status": "no_tokens", "sent": 0, "message": "No users have registered push tokens yet"}
     
