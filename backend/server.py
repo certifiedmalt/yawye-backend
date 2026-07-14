@@ -88,6 +88,7 @@ scans_collection = db["scans"]
 favorites_collection = db["favorites"]
 product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
+push_campaigns_collection = db["push_campaigns"]  # Push notification history
 
 # Security
 import bcrypt as _bcrypt
@@ -1163,11 +1164,16 @@ async def admin_send_notification(request: Request, key: str = ""):
     title = body.get("title", "You Are What You Eat")
     message = body.get("message", "Time to scan!")
     max_scans = body.get("max_scans")
+    tier = body.get("tier")
     dry_run = body.get("dry_run", False)
 
     query = {"push_token": {"$exists": True, "$ne": ""}}
     if max_scans is not None:
         query["$or"] = [{"total_scans": {"$lte": int(max_scans)}}, {"total_scans": {"$exists": False}}]
+    if tier == "premium":
+        query["subscription_tier"] = "premium"
+    elif tier == "free":
+        query["subscription_tier"] = {"$ne": "premium"}
 
     tokens = []
     async for u in users_collection.find(query, {"push_token": 1, "email": 1}):
@@ -1213,7 +1219,74 @@ async def admin_send_notification(request: Request, key: str = ""):
             errors.append(str(e))
     
     logger.info(f"Push notification sent: {sent} recipients, {len(errors)} errors")
+    await push_campaigns_collection.insert_one({
+        "title": title,
+        "message": message,
+        "audience": {"max_scans": max_scans, "tier": tier},
+        "sent": sent,
+        "errors": len(errors),
+        "sent_at": datetime.utcnow(),
+    })
     return {"status": "ok", "sent": sent, "total_tokens": len(tokens), "errors": errors}
+
+
+@app.get("/api/admin/push_campaigns")
+async def admin_push_campaigns(key: str = "", limit: int = 30):
+    """Push notification campaign history"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    campaigns = []
+    async for c in push_campaigns_collection.find({}, {"_id": 0}).sort("sent_at", -1).limit(limit):
+        if isinstance(c.get("sent_at"), datetime):
+            c["sent_at"] = c["sent_at"].isoformat()
+        campaigns.append(c)
+    return {"campaigns": campaigns}
+
+
+@app.get("/api/admin/failed_scans")
+async def admin_failed_scans(key: str = "", days: int = 7):
+    """Recent scans that failed lookup or got no AI score"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    email_by_id = {}
+    async for u in users_collection.find({}, {"email": 1}):
+        email_by_id[str(u["_id"])] = u.get("email")
+
+    lookup_failures = []
+    async for f in scan_analytics_collection.find(
+        {"timestamp": {"$gte": cutoff}, "success": False}, {"_id": 0}
+    ).sort("timestamp", -1).limit(50):
+        lookup_failures.append({
+            "barcode": f.get("barcode"),
+            "email": email_by_id.get(str(f.get("user_id"))) or f.get("user_id"),
+            "reason": f.get("error") or f.get("reason") or "product not found",
+            "at": f["timestamp"].isoformat() if isinstance(f.get("timestamp"), datetime) else f.get("timestamp"),
+        })
+
+    score_failures = []
+    async for s in scans_collection.find(
+        {"scanned_at": {"$gte": cutoff}, "$or": [
+            {"analysis.analysis_error": True},
+            {"analysis.overall_score": None},
+            {"analysis": None},
+        ]}
+    ).sort("scanned_at", -1).limit(50):
+        pd = s.get("product_data") or {}
+        score_failures.append({
+            "barcode": s.get("barcode"),
+            "product": pd.get("product_name") or s.get("product_name"),
+            "email": email_by_id.get(str(s.get("user_id"))),
+            "at": s["scanned_at"].isoformat() if isinstance(s.get("scanned_at"), datetime) else s.get("scanned_at"),
+        })
+
+    total_attempts = await scan_analytics_collection.count_documents({"timestamp": {"$gte": cutoff}})
+    return {
+        "total_attempts": total_attempts,
+        "lookup_failures": lookup_failures,
+        "score_failures": score_failures,
+    }
 
 
 DAY2_NUDGE_TITLE = "Your cupboard is hiding something 👀"

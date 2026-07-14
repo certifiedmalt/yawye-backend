@@ -82,6 +82,59 @@
       </div>
     </div>
 
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div class="bg-surface border border-white/10 rounded-3xl p-6">
+        <h2 class="font-heading font-bold text-lg">📣 Push Centre</h2>
+        <input id="push-title" placeholder="Title (e.g. Bet your cupboard is hiding something 👀)" maxlength="60" data-testid="push-title-input"
+          class="w-full mt-4 bg-black border border-white/20 rounded-xl px-4 py-3 text-white outline-none focus:border-brand text-sm">
+        <textarea id="push-msg" placeholder="Message body…" maxlength="150" rows="3" data-testid="push-message-input"
+          class="w-full mt-3 bg-black border border-white/20 rounded-xl px-4 py-3 text-white outline-none focus:border-brand text-sm"></textarea>
+        <div class="flex items-center gap-3 mt-3 flex-wrap">
+          <select id="push-audience" onchange="pushPreviewed=false;renderPushBtns()" data-testid="push-audience-select"
+            class="bg-black border border-white/20 rounded-xl px-3 py-2 text-sm">
+            <option value="all">All users (with push enabled)</option>
+            <option value="scans0">0 scans — never scanned</option>
+            <option value="scans4">≤4 scans — stuck users</option>
+            <option value="free">Free users only</option>
+            <option value="premium">Premium only</option>
+          </select>
+          <button onclick="pushPreview()" data-testid="push-preview-btn"
+            class="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-sm hover:bg-white/20">Preview reach</button>
+          <button id="push-send-btn" onclick="pushSend()" disabled data-testid="push-send-btn"
+            class="bg-brand text-black font-bold rounded-xl px-4 py-2 text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90">Send</button>
+        </div>
+        <div id="push-preview" class="mt-3 text-sm text-muted" data-testid="push-preview-result"></div>
+        <h3 class="font-heading font-bold text-sm mt-6 text-muted uppercase tracking-wider">Campaign history</h3>
+        <div id="push-history" class="mt-2 flex flex-col gap-2 text-sm max-h-64 overflow-y-auto" data-testid="push-history"></div>
+      </div>
+
+      <div class="bg-surface border border-white/10 rounded-3xl p-6">
+        <h2 class="font-heading font-bold text-lg">🧰 User Admin</h2>
+        <div class="flex gap-2 mt-4">
+          <input id="ua-q" placeholder="Search by email or name…" data-testid="user-admin-search-input"
+            class="flex-1 bg-black border border-white/20 rounded-xl px-4 py-3 text-white outline-none focus:border-brand text-sm">
+          <button onclick="uaSearch()" data-testid="user-admin-search-btn"
+            class="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-sm hover:bg-white/20">Search</button>
+        </div>
+        <div id="ua-results" class="mt-4 flex flex-col gap-3" data-testid="user-admin-results"></div>
+        <div id="ua-msg" class="mt-3 text-sm text-brand"></div>
+      </div>
+    </div>
+
+    <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
+      <h2 class="font-heading font-bold text-lg">⚠️ Failed Scans <span class="text-muted text-sm" id="failed-label"></span></h2>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+        <div>
+          <h3 class="text-muted text-xs uppercase tracking-wider">Barcode lookups that failed</h3>
+          <div id="failed-lookups" class="mt-2 flex flex-col gap-1 text-sm max-h-64 overflow-y-auto" data-testid="failed-lookups"></div>
+        </div>
+        <div>
+          <h3 class="text-muted text-xs uppercase tracking-wider">Scans with no AI score</h3>
+          <div id="failed-scores" class="mt-2 flex flex-col gap-1 text-sm max-h-64 overflow-y-auto" data-testid="failed-scores"></div>
+        </div>
+      </div>
+    </div>
+
     <p class="text-muted text-xs mt-8">Live data from production. Revenue estimate = premium users × £1.99/mo. Store-level download counts live in App Store Connect / Play Console.</p>
   </div>
 
@@ -92,6 +145,12 @@ let KEY = sessionStorage.getItem('yawye_admin_key') || '';
 async function api(path){
   const r = await fetch(`${API}${path}${path.includes('?')?'&':'?'}key=${encodeURIComponent(KEY)}`);
   if (r.status === 403) throw new Error('forbidden');
+  return r.json();
+}
+async function apiPost(path, body){
+  const r = await fetch(`${API}${path}?key=${encodeURIComponent(KEY)}`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})
+  });
   return r.json();
 }
 
@@ -180,10 +239,133 @@ async function loadAll(){
       <td class="py-2 pr-4 text-muted">${u.country||'?'}</td>
       <td class="py-2 text-muted">${recent||'<span class="text-warn">never scanned</span>'}</td></tr>`;
   }).join('');
+
+  loadPushHistory();
+  loadFailedScans();
 }
 
 document.getElementById('pw').addEventListener('keydown', e => { if(e.key==='Enter') unlock(); });
 if (KEY) unlock();
+
+// ---------- Push Centre ----------
+let pushPreviewed = false;
+function pushAudienceBody(){
+  const a = document.getElementById('push-audience').value;
+  if (a === 'scans0') return {max_scans: 0};
+  if (a === 'scans4') return {max_scans: 4};
+  if (a === 'free') return {tier: 'free'};
+  if (a === 'premium') return {tier: 'premium'};
+  return {};
+}
+function renderPushBtns(){
+  document.getElementById('push-send-btn').disabled = !pushPreviewed;
+  if(!pushPreviewed) document.getElementById('push-preview').innerHTML = '';
+}
+async function pushPreview(){
+  const el = document.getElementById('push-preview');
+  el.innerHTML = 'Checking reach…';
+  const res = await apiPost('/api/admin/send-notification', {...pushAudienceBody(), dry_run: true});
+  const emails = (res.emails||[]).join(', ');
+  el.innerHTML = `<span class="text-white font-bold">${res.eligible}</span> user(s) will receive this.` +
+    (emails ? `<div class="text-xs mt-1 text-muted">${emails}</div>` : '');
+  pushPreviewed = res.eligible > 0;
+  document.getElementById('push-send-btn').disabled = !pushPreviewed;
+}
+async function pushSend(){
+  const title = document.getElementById('push-title').value.trim();
+  const message = document.getElementById('push-msg').value.trim();
+  if (!title || !message) { alert('Add a title and message first.'); return; }
+  if (!confirm(`Send this push now?\n\n${title}\n${message}`)) return;
+  document.getElementById('push-send-btn').disabled = true;
+  const res = await apiPost('/api/admin/send-notification', {...pushAudienceBody(), title, message});
+  document.getElementById('push-preview').innerHTML =
+    `<span class="text-brand font-bold">✅ Sent to ${res.sent} user(s)</span>${res.errors&&res.errors.length?` — ${res.errors.length} errors`:''}`;
+  pushPreviewed = false;
+  document.getElementById('push-title').value = '';
+  document.getElementById('push-msg').value = '';
+  loadPushHistory();
+}
+async function loadPushHistory(){
+  const res = await api('/api/admin/push_campaigns');
+  document.getElementById('push-history').innerHTML = (res.campaigns||[]).map(c => {
+    const aud = c.audience?.tier ? c.audience.tier : (c.audience?.max_scans!=null ? `≤${c.audience.max_scans} scans` : 'all');
+    return `<div class="bg-black border border-white/10 rounded-xl px-3 py-2">
+      <div class="flex justify-between gap-2"><span class="font-bold">${c.title}</span>
+      <span class="text-muted whitespace-nowrap">${(c.sent_at||'').slice(0,16).replace('T',' ')}</span></div>
+      <div class="text-muted text-xs mt-0.5">${c.message}</div>
+      <div class="text-xs mt-1"><span class="text-brand">${c.sent} sent</span> · audience: ${aud}</div></div>`;
+  }).join('') || '<span class="text-muted">No campaigns yet.</span>';
+}
+
+// ---------- User Admin ----------
+async function uaSearch(){
+  const q = document.getElementById('ua-q').value.trim();
+  if (!q) return;
+  const el = document.getElementById('ua-results');
+  el.innerHTML = '<span class="text-muted text-sm">Searching…</span>';
+  const res = await api(`/api/admin/search_users?q=${encodeURIComponent(q)}`);
+  el.innerHTML = (res.users||[]).slice(0,8).map(u => {
+    const em = u.email || '';
+    const prem = u.subscription_tier === 'premium';
+    return `<div class="bg-black border border-white/10 rounded-xl p-3" data-testid="user-admin-card">
+      <div class="flex justify-between flex-wrap gap-1">
+        <span class="font-bold ${prem?'text-brand':''}">${em}</span>
+        <span class="text-muted text-xs">${u.name||''} · ${u.total_scans??0} scans · ${prem?'⭐ premium':'free'}</span>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-2 text-xs">
+        <button onclick="uaSetTier('${em}','${prem?'free':'premium'}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">${prem?'Revoke premium':'Grant premium'}</button>
+        <button onclick="uaResetPw('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">Reset password</button>
+        <button onclick="uaFixScans('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">Fix scan count</button>
+        <button onclick="uaViewScans('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">View scans</button>
+      </div>
+      <div id="ua-scans-${em.replace(/[^a-z0-9]/gi,'_')}" class="text-xs text-muted mt-2"></div>
+    </div>`;
+  }).join('') || '<span class="text-muted text-sm">No users found.</span>';
+}
+function uaNote(t){ const m = document.getElementById('ua-msg'); m.textContent = t; setTimeout(()=>m.textContent='',5000); }
+async function uaSetTier(email, tier){
+  if (!confirm(`Set ${email} to ${tier}?`)) return;
+  await apiPost(`/api/admin/set_premium?email=${encodeURIComponent(email)}&tier=${tier}`);
+  uaNote(`✅ ${email} → ${tier}`); uaSearch();
+}
+async function uaResetPw(email){
+  const pw = prompt(`New password for ${email}:`);
+  if (!pw) return;
+  const r = await apiPost('/api/admin/reset_password', {email, new_password: pw});
+  uaNote(r.status==='ok' ? `✅ Password reset for ${email}` : `❌ ${r.detail||'failed'}`);
+}
+async function uaFixScans(email){
+  const r = await apiPost(`/api/admin/fix_scan_count?email=${encodeURIComponent(email)}`);
+  uaNote(`✅ ${email}: scans ${r.old_count} → ${r.new_count}`); uaSearch();
+}
+async function uaViewScans(email){
+  const box = document.getElementById(`ua-scans-${email.replace(/[^a-z0-9]/gi,'_')}`);
+  box.innerHTML = 'Loading…';
+  const r = await api(`/api/admin/user_scans?email=${encodeURIComponent(email)}`);
+  box.innerHTML = (r.scans||[]).slice(0,8).map(s => {
+    const pd = s.product_data||{}; const a = s.analysis||{};
+    return `${(s.scanned_at||'').slice(5,10)} — ${(pd.product_name||s.barcode||'').toString().slice(0,30)} <b class="${a.overall_score==null?'text-warn':'text-white'}">${a.overall_score??'ERR'}</b>`;
+  }).join('<br>') || 'No scans.';
+}
+
+// ---------- Failed Scans ----------
+async function loadFailedScans(){
+  const days = document.getElementById('days').value;
+  const r = await api(`/api/admin/failed_scans?days=${days}`);
+  document.getElementById('failed-label').textContent =
+    `— ${r.lookup_failures.length + r.score_failures.length} issues / ${r.total_attempts} attempts (${days}d)`;
+  document.getElementById('failed-lookups').innerHTML = r.lookup_failures.map(f =>
+    `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
+      <span>${f.barcode||'?'} <span class="text-warn">${f.reason||''}</span></span>
+      <span class="text-muted text-xs whitespace-nowrap">${(f.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
+    || '<span class="text-muted">None 🎉</span>';
+  document.getElementById('failed-scores').innerHTML = r.score_failures.map(f =>
+    `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
+      <span>${(f.product||f.barcode||'?').toString().slice(0,28)} <span class="text-muted">${f.email||''}</span></span>
+      <span class="text-muted text-xs whitespace-nowrap">${(f.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
+    || '<span class="text-muted">None 🎉</span>';
+}
+document.getElementById('ua-q').addEventListener('keydown', e => { if(e.key==='Enter') uaSearch(); });
 </script>
 </body>
 </html>
