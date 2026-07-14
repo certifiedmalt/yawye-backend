@@ -53,6 +53,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - Python 3.13 Railway deploy fixes
 - **Feb 2026**: Fixed 0% UPF scoring bug (products with 0% UPF were getting score 5 instead of 7+)
 - **Jun 2026**: Scan-limit paywall fix (Build 50). iOS Build 50 submitted to App Store Connect via EAS Submit. Android Build 50 AAB delivered to user for Play Console upload.
+- **Jun 2026**: Added Premium Subscribers table to founder dashboard (backend user_stats enriched with created_at/country; deployed to Railway + GitHub Pages).
 
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)
