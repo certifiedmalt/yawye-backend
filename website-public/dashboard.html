@@ -57,6 +57,19 @@
     </div>
 
     <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
+      <h2 class="font-heading font-bold text-lg">⭐ Premium Subscribers <span class="text-muted text-sm" id="premium-label"></span></h2>
+      <div class="overflow-x-auto mt-4">
+        <table class="w-full text-sm" data-testid="dashboard-premium-table">
+          <thead><tr class="text-muted text-left border-b border-white/10">
+            <th class="py-2 pr-4">Joined</th><th class="py-2 pr-4">Email</th><th class="py-2 pr-4">Name</th>
+            <th class="py-2 pr-4">Scans</th><th class="py-2">Country</th>
+          </tr></thead>
+          <tbody id="premium-users"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
       <h2 class="font-heading font-bold text-lg">Recent Signups <span class="text-muted text-sm" id="cohort-label"></span></h2>
       <div class="overflow-x-auto mt-4">
         <table class="w-full text-sm" data-testid="dashboard-users-table">
@@ -109,10 +122,21 @@ function bar(label, n, total, color){
 
 async function loadAll(){
   const days = document.getElementById('days').value;
-  const [funnel, diag] = await Promise.all([
+  const [funnel, diag, stats] = await Promise.all([
     api(`/api/admin/funnel_stats?days=${days}`),
     api(`/api/admin/cohort_diagnostics?days=${days}`),
+    api('/api/admin/user_stats'),
   ]);
+
+  const prem = stats.premium_user_details || [];
+  document.getElementById('premium-label').textContent = `— ${prem.length} paying`;
+  document.getElementById('premium-users').innerHTML = prem.map(u => `<tr class="border-b border-white/5">
+      <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(0,10)}</td>
+      <td class="py-2 pr-4 text-brand font-bold">${u.email||''}</td>
+      <td class="py-2 pr-4 text-muted">${u.name||''}</td>
+      <td class="py-2 pr-4">${u.total_scans??0}</td>
+      <td class="py-2 text-muted">${u.country||'?'}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="py-3 text-muted">No premium subscribers yet.</td></tr>';
   const all = funnel.all_time;
   const cohort = funnel[`last_${days}_days_cohort`];
   const revenue = (all.premium * 1.99).toFixed(0);

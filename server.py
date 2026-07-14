@@ -2248,7 +2248,12 @@ async def admin_user_stats(key: str = ""):
     premium_users = await users_collection.count_documents({"subscription_tier": "premium"})
     free_users = total_users - premium_users
     premium_list = []
-    async for u in users_collection.find({"subscription_tier": "premium"}, {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1}):
+    async for u in users_collection.find(
+        {"subscription_tier": "premium"},
+        {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1, "created_at": 1, "country": 1}
+    ).sort("created_at", -1):
+        if isinstance(u.get("created_at"), datetime):
+            u["created_at"] = u["created_at"].isoformat()
         premium_list.append(u)
     return {
         "total_users": total_users,
