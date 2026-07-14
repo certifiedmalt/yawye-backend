@@ -54,6 +54,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - **Feb 2026**: Fixed 0% UPF scoring bug (products with 0% UPF were getting score 5 instead of 7+)
 - **Jun 2026**: Scan-limit paywall fix (Build 50). iOS Build 50 submitted to App Store Connect via EAS Submit. Android Build 50 AAB delivered to user for Play Console upload.
 - **Jun 2026**: Added Premium Subscribers table to founder dashboard (backend user_stats enriched with created_at/country; deployed to Railway + GitHub Pages).
+- **Jun 2026**: Push notification targeting added (`max_scans` filter + `dry_run` on /api/admin/send-notification). Sent re-engagement push to 4 zero-scan users with tokens.
 
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)
