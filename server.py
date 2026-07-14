@@ -1769,6 +1769,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                     "source": "cache"
                 })
             logger.info(f"Cache hit (complete) for {barcode}")
+            await log_scan_analytics(barcode, True, "cache", 0)
             return {
                 "status": "complete",
                 "product_name": cached.get("product_name"),
@@ -1832,6 +1833,9 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
         logger.info(f"Quick scan: no DB match for {barcode}, falling back to AI identification")
         product_data = {"product_name": f"Product (barcode {barcode})", "brands": "", "ingredients_text": "", "image_url": ""}
         source = "ai_identification"
+        await log_scan_analytics(barcode, False, "none", 0, "No DB match - AI identification fallback")
+    else:
+        await log_scan_analytics(barcode, True, source, 0)
     
     # Start background AI analysis
     ingredients_text = product_data.get("ingredients_text", "")
