@@ -23,3 +23,6 @@
 - Issuer ID: `15e998af-a427-4258-a434-7ed291c56f1b`
 - API Key: `QS39X6QRC7`
 - ASC App ID: `6760589990`
+
+## SendGrid
+- Recovery code (saved from user, NOT the API key): `AVGSMJV8E1L2EWE2R1KUA6NW`
