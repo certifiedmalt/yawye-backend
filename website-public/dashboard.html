@@ -317,6 +317,7 @@ async function uaSearch(){
         <button onclick="uaResetPw('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">Reset password</button>
         <button onclick="uaFixScans('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">Fix scan count</button>
         <button onclick="uaViewScans('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">View scans</button>
+        <button onclick="uaDelete('${em}')" data-testid="user-admin-delete-btn" class="bg-warn/20 border border-warn/40 text-warn rounded-lg px-3 py-1.5 hover:bg-warn/40">Delete</button>
       </div>
       <div id="ua-scans-${em.replace(/[^a-z0-9]/gi,'_')}" class="text-xs text-muted mt-2"></div>
     </div>`;
@@ -337,6 +338,11 @@ async function uaResetPw(email){
 async function uaFixScans(email){
   const r = await apiPost(`/api/admin/fix_scan_count?email=${encodeURIComponent(email)}`);
   uaNote(`✅ ${email}: scans ${r.old_count} → ${r.new_count}`); uaSearch();
+}
+async function uaDelete(email){
+  if (!confirm(`⚠️ PERMANENTLY delete ${email} and all their data?\nThis cannot be undone.`)) return;
+  const r = await apiPost(`/api/admin/delete_user?email=${encodeURIComponent(email)}`);
+  uaNote(r.status==='deleted' ? `🗑️ Deleted ${email}` : `❌ ${r.detail||'failed'}`); uaSearch();
 }
 async function uaViewScans(email){
   const box = document.getElementById(`ua-scans-${email.replace(/[^a-z0-9]/gi,'_')}`);

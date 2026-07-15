@@ -2510,6 +2510,22 @@ async def admin_set_premium(key: str = "", email: str = "", tier: str = "premium
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"Set {email} to {tier}"}
 
+@app.post("/api/admin/delete_user")
+async def admin_delete_user(key: str = "", email: str = ""):
+    """Delete a user and all their data (scans, favorites)"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    user = await users_collection.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    uid = str(user["_id"])
+    scans_deleted = (await scans_collection.delete_many({"user_id": uid})).deleted_count
+    await favorites_collection.delete_many({"user_id": uid})
+    await users_collection.delete_one({"_id": user["_id"]})
+    logger.info(f"Admin deleted user {email} ({scans_deleted} scans)")
+    return {"status": "deleted", "email": email, "scans_deleted": scans_deleted}
+
+
 @app.post("/api/admin/fix_scan_count")
 async def admin_fix_scan_count(key: str = "", email: str = ""):
     """Fix inflated scan count by setting it to actual unique scan records"""
