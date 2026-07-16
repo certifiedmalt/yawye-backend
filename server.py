@@ -1442,6 +1442,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         is_error_result = (
             cached_analysis.get("analysis_error") or
             cached_analysis.get("processing_category", "").lower() == "unknown" or
+            "unknown" in (cached.get("product_name") or "").lower() or
             (cached_analysis.get("overall_score") in [0, 5] and cached_analysis.get("upf_score") in ["0%", "Unknown", None])
         )
         if not is_error_result:
@@ -1770,6 +1771,11 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     """
     barcode = scan_req.barcode.strip()
     logger.info(f"Quick scan request for barcode: {barcode}")
+
+    clean_barcode = barcode.replace(" ", "")
+    if not clean_barcode.isdigit() or not (6 <= len(clean_barcode) <= 14):
+        await log_scan_analytics(barcode[:60], False, "invalid", 0, "Not a product barcode (QR code or invalid format)")
+        raise HTTPException(status_code=400, detail="That doesn't look like a product barcode. If you scanned a QR code, look for the striped barcode with numbers underneath instead.")
     
     # Check subscription limits
     subscription_tier = current_user.get("subscription_tier", "free")
@@ -1785,6 +1791,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
         is_error_result = (
             cached_analysis.get("analysis_error") or
             cached_analysis.get("processing_category", "").lower() == "unknown" or
+            "unknown" in (cached.get("product_name") or "").lower() or
             (cached_analysis.get("overall_score") in [0, 5] and cached_analysis.get("upf_score") in ["0%", "Unknown", None])
         )
         if is_error_result:
@@ -1936,7 +1943,8 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 # No database had this product — ask AI to identify it from the barcode
                 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
                 ai_result = await identify_product_by_barcode(client, barcode)
-                if ai_result:
+                identified_name = (ai_result or {}).get("identified_product", "") or ""
+                if ai_result and identified_name and "unknown" not in identified_name.lower():
                     # AI identified the product — update the product info
                     identified_name = ai_result.pop("identified_product", product_name)
                     identified_brand = ai_result.pop("identified_brand", "")
