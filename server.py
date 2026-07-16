@@ -90,6 +90,7 @@ product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 push_campaigns_collection = db["push_campaigns"]  # Push notification history
 link_clicks_collection = db["link_clicks"]  # Influencer tracked link clicks
+pending_premium_collection = db["pending_premium"]  # Emails auto-granted premium on signup
 
 # Security
 import bcrypt as _bcrypt
@@ -986,15 +987,23 @@ async def register(user: UserRegister, request: Request):
     
     # Create user
     hashed_password = get_password_hash(user.password)
+    pending = await pending_premium_collection.find_one({"email": user.email.lower().strip()})
+    tier = "premium" if pending else "free"
     user_doc = {
         "email": user.email,
         "name": user.name,
         "password": hashed_password,
-        "subscription_tier": "free",
+        "subscription_tier": tier,
         "total_scans": 0,
         "created_at": datetime.utcnow()
     }
     result = await users_collection.insert_one(user_doc)
+    if pending:
+        await pending_premium_collection.update_one(
+            {"email": user.email.lower().strip()},
+            {"$set": {"claimed_at": datetime.utcnow()}}
+        )
+        logger.info(f"Pending premium auto-granted to {user.email}")
     asyncio.create_task(capture_user_country(result.inserted_id, _client_ip(request)))
     
     # Create token
@@ -1006,7 +1015,7 @@ async def register(user: UserRegister, request: Request):
             "id": str(result.inserted_id),
             "email": user.email,
             "name": user.name,
-            "subscription_tier": "free"
+            "subscription_tier": tier
         }
     }
 
@@ -2589,6 +2598,26 @@ async def admin_search_users(key: str = "", q: str = ""):
     async for u in users_collection.find(query, {"_id": 0, "password_hash": 0}):
         results.append(u)
     return {"users": results, "count": len(results)}
+
+
+@app.post("/api/admin/grant_pending_premium")
+async def admin_grant_pending_premium(key: str = "", email: str = "", note: str = ""):
+    """Grant premium to an email — applies now if the user exists, or automatically on signup"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    email = email.lower().strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="valid email required")
+    user = await users_collection.find_one({"email": email})
+    if user:
+        await users_collection.update_one({"email": email}, {"$set": {"subscription_tier": "premium"}})
+        return {"status": "granted_now", "email": email}
+    await pending_premium_collection.update_one(
+        {"email": email},
+        {"$set": {"email": email, "note": note, "created_at": datetime.utcnow()}},
+        upsert=True
+    )
+    return {"status": "pending_signup", "email": email, "message": "Premium will activate automatically when they register"}
 
 
 @app.post("/api/admin/set_premium")
