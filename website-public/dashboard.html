@@ -135,6 +135,20 @@
       </div>
     </div>
 
+    <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
+      <h2 class="font-heading font-bold text-lg">🔗 Tracked Links <span class="text-muted text-sm">— youarewhatyoueat.store/go/&lt;code&gt;</span></h2>
+      <div class="overflow-x-auto mt-4">
+        <table class="w-full text-sm" data-testid="dashboard-links-table">
+          <thead><tr class="text-muted text-left border-b border-white/10">
+            <th class="py-2 pr-4">Code</th><th class="py-2 pr-4">Clicks</th><th class="py-2 pr-4">iOS</th>
+            <th class="py-2 pr-4">Android</th><th class="py-2 pr-4">Countries</th><th class="py-2">Last click</th>
+          </tr></thead>
+          <tbody id="link-stats"></tbody>
+        </table>
+      </div>
+      <p class="text-muted text-xs mt-3">Share youarewhatyoueat.store/go/anycode — clicks are tracked automatically, no setup needed per code.</p>
+    </div>
+
     <p class="text-muted text-xs mt-8">Live data from production. Revenue estimate = premium users × £1.99/mo. Store-level download counts live in App Store Connect / Play Console.</p>
   </div>
 
@@ -242,6 +256,19 @@ async function loadAll(){
 
   loadPushHistory();
   loadFailedScans();
+  loadLinkStats();
+}
+
+async function loadLinkStats(){
+  const r = await api('/api/admin/link_stats');
+  document.getElementById('link-stats').innerHTML = (r.links||[]).map(l => `<tr class="border-b border-white/5">
+      <td class="py-2 pr-4 font-bold text-brand">/go/${l.code}</td>
+      <td class="py-2 pr-4 font-bold">${l.clicks}</td>
+      <td class="py-2 pr-4">${l.ios}</td>
+      <td class="py-2 pr-4">${l.android}</td>
+      <td class="py-2 pr-4 text-muted">${(l.countries||[]).join(', ')||'—'}</td>
+      <td class="py-2 text-muted">${(l.last_click||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="py-3 text-muted">No link clicks yet. Share youarewhatyoueat.store/go/yourcode to start tracking.</td></tr>';
 }
 
 document.getElementById('pw').addEventListener('keydown', e => { if(e.key==='Enter') unlock(); });

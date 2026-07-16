@@ -89,6 +89,7 @@ favorites_collection = db["favorites"]
 product_cache_collection = db["product_cache"]  # New: Cache for faster lookups
 scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 push_campaigns_collection = db["push_campaigns"]  # Push notification history
+link_clicks_collection = db["link_clicks"]  # Influencer tracked link clicks
 
 # Security
 import bcrypt as _bcrypt
@@ -1241,6 +1242,51 @@ async def admin_push_campaigns(key: str = "", limit: int = 30):
             c["sent_at"] = c["sent_at"].isoformat()
         campaigns.append(c)
     return {"campaigns": campaigns}
+
+
+@app.post("/api/track/click")
+async def track_link_click(request: Request):
+    """Log an influencer tracked-link click (called from the website /go/ redirect)"""
+    body = await request.json()
+    code = (body.get("code") or "").strip().lower()[:40]
+    if not code:
+        raise HTTPException(status_code=400, detail="code required")
+    ip = _client_ip(request)
+    country = ""
+    if ip and not ip.startswith(("10.", "192.168.", "127.", "172.")):
+        loop = asyncio.get_event_loop()
+        country = await loop.run_in_executor(None, _resolve_country, ip)
+    await link_clicks_collection.insert_one({
+        "code": code,
+        "device": body.get("device", "unknown"),
+        "country": country,
+        "clicked_at": datetime.utcnow(),
+    })
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/link_stats")
+async def admin_link_stats(key: str = ""):
+    """Per-code click stats for influencer tracked links"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    stats = []
+    async for d in link_clicks_collection.aggregate([
+        {"$group": {
+            "_id": "$code", "clicks": {"$sum": 1},
+            "ios": {"$sum": {"$cond": [{"$eq": ["$device", "ios"]}, 1, 0]}},
+            "android": {"$sum": {"$cond": [{"$eq": ["$device", "android"]}, 1, 0]}},
+            "countries": {"$addToSet": "$country"},
+            "last_click": {"$max": "$clicked_at"},
+        }},
+        {"$sort": {"clicks": -1}},
+    ]):
+        stats.append({
+            "code": d["_id"], "clicks": d["clicks"], "ios": d["ios"], "android": d["android"],
+            "countries": sorted(c for c in d["countries"] if c),
+            "last_click": d["last_click"].isoformat() if d.get("last_click") else None,
+        })
+    return {"links": stats}
 
 
 @app.get("/api/admin/failed_scans")

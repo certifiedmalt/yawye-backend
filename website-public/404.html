@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You Are What You Eat</title>
+  <meta name="robots" content="noindex">
+  <style>
+    body{background:#0A0A0A;color:#fff;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center}
+    a{color:#4CAF50}
+    .spinner{width:36px;height:36px;border:4px solid rgba(255,255,255,.15);border-top-color:#4CAF50;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div id="content">
+    <div class="spinner" id="spinner" style="display:none"></div>
+    <h1 id="title">Page not found</h1>
+    <p id="sub"><a href="/">Go to youarewhatyoueat.store</a></p>
+  </div>
+<script>
+(function(){
+  var m = location.pathname.match(/^\/go\/([\w-]+)/i);
+  if (!m) return;
+  var code = m[1].toLowerCase();
+  var ua = navigator.userAgent;
+  var isAndroid = /android/i.test(ua);
+  var isIOS = /iphone|ipad|ipod/i.test(ua);
+  var device = isAndroid ? 'android' : (isIOS ? 'ios' : 'desktop');
+  var dest = isAndroid
+    ? 'https://play.google.com/store/apps/details?id=com.youarewhatyoueat.app&referrer=utm_source%3D' + encodeURIComponent(code)
+    : 'https://apps.apple.com/app/id6760589990?ct=' + encodeURIComponent(code);
+  document.getElementById('spinner').style.display = 'block';
+  document.getElementById('title').textContent = 'Taking you to the app…';
+  document.getElementById('sub').innerHTML = '<a href="' + dest + '">Tap here if nothing happens</a>';
+  try {
+    fetch('https://web-production-66c05.up.railway.app/api/track/click', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code: code, device: device}),
+      keepalive: true
+    }).catch(function(){});
+  } catch(e){}
+  setTimeout(function(){ location.replace(dest); }, 400);
+})();
+</script>
+</body>
+</html>
