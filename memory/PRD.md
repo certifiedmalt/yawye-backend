@@ -57,6 +57,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - **Jun 2026**: Push notification targeting added (`max_scans` filter + `dry_run` on /api/admin/send-notification). Sent re-engagement push to 4 zero-scan users with tokens.
 - **Jun 2026**: Dashboard v2 — Push Centre (compose, audience targeting, reach preview, campaign history via push_campaigns collection), User Admin panel (search, grant/revoke premium, reset password, fix scan count, view scans), Failed Scans monitor (/api/admin/failed_scans). Also fixed /api/scan/quick to log scan_analytics (was never logging).
 - **Jun 2026**: Deleted 20 dev/test accounts (+70 junk scan records) from production. Kept applereview@yawye.app, googlereviewer@yawye.app, test.screenshot@yawye.app. Added /api/admin/delete_user endpoint + Delete button in dashboard User Admin panel.
+- **Jun 2026**: Influencer tracked links: youarewhatyoueat.store/go/<code> (GitHub Pages 404.html redirect trick) → logs click to POST /api/track/click (device, IP country) → redirects to App Store (?ct=code) or Play Store (utm referrer). Dashboard "Tracked Links" panel via /api/admin/link_stats. Verified e2e. Competitive positioning doc saved at /app/memory/COMPETITIVE_POSITIONING.md. Influencer strategy: Austin + SLC first; exclusive DM drafted for @thatcrunchymomkate (/go/kate).
 
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)
