@@ -2074,6 +2074,48 @@ async def scan_status(barcode: str, current_user = Depends(get_current_user)):
     return {"status": "analyzing"}
 
 
+@app.post("/api/scan/identify")
+async def identify_scanned_product(request: Request, current_user = Depends(get_current_user)):
+    """User-assisted identification: user tells us the product name for an unrecognized barcode"""
+    body = await request.json()
+    barcode = (body.get("barcode") or "").strip()
+    product_name = (body.get("product_name") or "").strip()
+    if not barcode or len(product_name) < 3:
+        raise HTTPException(status_code=400, detail="barcode and product_name required")
+    analysis = await analyze_ingredients_with_ai(product_name, "")
+    if not analysis or analysis.get("analysis_error"):
+        raise HTTPException(status_code=500, detail="Could not analyze this product. Please try again.")
+    now = datetime.utcnow()
+    await product_cache_collection.update_one(
+        {"barcode": barcode},
+        {"$set": {
+            "barcode": barcode,
+            "product_name": product_name,
+            "brands": "",
+            "ingredients_text": "",
+            "image_url": "",
+            "analysis": analysis,
+            "cached_at": now,
+            "source": "user_contribution",
+        }},
+        upsert=True
+    )
+    await scans_collection.update_many(
+        {"user_id": str(current_user["_id"]), "barcode": barcode},
+        {"$set": {"product_name": product_name, "analysis": analysis}}
+    )
+    logger.info(f"User contribution: {barcode} identified as '{product_name}' by {current_user.get('email')}")
+    return {
+        "status": "complete",
+        "product_name": product_name,
+        "brands": "",
+        "ingredients_text": "",
+        "image_url": "",
+        "analysis": analysis,
+        "source": "user_contribution",
+    }
+
+
 @app.post("/api/scan/rescan")
 async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """

@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Share,
   Platform,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +22,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Haptics from 'expo-haptics';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { askNotificationsAfterFirstScan } from '../utils/notifications';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://web-production-66c05.up.railway.app';
 
@@ -99,8 +102,17 @@ export default function Result() {
   const [swaps, setSwaps] = useState<any[]>([]);
   const [swapsLoading, setSwapsLoading] = useState(false);
   const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
+  const [identifyName, setIdentifyName] = useState('');
+  const [identifying, setIdentifying] = useState(false);
   const scoreAnim = useRef(new Animated.Value(0)).current;
   const { token } = useAuth();
+
+  useEffect(() => {
+    if (productData?.analysis) {
+      const t = setTimeout(() => askNotificationsAfterFirstScan(token), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [productData?.analysis]);
 
   useEffect(() => {
     if (productData?.analysis) {
@@ -281,6 +293,28 @@ export default function Result() {
   }
 
   const { product_name, brands, image_url, analysis } = productData;
+  const isUnidentified = !!analysis && (product_name || '').toLowerCase().includes('unknown');
+
+  const handleIdentify = async () => {
+    const name = identifyName.trim();
+    if (!name || name.length < 3) return;
+    setIdentifying(true);
+    try {
+      const res = await axios.post(
+        `${BACKEND_URL}/api/scan/identify`,
+        { barcode: params.barcode, product_name: name },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+      );
+      setProductData(res.data);
+      setIdentifyName('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Analysis Failed', e?.response?.data?.detail || 'Could not analyze this product. Please try again.');
+    } finally {
+      setIdentifying(false);
+    }
+  };
+
   const scoreColor = !analysis ? '#4CAF50' :
     analysis.overall_score >= 7
       ? '#00E676'
@@ -332,7 +366,7 @@ export default function Result() {
                     headers: { Authorization: `Bearer ${token}` }
                   });
                   if (res.data?.analysis) {
-                    setAnalysis(res.data.analysis);
+                    setProductData(prev => prev ? { ...prev, analysis: res.data.analysis } : prev);
                   }
                 } catch (e: any) {
                   console.warn('Rescan error:', e);
@@ -408,6 +442,37 @@ export default function Result() {
           )}
           <Text style={styles.recommendation}>{analysis.recommendation}</Text>
         </View>
+
+        {isUnidentified && (
+          <View style={styles.identifyCard} data-testid="identify-product-card">
+            <View style={styles.identifyHeader}>
+              <Ionicons name="help-circle" size={22} color="#FFD54F" />
+              <Text style={styles.identifyTitle}>Help us identify this product</Text>
+            </View>
+            <Text style={styles.identifyHint}>
+              This barcode isn't in any food database yet. Tell us the product name and our AI will analyze it — you'll also unlock it for every future scanner!
+            </Text>
+            <TextInput
+              style={styles.identifyInput}
+              placeholder="e.g. Tesco Chocolate Digestives"
+              placeholderTextColor="#777"
+              value={identifyName}
+              onChangeText={setIdentifyName}
+              editable={!identifying}
+              data-testid="identify-product-input"
+            />
+            <TouchableOpacity
+              style={[styles.identifyButton, (!identifyName.trim() || identifying) && { opacity: 0.5 }]}
+              disabled={!identifyName.trim() || identifying}
+              onPress={handleIdentify}
+              data-testid="identify-product-submit"
+            >
+              {identifying
+                ? <ActivityIndicator color="#000" />
+                : <Text style={styles.identifyButtonText}>Analyze it</Text>}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Shocking Facts - "Did You Know?" Section */}
         {analysis.shocking_facts && analysis.shocking_facts.length > 0 && (
@@ -858,6 +923,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     textAlign: 'center',
+  },
+  identifyCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FFD54F',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  identifyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  identifyTitle: {
+    color: '#FFD54F',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  identifyHint: {
+    color: '#bbb',
+    fontSize: 13,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  identifyInput: {
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 10,
+    color: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    marginBottom: 10,
+  },
+  identifyButton: {
+    backgroundColor: '#FFD54F',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  identifyButtonText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
   processingBadge: {
     backgroundColor: '#2196F3',
@@ -1446,3 +1559,4 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
 });
+

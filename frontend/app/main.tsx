@@ -83,11 +83,10 @@ export default function Main() {
         const alreadyAsked = await AsyncStorage.getItem('notifications_v2_scheduled');
         if (alreadyAsked === 'true') return;
 
-        const { status } = await Notifications.requestPermissionsAsync();
-        if (status !== 'granted') {
-          await AsyncStorage.setItem('notifications_v2_scheduled', 'true');
-          return;
-        }
+        // Permission is now requested after the user's first scan (result screen).
+        // Here we only schedule reminders for users who have ALREADY granted permission.
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') return;
 
         // Create notification channel for Android (required for Android 8+)
         if (Platform.OS === 'android') {
