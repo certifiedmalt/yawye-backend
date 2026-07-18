@@ -807,6 +807,8 @@ NOVA CLASSIFICATION GUIDE (YOU MUST FOLLOW THIS EXACTLY):
 
 CRITICAL: Sugar, salt, butter, flour, olive oil, honey = NOVA 2 (NOT NOVA 4). Only classify as NOVA 4 if the product contains NOVA 4 marker additives listed above.
 
+FRIED SNACKS: chips, crisps, fries and other deep-fried snack products are NEVER "Whole Food" or "Minimally Processed", even with a short ingredient list. Classify them as Processed (NOVA 3) at minimum, score maximum 5, and note acrylamide in harmful_ingredients with severity "moderate".
+
 RULE 1 — ADDED CARCINOGENS = AUTOMATIC 1/10 RED:
 - ANY product containing ANY ADDED carcinogenic ingredient (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
 - This includes: nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
@@ -847,7 +849,7 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
                 {"role": "system", "content": "You are a food science expert. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3,
+            temperature=0.0,
             response_format={"type": "json_object"}
         )
         
@@ -893,6 +895,10 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
                 result["upf_score"] = "unknown"
                 upf_pct = -1
 
+        # Fried snacks (chips/crisps/fries) can have short "clean" ingredient lists but are
+        # never whole/minimally-processed — exclude from clean-list and whole-food boosts
+        fried_snack = any(k in (product_name or "").lower() for k in ["chips", "crisps", "fries", "tortilla"])
+
         # Rule 1: Any ADDED carcinogen = score 1.
         # Process-formed compounds (acrylamide forms in ALL baked/fried starches, incl.
         # home cooking) must never tank the score on their own — they cap at 4 instead.
@@ -906,7 +912,7 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         elif "ultra" in category:
             result["overall_score"] = min(score, 3)
         # Rule 8: Clean short ingredient list (1-3 natural ingredients, no harmful) = minimum 8
-        elif ingredient_count <= 3 and ingredient_count > 0 and not has_industrial_additives and len(harmful) == 0:
+        elif ingredient_count <= 3 and ingredient_count > 0 and not has_industrial_additives and len(harmful) == 0 and not fried_snack:
             result["overall_score"] = max(score, 8)
         # Rule 3: Processed (NOVA 3) = clamp to 3-5 — BUT not if UPF is genuinely 0-10%
         elif "processed" in category and "minimally" not in category and "whole" not in category:
@@ -918,13 +924,17 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         
         # Rule 9: Zero/Low UPF safety net — 0% UPF must score at least 7
         # Fires AFTER all other rules as a final sanity check
-        if upf_pct >= 0 and upf_pct <= 10 and not has_industrial_additives:
+        if upf_pct >= 0 and upf_pct <= 10 and not has_industrial_additives and not fried_snack:
             if not (carcinogens and len(carcinogens) > 0) and "ultra" not in category:
                 result["overall_score"] = max(result["overall_score"], 7)
         
         # Rule 10: Whole Food / Minimally Processed floor = 7
-        if ("whole" in category or "minimally" in category) and not (carcinogens and len(carcinogens) > 0):
+        if ("whole" in category or "minimally" in category) and not (carcinogens and len(carcinogens) > 0) and not fried_snack:
             result["overall_score"] = max(result["overall_score"], 7)
+
+        # Rule 12: Fried snacks always clamp to max 5 regardless of category the AI chose
+        if fried_snack:
+            result["overall_score"] = min(result["overall_score"], 5)
 
         # Rule 11: Acrylamide (process-formed) caution cap — max 4, never score 1 on its own
         if has_acrylamide and not added_carcinogens:
