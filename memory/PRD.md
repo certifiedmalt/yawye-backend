@@ -62,6 +62,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - **Jun 2026**: Build 51 features (code ready, BUILD NOT YET KICKED OFF): teach-the-app identify flow (POST /api/scan/identify + result.tsx card), push permission moved to after first scan (utils/notifications.ts), QR scanner fix, fixed rescan crash bugs (missing Alert import, undefined setAnalysis). Verified identify endpoint in production.
 - **Jun 2026**: Pending premium auto-grant: /api/admin/grant_pending_premium — premium activates on signup. Granted to myfoodspree@gmail.com (first influencer yes: Shweta @myfoodspree, Nashville, link /go/foodspree). CLAIMED — Shweta signed up (first US user), premium active, filming video.
 - **Jun 2026**: Scoring accuracy fixes (live, verified on 10 US products): acrylamide reclassified as process-formed (cap 4, never auto-1); NOVA-3 floor 3; fried-snack guard (chips/crisps/fries max 5, excluded from clean-list/whole-food boosts); temperature 0 for deterministic scores. Tostitos 1→4 consistent; Coke=1, Oats=10 regression passed.
+- **Jun 2026**: Extended process-formed carcinogen guard to full family: furan, HCAs, PAHs/benzo(a)pyrene, 3-MCPD/glycidyl esters, ethyl carbamate (Rule 11 cap 4, whole/minimally-processed exempt). Verified: coffee 7/10, smoked salmon 6/10, cashews 9/10, raspberries 10/10, Tostitos 4/10. Nitrosamines/processed meat still auto-1 (added nitrites).
 
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)
