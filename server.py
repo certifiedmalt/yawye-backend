@@ -912,7 +912,19 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         def _is_process_formed(c):
             return any(pf in str(c).lower() for pf in PROCESS_FORMED)
         added_carcinogens = [c for c in carcinogens if not _is_process_formed(c)]
-        has_acrylamide = len(added_carcinogens) < len(carcinogens) or any(
+        process_formed_entries = [c for c in carcinogens if _is_process_formed(c)]
+        if process_formed_entries:
+            # Relocate: process-formed compounds must not appear in the carcinogen panel
+            result["carcinogens_found"] = added_carcinogens
+            for c in process_formed_entries:
+                harmful.append({
+                    "name": c.get("name") if isinstance(c, dict) else str(c),
+                    "severity": "moderate",
+                    "explanation": (c.get("explanation") if isinstance(c, dict) else None) or
+                        "Forms during normal cooking/industrial heat processing; not an added ingredient.",
+                })
+            result["harmful_ingredients"] = harmful
+        has_acrylamide = len(process_formed_entries) > 0 or any(
             _is_process_formed(h.get("name", "")) for h in harmful
         )
         if added_carcinogens:
@@ -944,6 +956,11 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # Rule 12: Fried snacks always clamp to max 5 regardless of category the AI chose
         if fried_snack:
             result["overall_score"] = min(result["overall_score"], 5)
+
+        # Score 1 is reserved for ADDED carcinogens (Rule 1) — a process-formed compound
+        # alone can never produce a 1
+        if not added_carcinogens and result["overall_score"] < 2:
+            result["overall_score"] = 2
 
         # Rule 11: Process-formed compound caution cap — max 4 for processed products,
         # never score 1 on its own. Whole/minimally-processed items (e.g. plain coffee,
