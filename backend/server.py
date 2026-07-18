@@ -807,9 +807,10 @@ NOVA CLASSIFICATION GUIDE (YOU MUST FOLLOW THIS EXACTLY):
 
 CRITICAL: Sugar, salt, butter, flour, olive oil, honey = NOVA 2 (NOT NOVA 4). Only classify as NOVA 4 if the product contains NOVA 4 marker additives listed above.
 
-RULE 1 — CARCINOGENS = AUTOMATIC 1/10 RED:
-- ANY product containing ANY carcinogen (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
-- This includes: acrylamide, nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
+RULE 1 — ADDED CARCINOGENS = AUTOMATIC 1/10 RED:
+- ANY product containing ANY ADDED carcinogenic ingredient (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
+- This includes: nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
+- EXCEPTION — PROCESS-FORMED COMPOUNDS: acrylamide is NOT an added ingredient. It forms naturally in ALL baked, toasted, roasted or fried starchy foods, including home-cooked bread, toast, roast potatoes and coffee. Do NOT list acrylamide in carcinogens_found. If relevant (e.g. fried snacks), mention it in harmful_ingredients with severity "moderate" instead. Acrylamide alone must NEVER drive a score to 1.
 
 RULE 2 — NOVA 4 (ULTRA-PROCESSED) = MAX 3/10 RED:
 - Any product classified as NOVA 4 / Ultra-Processed = MAX score 3/10.
@@ -892,8 +893,12 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
                 result["upf_score"] = "unknown"
                 upf_pct = -1
 
-        # Rule 1: Any carcinogen = score 1
-        if carcinogens and len(carcinogens) > 0:
+        # Rule 1: Any ADDED carcinogen = score 1.
+        # Process-formed compounds (acrylamide forms in ALL baked/fried starches, incl.
+        # home cooking) must never tank the score on their own — they cap at 4 instead.
+        added_carcinogens = [c for c in carcinogens if "acrylamide" not in str(c).lower()]
+        has_acrylamide = len(added_carcinogens) < len(carcinogens)
+        if added_carcinogens:
             result["overall_score"] = 1
         # Rule 2: Ultra-Processed (NOVA 4) = max 3
         elif "ultra" in category:
@@ -901,13 +906,13 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # Rule 8: Clean short ingredient list (1-3 natural ingredients, no harmful) = minimum 8
         elif ingredient_count <= 3 and ingredient_count > 0 and not has_industrial_additives and len(harmful) == 0:
             result["overall_score"] = max(score, 8)
-        # Rule 3: Processed (NOVA 3) = max 5 — BUT not if UPF is genuinely 0-10%
+        # Rule 3: Processed (NOVA 3) = clamp to 3-5 — BUT not if UPF is genuinely 0-10%
         elif "processed" in category and "minimally" not in category and "whole" not in category:
             if upf_pct >= 0 and upf_pct <= 10:
                 # UPF 0-10% contradicts "Processed" — trust the UPF score, boost it
                 result["overall_score"] = max(score, 7)
             else:
-                result["overall_score"] = min(score, 5)
+                result["overall_score"] = max(min(score, 5), 3)
         
         # Rule 9: Zero/Low UPF safety net — 0% UPF must score at least 7
         # Fires AFTER all other rules as a final sanity check
@@ -918,6 +923,10 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # Rule 10: Whole Food / Minimally Processed floor = 7
         if ("whole" in category or "minimally" in category) and not (carcinogens and len(carcinogens) > 0):
             result["overall_score"] = max(result["overall_score"], 7)
+
+        # Rule 11: Acrylamide (process-formed) caution cap — max 4, never score 1 on its own
+        if has_acrylamide and not added_carcinogens:
+            result["overall_score"] = min(result["overall_score"], 4)
         
         logger.info(f"Scoring enforced: product={product_name}, ai_score={score}, final_score={result['overall_score']}, upf={upf_pct}%, category={category}")
         
