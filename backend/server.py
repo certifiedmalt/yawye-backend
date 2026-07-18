@@ -897,7 +897,9 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # Process-formed compounds (acrylamide forms in ALL baked/fried starches, incl.
         # home cooking) must never tank the score on their own — they cap at 4 instead.
         added_carcinogens = [c for c in carcinogens if "acrylamide" not in str(c).lower()]
-        has_acrylamide = len(added_carcinogens) < len(carcinogens)
+        has_acrylamide = len(added_carcinogens) < len(carcinogens) or any(
+            "acrylamide" in str(h.get("name", "")).lower() for h in harmful
+        )
         if added_carcinogens:
             result["overall_score"] = 1
         # Rule 2: Ultra-Processed (NOVA 4) = max 3
