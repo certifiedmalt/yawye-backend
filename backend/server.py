@@ -812,7 +812,7 @@ FRIED SNACKS: chips, crisps, fries and other deep-fried snack products are NEVER
 RULE 1 — ADDED CARCINOGENS = AUTOMATIC 1/10 RED:
 - ANY product containing ANY ADDED carcinogenic ingredient (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
 - This includes: nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
-- EXCEPTION — PROCESS-FORMED COMPOUNDS: acrylamide is NOT an added ingredient. It forms naturally in ALL baked, toasted, roasted or fried starchy foods, including home-cooked bread, toast, roast potatoes and coffee. Do NOT list acrylamide in carcinogens_found. If relevant (e.g. fried snacks), mention it in harmful_ingredients with severity "moderate" instead. Acrylamide alone must NEVER drive a score to 1.
+- EXCEPTION — PROCESS-FORMED COMPOUNDS: acrylamide, furan, heterocyclic amines (HCAs), PAHs/benzo(a)pyrene from roasting/smoking, 3-MCPD/glycidyl esters from oil refining, and ethyl carbamate from fermentation are NOT added ingredients. They form naturally during normal cooking and processing, including home cooking (toast, roast potatoes, grilled meat, coffee roasting). Do NOT list them in carcinogens_found. If relevant, mention them in harmful_ingredients with severity "moderate" instead. These compounds alone must NEVER drive a score to 1. (Nitrosamines in cured/processed meat DO count — the nitrites are deliberately added.)
 
 RULE 2 — NOVA 4 (ULTRA-PROCESSED) = MAX 3/10 RED:
 - Any product classified as NOVA 4 / Ultra-Processed = MAX score 3/10.
@@ -900,11 +900,16 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         fried_snack = any(k in (product_name or "").lower() for k in ["chips", "crisps", "fries", "tortilla"])
 
         # Rule 1: Any ADDED carcinogen = score 1.
-        # Process-formed compounds (acrylamide forms in ALL baked/fried starches, incl.
-        # home cooking) must never tank the score on their own — they cap at 4 instead.
-        added_carcinogens = [c for c in carcinogens if "acrylamide" not in str(c).lower()]
+        # Process-formed compounds (form during normal cooking/processing, incl. at home)
+        # must never tank the score on their own — they cap at 4 instead.
+        PROCESS_FORMED = ("acrylamide", "furan", "heterocyclic", "hca", "polycyclic",
+                          "pah", "benzo(a)pyrene", "benzoapyrene", "benzo[a]pyrene",
+                          "3-mcpd", "mcpd", "glycidyl", "ethyl carbamate")
+        def _is_process_formed(c):
+            return any(pf in str(c).lower() for pf in PROCESS_FORMED)
+        added_carcinogens = [c for c in carcinogens if not _is_process_formed(c)]
         has_acrylamide = len(added_carcinogens) < len(carcinogens) or any(
-            "acrylamide" in str(h.get("name", "")).lower() for h in harmful
+            _is_process_formed(h.get("name", "")) for h in harmful
         )
         if added_carcinogens:
             result["overall_score"] = 1
@@ -936,8 +941,10 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         if fried_snack:
             result["overall_score"] = min(result["overall_score"], 5)
 
-        # Rule 11: Acrylamide (process-formed) caution cap — max 4, never score 1 on its own
-        if has_acrylamide and not added_carcinogens:
+        # Rule 11: Process-formed compound caution cap — max 4 for processed products,
+        # never score 1 on its own. Whole/minimally-processed items (e.g. plain coffee,
+        # plain nuts) are exempt — the compounds form in ALL cooking including at home.
+        if has_acrylamide and not added_carcinogens and "whole" not in category and "minimally" not in category:
             result["overall_score"] = min(result["overall_score"], 4)
         
         logger.info(f"Scoring enforced: product={product_name}, ai_score={score}, final_score={result['overall_score']}, upf={upf_pct}%, category={category}")
