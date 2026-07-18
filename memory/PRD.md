@@ -65,6 +65,7 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - **Jun 2026**: Extended process-formed carcinogen guard to full family: furan, HCAs, PAHs/benzo(a)pyrene, 3-MCPD/glycidyl esters, ethyl carbamate (Rule 11 cap 4, whole/minimally-processed exempt). Verified: coffee 7/10, smoked salmon 6/10, cashews 9/10, raspberries 10/10, Tostitos 4/10. Nitrosamines/processed meat still auto-1 (added nitrites).
 - **Jun 2026**: Refined seed oil positioning (option 3): evidence-based score (7-8) + full-context analysis (industrial refining in shocking_facts, cold-pressed alternatives, no bare "healthy" claims). Palm oil correctly penalized 3-4 (glycidyl esters). Added no-fake-citation rule to prompt. 10-oil test documented.
 - **Jun 2026**: Yuka-criticism tests passed: natural vs added sugar (raisins/OJ 9, candy/sweetened yogurt 3-5); MSG handled per evidence (soy sauce 6, no "hazardous" labels). Bug fixed: process-formed compounds now relocated out of carcinogen panel in code (AI disobeyed prompt on non-English products); score 1 strictly reserved for added carcinogens (floor 2 otherwise). Verified: MAMA noodles 1→2, Coke=1, Tostitos=4.
+- **Jun 2026**: Lazy cache refresh (live): cache entries >90 days old trigger silent background re-fetch on scan; re-analysis only if normalized ingredients changed (reformulation detection — Yuka's #1 complaint category). Both branches tested. Barcodes do NOT change on reformulation (GS1).
 
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)

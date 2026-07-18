@@ -24,6 +24,11 @@ User will be in App Store Connect + Play Console. Agent guides step-by-step.
    - Premium feature candidate = upsell driver
 
 ## P1
+- ~~Cache refresh~~ ✅ DONE (lazy 90-day refresh, reformulation detection)
+- Kids-as-labels rule for family profiles design (COPPA: no child accounts/emails — WW got $1.5M FTC fine)
+- App Store privacy label check tomorrow: disclose third-party AI processing (Guideline 5.1.2 rejections happening)
+- Hazard-language audit of shocking_facts on branded products (Goya v. Yuka lesson: "hazardous" = defamation bait; taxonomy language = safe)
+- "Report incorrect data" button (user backstop + legal defense; bundle Build 52/53)
 - SendGrid password reset emails (BLOCKED: waiting for user's SG. API key; domain auth must be redone WITHOUT www)
 - Email campaign centre in dashboard (once SendGrid live) — 59 zero-scan users reachable by email vs 4 by push
 - Google Analytics on website
