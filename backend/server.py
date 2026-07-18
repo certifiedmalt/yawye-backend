@@ -14,6 +14,7 @@ from passlib.context import CryptContext  # kept for backward compat import
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 import asyncio
+import re
 import time
 import logging
 import random
@@ -1820,6 +1821,58 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
 # Background AI analysis task storage
 _pending_analyses = {}
 
+CACHE_REFRESH_DAYS = 90
+
+def _norm_ingredients(t: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (t or "").lower())
+
+async def refresh_stale_cache_entry(barcode: str):
+    """Background: re-fetch source data for a stale cache entry; re-analyze only if ingredients changed"""
+    try:
+        cached = await product_cache_collection.find_one({"barcode": barcode})
+        if not cached:
+            return
+        lookup_order = [fetch_from_openfoodfacts, fetch_from_off_uk, fetch_from_usda,
+                        fetch_from_upcitemdb, fetch_from_brocade, fetch_from_off_search, fetch_from_fatsecret]
+        loop = asyncio.get_event_loop()
+        fresh = None
+        for fn in lookup_order:
+            try:
+                r = await loop.run_in_executor(None, fn, barcode)
+                if r and r.get("product_name"):
+                    fresh = r
+                    break
+            except Exception:
+                continue
+        if not fresh:
+            # Source has nothing now — keep what we have, re-check in another cycle
+            await product_cache_collection.update_one({"barcode": barcode}, {"$set": {"cached_at": datetime.utcnow()}})
+            logger.info(f"CACHE REFRESH: no source data for {barcode}, kept existing entry")
+            return
+        old_ing = _norm_ingredients(cached.get("ingredients_text"))
+        new_ing = _norm_ingredients(fresh.get("ingredients_text"))
+        if new_ing and new_ing != old_ing:
+            logger.info(f"CACHE REFRESH: ingredients changed for {barcode} — re-analyzing")
+            analysis = await analyze_ingredients_with_ai(fresh.get("product_name"), fresh.get("ingredients_text") or "")
+            update = {
+                "product_name": fresh.get("product_name"),
+                "brands": fresh.get("brands") or cached.get("brands", ""),
+                "ingredients_text": fresh.get("ingredients_text"),
+                "image_url": fresh.get("image_url") or cached.get("image_url", ""),
+                "cached_at": datetime.utcnow(),
+                "refreshed_at": datetime.utcnow(),
+                "refresh_reason": "ingredients_changed",
+            }
+            if analysis and not analysis.get("analysis_error"):
+                update["analysis"] = analysis
+            await product_cache_collection.update_one({"barcode": barcode}, {"$set": update})
+        else:
+            await product_cache_collection.update_one({"barcode": barcode}, {"$set": {"cached_at": datetime.utcnow()}})
+            logger.info(f"CACHE REFRESH: ingredients unchanged for {barcode}")
+    except Exception as e:
+        logger.error(f"Cache refresh failed for {barcode}: {e}")
+
+
 @app.post("/api/scan/quick")
 async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user)):
     """
@@ -1881,6 +1934,10 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 })
             logger.info(f"Cache hit (complete) for {barcode}")
             await log_scan_analytics(barcode, True, "cache", 0)
+            # Freshness check: stale entries get a silent background refresh
+            cached_at = cached.get("cached_at")
+            if cached_at and (datetime.utcnow() - cached_at) > timedelta(days=CACHE_REFRESH_DAYS):
+                asyncio.create_task(refresh_stale_cache_entry(barcode))
             return {
                 "status": "complete",
                 "product_name": cached.get("product_name"),
