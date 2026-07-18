@@ -24,6 +24,7 @@
   if (!m) return;
   var code = m[1].toLowerCase();
   var ua = navigator.userAgent;
+  var isBot = navigator.webdriver || /bot|crawler|spider|facebookexternalhit|meta-externalagent|preview|scanner|headless/i.test(ua);
   var isAndroid = /android/i.test(ua);
   var isIOS = /iphone|ipad|ipod/i.test(ua);
   var device = isAndroid ? 'android' : (isIOS ? 'ios' : 'desktop');
@@ -34,7 +35,7 @@
   document.getElementById('title').textContent = 'Taking you to the app…';
   document.getElementById('sub').innerHTML = '<a href="' + dest + '">Tap here if nothing happens</a>';
   try {
-    fetch('https://web-production-66c05.up.railway.app/api/track/click', {
+    if (!isBot) fetch('https://web-production-66c05.up.railway.app/api/track/click', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({code: code, device: device}),
