@@ -809,6 +809,8 @@ CRITICAL: Sugar, salt, butter, flour, olive oil, honey = NOVA 2 (NOT NOVA 4). On
 
 FRIED SNACKS: chips, crisps, fries and other deep-fried snack products are NEVER "Whole Food" or "Minimally Processed", even with a short ingredient list. Classify them as Processed (NOVA 3) at minimum, score maximum 5, and note acrylamide in harmful_ingredients with severity "moderate".
 
+REFINED SEED/VEGETABLE OILS (refined sunflower, rapeseed/canola, soybean, corn, vegetable, palm): score by the evidence — do NOT treat them as toxic or cap their score for merely being refined. BUT the recommendation must tell the whole story, always including: (1) the oil is industrially refined (typically solvent-extracted, bleached and deodorized at high temperature), (2) best not reused for repeated high-heat cooking due to oxidation products, and (3) refined oils are a signature ingredient of ultra-processed foods. NEVER describe a refined oil simply as "healthy" without this context. Cold-pressed, extra-virgin and unrefined oils do not need these caveats.
+
 RULE 1 — ADDED CARCINOGENS = AUTOMATIC 1/10 RED:
 - ANY product containing ANY ADDED carcinogenic ingredient (Group 1, 2A, or 2B) = SCORE 1/10. No exceptions. Even trace amounts.
 - This includes: nitrites/nitrosamines, BHA, aspartame, artificial colors (E129, E110, E102, E127, E150d), titanium dioxide, BPA, PFAS, TBHQ, BHT, sodium benzoate + vitamin C, alcohol, processed meat.
