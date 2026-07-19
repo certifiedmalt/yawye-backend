@@ -705,6 +705,54 @@ Respond with JSON only:
             "analysis_note": "Analysis failed - no ingredient data available"
         }
 
+# Compounds that form during normal cooking/processing — never "added" carcinogens
+PROCESS_FORMED = ("acrylamide", "furan", "heterocyclic", "hca", "polycyclic",
+                  "pah", "benzo(a)pyrene", "benzoapyrene", "benzo[a]pyrene",
+                  "3-mcpd", "mcpd", "glycidyl", "ethyl carbamate")
+
+# Agents genuinely classified by IARC (Group 1/2A/2B) that appear in food.
+# The AI cannot trigger a score of 1 with a carcinogen claim outside this list.
+IARC_VERIFIED_KEYWORDS = (
+    "alcohol", "ethanol", "processed meat", "nitrite", "nitrate", "nitrosamine",
+    "e250", "e251", "e252", "aflatoxin", "benzene", "formaldehyde", "red meat",
+    "glyphosate", "styrene", "bha", "butylated hydroxyanisole", "e320",
+    "titanium dioxide", "e171", "aspartame", "e951", "methylimidazole", "4-mei",
+    "e150", "carbon black", "e153", "potassium bromate", "e924",
+    "cadmium", "arsenic", "lead")
+
+def _is_process_formed(c):
+    return any(pf in str(c).lower() for pf in PROCESS_FORMED)
+
+def _is_iarc_verified(c):
+    name = str(c.get("name", "") if isinstance(c, dict) else c).lower()
+    return any(k in name for k in IARC_VERIFIED_KEYWORDS)
+
+def sanitize_carcinogen_claims(result: dict) -> list:
+    """Strip process-formed compounds and unverifiable (AI-invented) carcinogen ratings
+    out of the carcinogen panel. Returns the verified ADDED carcinogens (may trigger score 1)."""
+    carcinogens = result.get("carcinogens_found") or []
+    harmful = result.get("harmful_ingredients") or []
+    verified, demoted = [], []
+    for c in carcinogens:
+        if _is_process_formed(c):
+            demoted.append((c, (c.get("explanation") if isinstance(c, dict) else None) or
+                            "Forms during normal cooking/industrial heat processing; not an added ingredient."))
+        elif not _is_iarc_verified(c):
+            demoted.append((c, "Additive worth limiting, but NOT classified as a carcinogen by IARC."))
+        else:
+            verified.append(c)
+    if demoted:
+        result["carcinogens_found"] = verified
+        for c, note in demoted:
+            harmful.append({
+                "name": c.get("name") if isinstance(c, dict) else str(c),
+                "severity": "moderate",
+                "explanation": note,
+            })
+        result["harmful_ingredients"] = harmful
+        logger.info(f"Carcinogen gate: demoted {[str(c.get('name') if isinstance(c, dict) else c) for c, _ in demoted]}")
+    return verified
+
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str, off_nova_group: int = None) -> dict:
     """Analyze ingredients using OpenAI GPT-4o with focus on ultra-processed foods (UPFs)"""
     try:
@@ -749,9 +797,8 @@ Group 2B (POSSIBLE carcinogens):
 - Carbon black (E153)
 - Lead (trace contamination)
 - Styrene (from polystyrene packaging leaching)
-- Red 3 / Erythrosine (E127) — banned in cosmetics, still in food
-- Allura Red / Red 40 (E129)
-- Sunset Yellow / Yellow 6 (E110)
+
+CRITICAL — NO INVENTED RATINGS: The IARC lists above are EXHAUSTIVE. ONLY list an ingredient in carcinogens_found if it appears on the lists above, with its exact group. NEVER invent or assume an IARC classification. Synthetic food dyes (Red 40/E129, Yellow 5/E102, Yellow 6/E110, Red 3/E127) are NOT classified by IARC — flag them in harmful_ingredients and chemical_breakdown instead, NEVER in carcinogens_found.
 
 Endocrine disruptors:
 - BPA / Bisphenol A (from can linings, plastic packaging)
@@ -767,7 +814,10 @@ Other dangerous chemicals:
 - Sodium benzoate (E211) — when combined with vitamin C/citric acid forms BENZENE (known carcinogen)
 - Phosphoric acid (E338) — in cola, erodes bones and teeth
 - Brominated vegetable oil / BVO — BANNED in EU, still in some US drinks
-- Tartrazine / Yellow 5 (E102) — linked to hyperactivity, banned for children in EU
+- Tartrazine / Yellow 5 (E102) — linked to hyperactivity, banned for children in EU. NOT IARC-classified.
+- Allura Red / Red 40 (E129) — linked to hyperactivity in children, EU warning label required. NOT IARC-classified.
+- Sunset Yellow / Yellow 6 (E110) — linked to hyperactivity in children, EU warning label required. NOT IARC-classified.
+- Red 3 / Erythrosine (E127) — banned in US foods by FDA (2025). NOT IARC-classified.
 - Carrageenan (E407) — intestinal inflammation
 
 HARMFUL UPF ingredients: seed oils (sunflower, rapeseed, soybean), emulsifiers (E471/E472/polysorbate 80), artificial sweeteners (sucralose, acesulfame K), preservatives, artificial colors, modified starches, hydrogenated/partially hydrogenated oils, added sugars, high fructose corn syrup, MSG (E621), maltodextrin, palm oil, dextrose, invert sugar syrup.
@@ -906,30 +956,12 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # never whole/minimally-processed — exclude from clean-list and whole-food boosts
         fried_snack = any(k in (product_name or "").lower() for k in ["chips", "crisps", "fries", "tortilla"])
 
-        # Rule 1: Any ADDED carcinogen = score 1.
-        # Process-formed compounds (form during normal cooking/processing, incl. at home)
-        # must never tank the score on their own — they cap at 4 instead.
-        PROCESS_FORMED = ("acrylamide", "furan", "heterocyclic", "hca", "polycyclic",
-                          "pah", "benzo(a)pyrene", "benzoapyrene", "benzo[a]pyrene",
-                          "3-mcpd", "mcpd", "glycidyl", "ethyl carbamate")
-        def _is_process_formed(c):
-            return any(pf in str(c).lower() for pf in PROCESS_FORMED)
-        added_carcinogens = [c for c in carcinogens if not _is_process_formed(c)]
-        process_formed_entries = [c for c in carcinogens if _is_process_formed(c)]
-        if process_formed_entries:
-            # Relocate: process-formed compounds must not appear in the carcinogen panel
-            result["carcinogens_found"] = added_carcinogens
-            for c in process_formed_entries:
-                harmful.append({
-                    "name": c.get("name") if isinstance(c, dict) else str(c),
-                    "severity": "moderate",
-                    "explanation": (c.get("explanation") if isinstance(c, dict) else None) or
-                        "Forms during normal cooking/industrial heat processing; not an added ingredient.",
-                })
-            result["harmful_ingredients"] = harmful
-        has_acrylamide = len(process_formed_entries) > 0 or any(
-            _is_process_formed(h.get("name", "")) for h in harmful
-        )
+        # Rule 1: Any VERIFIED ADDED carcinogen = score 1.
+        # Process-formed compounds and AI-invented IARC ratings are demoted by
+        # sanitize_carcinogen_claims and can never trigger a 1 on their own.
+        added_carcinogens = sanitize_carcinogen_claims(result)
+        harmful = result.get("harmful_ingredients", harmful)
+        has_acrylamide = any(_is_process_formed(h.get("name", "")) for h in harmful)
         if added_carcinogens:
             result["overall_score"] = 1
         # Rule 2: Ultra-Processed (NOVA 4) = max 3
@@ -2115,6 +2147,8 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                     identified_brand = ai_result.pop("identified_brand", "")
                     typical_ingredients = ai_result.pop("typical_ingredients", "")
                     analysis = ai_result
+                    if not sanitize_carcinogen_claims(analysis) and analysis.get("overall_score", 5) < 2:
+                        analysis["overall_score"] = 2
                     
                     cache_data = {
                         "barcode": barcode,
@@ -2763,6 +2797,32 @@ async def admin_cache_delete(key: str = "", barcode: str = ""):
         raise HTTPException(status_code=403, detail="Invalid key")
     r = await product_cache_collection.delete_one({"barcode": barcode})
     return {"deleted": r.deleted_count, "barcode": barcode}
+
+
+@app.post("/api/admin/carcinogen_audit")
+async def admin_carcinogen_audit(key: str = "", purge: bool = False):
+    """Find cached analyses whose carcinogen panel contains unverifiable (AI-invented)
+    IARC claims or process-formed compounds; optionally purge them for re-analysis."""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    suspects = []
+    cursor = product_cache_collection.find(
+        {"analysis.carcinogens_found.0": {"$exists": True}},
+        {"barcode": 1, "product_name": 1, "analysis.carcinogens_found": 1, "analysis.overall_score": 1})
+    async for doc in cursor:
+        claims = (doc.get("analysis") or {}).get("carcinogens_found") or []
+        bad = [str(c.get("name") if isinstance(c, dict) else c) for c in claims
+               if _is_process_formed(c) or not _is_iarc_verified(c)]
+        if bad:
+            suspects.append({
+                "barcode": doc.get("barcode"),
+                "product_name": doc.get("product_name"),
+                "score": (doc.get("analysis") or {}).get("overall_score"),
+                "unverified_claims": bad,
+            })
+    if purge and suspects:
+        await product_cache_collection.delete_many({"barcode": {"$in": [s["barcode"] for s in suspects]}})
+    return {"count": len(suspects), "purged": bool(purge), "suspects": suspects}
 
 
 @app.post("/api/admin/grant_pending_premium")
