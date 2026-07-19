@@ -68,6 +68,8 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - **Jun 2026**: Lazy cache refresh (live): cache entries >90 days old trigger silent background re-fetch on scan; re-analysis only if normalized ingredients changed (reformulation detection — Yuka's #1 complaint category). Both branches tested. Barcodes do NOT change on reformulation (GS1).
 - **Jun 2026**: CRITICAL FIX — AI barcode identification was hallucinating product names (2 different barcodes both "identified" as Heinz Baked Beans). Fixed: no-guess prompt + confidence=="high" gate in caller + temp 0. Purged 4 hallucinated cache entries + 4 test fakes via new /api/admin/cache_delete. Verified: hallucinated barcode now honest Unknown (0), real products still resolve.
 
+- **Jun 2026**: VERIFIED LIVE post-fork: GTIN checksum gate + GS1 prefix verification (commit 40fb2ed) deployed on Railway. Invalid-checksum barcodes rejected with friendly retry message; real products (Coke) unaffected. Root/backend server.py confirmed in sync, commit pushed to origin/main.
+
 ## Pending Issues
 - P0: Password reset emails (needs SendGrid API key from user)
 - P1: Google Play Store: user needs to upload AAB Build 50
