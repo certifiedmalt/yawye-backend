@@ -584,7 +584,9 @@ Barcode prefixes indicate the country of origin:
 - 87xxxxx = Netherlands
 - 93-94xxx = Australia/NZ
 
-TASK: Identify what product this barcode belongs to. If you recognize it, provide the product name, brand, typical ingredients, and full health analysis. If you don't recognize the exact barcode, say so honestly but still provide your best guess based on the barcode prefix (country) and any patterns you recognize.
+TASK: Identify what product this barcode belongs to. You do NOT have a complete barcode database, so be extremely conservative: ONLY provide a product name if this is a barcode you GENUINELY recognize with high confidence (major internationally-known products). A wrong identification is far worse than an honest unknown — the user is holding the real product and will instantly see the mistake.
+
+If you do not genuinely recognize this exact barcode, respond with "identified_product": "Unknown product" and "confidence": "low". NEVER guess a plausible-sounding product name from the country prefix or digit patterns.
 
 Respond with JSON only:
 {{
@@ -620,10 +622,10 @@ Respond with JSON only:
         response = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a food product identification expert. You know thousands of commercial food products and their barcodes. Identify the product and provide health analysis. Be honest about your confidence level. Respond only with valid JSON."},
+                {"role": "system", "content": "You are a food product identification expert. You only identify products you genuinely recognize — you NEVER guess. An honest 'Unknown product' is always better than a wrong identification. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3,
+            temperature=0.0,
             response_format={"type": "json_object"}
         )
         
@@ -2059,7 +2061,8 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
                 ai_result = await identify_product_by_barcode(client, barcode)
                 identified_name = (ai_result or {}).get("identified_product", "") or ""
-                if ai_result and identified_name and "unknown" not in identified_name.lower():
+                ai_confident = (ai_result or {}).get("confidence", "low") == "high"
+                if ai_result and identified_name and "unknown" not in identified_name.lower() and ai_confident:
                     # AI identified the product — update the product info
                     identified_name = ai_result.pop("identified_product", product_name)
                     identified_brand = ai_result.pop("identified_brand", "")
@@ -2704,6 +2707,15 @@ async def admin_search_users(key: str = "", q: str = ""):
     async for u in users_collection.find(query, {"_id": 0, "password_hash": 0}):
         results.append(u)
     return {"users": results, "count": len(results)}
+
+
+@app.post("/api/admin/cache_delete")
+async def admin_cache_delete(key: str = "", barcode: str = ""):
+    """Delete a product cache entry so it gets fully re-processed on next scan"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    r = await product_cache_collection.delete_one({"barcode": barcode})
+    return {"deleted": r.deleted_count, "barcode": barcode}
 
 
 @app.post("/api/admin/grant_pending_premium")
