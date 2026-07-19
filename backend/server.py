@@ -1823,6 +1823,40 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
 # Background AI analysis task storage
 _pending_analyses = {}
 
+def _valid_gtin_checksum(code: str) -> bool:
+    """Validate EAN/UPC check digit — catches camera misreads before they hit databases"""
+    if len(code) not in (8, 12, 13, 14):
+        return True  # non-standard lengths: skip validation
+    digits = [int(c) for c in code]
+    total = sum(d * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(digits[:-1])))
+    return (10 - total % 10) % 10 == digits[-1]
+
+def _brand_prefix_match(barcode: str, brand: str) -> bool:
+    """Verify an AI-claimed brand against real GS1 prefixes: does this brand's known
+    products (per OpenFoodFacts) share this barcode's company prefix?"""
+    try:
+        tag = re.sub(r"[^a-z0-9]+", "-", (brand or "").lower()).strip("-")
+        if not tag:
+            return False
+        codes = []
+        for attempt in range(2):
+            try:
+                resp = requests.get(
+                    f"https://world.openfoodfacts.org/api/v2/search?brands_tags={tag}&fields=code&page_size=100",
+                    headers={"User-Agent": "YAWYE/1.0"}, timeout=8)
+                codes = [str(p.get("code", "")) for p in resp.json().get("products", [])]
+                break
+            except Exception:
+                time.sleep(3)
+        if not codes:
+            return False  # cannot verify -> reject (conservative)
+        bc = barcode.lstrip("0")
+        prefix = bc[:6]
+        return any(c.lstrip("0").startswith(prefix) for c in codes)
+    except Exception as e:
+        logger.warning(f"Prefix verification failed for {barcode}/{brand}: {e}")
+        return False
+
 CACHE_REFRESH_DAYS = 90
 
 def _norm_ingredients(t: str) -> str:
@@ -1889,6 +1923,10 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     if not clean_barcode.isdigit() or not (6 <= len(clean_barcode) <= 14):
         await log_scan_analytics(barcode[:60], False, "invalid", 0, "Not a product barcode (QR code or invalid format)")
         raise HTTPException(status_code=400, detail="That doesn't look like a product barcode. If you scanned a QR code, look for the striped barcode with numbers underneath instead.")
+
+    if not _valid_gtin_checksum(clean_barcode):
+        await log_scan_analytics(barcode[:60], False, "invalid", 0, "Checksum failed (camera misread)")
+        raise HTTPException(status_code=400, detail="That barcode didn't scan cleanly. Hold steady and try scanning it again.")
     
     # Check subscription limits
     subscription_tier = current_user.get("subscription_tier", "free")
@@ -2062,7 +2100,16 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                 ai_result = await identify_product_by_barcode(client, barcode)
                 identified_name = (ai_result or {}).get("identified_product", "") or ""
                 ai_confident = (ai_result or {}).get("confidence", "low") == "high"
+                ai_verified = False
                 if ai_result and identified_name and "unknown" not in identified_name.lower() and ai_confident:
+                    brand_claim = ((ai_result.get("identified_brand") or "").strip() or identified_name.split()[0])
+                    if brand_claim.lower() == "unknown":
+                        brand_claim = identified_name.split()[0]
+                    verify_loop = asyncio.get_event_loop()
+                    ai_verified = await verify_loop.run_in_executor(None, _brand_prefix_match, barcode, brand_claim)
+                    if not ai_verified:
+                        logger.info(f"AI identification REJECTED by prefix check: {barcode} -> '{identified_name}' (brand: {brand_claim})")
+                if ai_verified:
                     # AI identified the product — update the product info
                     identified_name = ai_result.pop("identified_product", product_name)
                     identified_brand = ai_result.pop("identified_brand", "")
