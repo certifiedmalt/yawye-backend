@@ -2000,6 +2000,42 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     if not _valid_gtin_checksum(clean_barcode):
         await log_scan_analytics(barcode[:60], False, "invalid", 0, "Checksum failed (camera misread)", user_id=str(current_user["_id"]))
         raise HTTPException(status_code=400, detail="That barcode didn't scan cleanly. Hold steady and try scanning it again.")
+
+    # GTIN-14 / case-code conversion: users sometimes scan the multipack/outer-box
+    # barcode — derive the contained EAN-13 and look that up instead
+    if len(clean_barcode) == 14:
+        base = clean_barcode[1:13]
+        s = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(base))
+        converted = base + str((10 - s % 10) % 10)
+        for cand in (clean_barcode[1:], clean_barcode[:13], converted):
+            if _valid_gtin_checksum(cand):
+                logger.info(f"GTIN-14 scan {clean_barcode} -> trying EAN-13 {cand}")
+                barcode = clean_barcode = cand
+                break
+
+    # Store-internal labels (GS1 restricted prefix 2x, incl. zero-padded 02): weighed/
+    # deli/reduced items — only meaningful inside one store, never in any global
+    # database. Skip the pointless AI identification, go straight to teach-the-app.
+    if (clean_barcode[0] == "2" and len(clean_barcode) in (8, 12, 13)) or \
+       (len(clean_barcode) == 13 and clean_barcode.startswith("02")):
+        await log_scan_analytics(clean_barcode, False, "store_label", 0, "Store-internal label (weighed/deli/reduced item)", user_id=str(current_user["_id"]))
+        return {
+            "status": "complete",
+            "product_name": f"Unknown Product (store label {clean_barcode})",
+            "brands": "",
+            "ingredients_text": "",
+            "image_url": "",
+            "analysis": {
+                "harmful_ingredients": [],
+                "beneficial_ingredients": [],
+                "overall_score": 0,
+                "upf_score": "Unknown",
+                "processing_category": "Unknown",
+                "recommendation": "This is a store-printed label (used for weighed, deli or price-reduced items inside one store) — it can't be looked up globally. Type the product name below and we'll analyze it.",
+                "analysis_note": "Store-internal barcode (GS1 restricted range)",
+            },
+            "source": "store_label",
+        }
     
     # Check subscription limits
     subscription_tier = current_user.get("subscription_tier", "free")
