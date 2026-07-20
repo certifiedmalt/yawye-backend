@@ -1430,6 +1430,19 @@ async def admin_failed_scans(key: str = "", days: int = 7):
             "at": f["timestamp"].isoformat() if isinstance(f.get("timestamp"), datetime) else f.get("timestamp"),
         })
 
+    # Mark failures as recovered if the barcode now has a real completed analysis
+    # (user taught the app, or AI identification succeeded later)
+    fail_barcodes = list({f["barcode"] for f in lookup_failures if f.get("barcode")})
+    recovered = set()
+    async for c in product_cache_collection.find(
+        {"barcode": {"$in": fail_barcodes}, "analysis.overall_score": {"$gte": 1}},
+        {"barcode": 1, "product_name": 1}
+    ):
+        if "unknown" not in (c.get("product_name") or "").lower():
+            recovered.add(c["barcode"])
+    for f in lookup_failures:
+        f["recovered"] = f.get("barcode") in recovered
+
     score_failures = []
     async for s in scans_collection.find(
         {"scanned_at": {"$gte": cutoff}, "$or": [

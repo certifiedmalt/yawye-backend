@@ -440,10 +440,10 @@ async function loadFailedScans(){
   const days = document.getElementById('days').value;
   const r = await api(`/api/admin/failed_scans?days=${days}`);
   document.getElementById('failed-label').textContent =
-    `— ${r.lookup_failures.length + r.score_failures.length} issues / ${r.total_attempts} attempts (${days}d)`;
+    `— ${r.lookup_failures.filter(f=>!f.recovered&&!f.is_internal).length} unresolved / ${r.lookup_failures.length + r.score_failures.length} logged / ${r.total_attempts} attempts (${days}d)`;
   document.getElementById('failed-lookups').innerHTML = r.lookup_failures.map(f =>
     `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
-      <span>${f.barcode||'?'} <span class="text-warn">${f.reason||''}</span>${f.is_internal?' <span class="bg-yellow-500/20 text-yellow-400 rounded px-1.5 text-xs font-bold">INTERNAL TEST</span>':''}</span>
+      <span>${f.barcode||'?'} <span class="${f.recovered?'text-muted':'text-warn'}">${f.reason||''}</span>${f.recovered?' <span class="bg-brand/20 text-brand rounded px-1.5 text-xs font-bold">RECOVERED ✓</span>':''}${f.is_internal?' <span class="bg-yellow-500/20 text-yellow-400 rounded px-1.5 text-xs font-bold">INTERNAL TEST</span>':''}</span>
       <span class="text-muted text-xs whitespace-nowrap">${(f.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
     || '<span class="text-muted">None 🎉</span>';
   document.getElementById('failed-scores').innerHTML = r.score_failures.map(f =>
