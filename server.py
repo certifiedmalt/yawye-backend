@@ -1550,7 +1550,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         )
         if not is_error_result:
             response_time = time.time() - start_time
-            await log_scan_analytics(barcode, True, "cache", response_time)
+            await log_scan_analytics(barcode, True, "cache", response_time, user_id=str(current_user["_id"]))
             # Increment scan count
             await users_collection.update_one(
                 {"_id": current_user["_id"]},
@@ -2638,19 +2638,22 @@ async def admin_user_stats(key: str = ""):
     total_users = await users_collection.count_documents({})
     premium_users = await users_collection.count_documents({"subscription_tier": "premium"})
     free_users = total_users - premium_users
-    premium_list = []
+    premium_list, comped_list = [], []
     async for u in users_collection.find(
         {"subscription_tier": "premium"},
-        {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1, "created_at": 1, "country": 1}
+        {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1, "created_at": 1, "country": 1, "comped": 1}
     ).sort("created_at", -1):
         if isinstance(u.get("created_at"), datetime):
             u["created_at"] = u["created_at"].isoformat()
-        premium_list.append(u)
+        (comped_list if u.get("comped") else premium_list).append(u)
     return {
         "total_users": total_users,
         "premium_subscribers": premium_users,
+        "paying_subscribers": len(premium_list),
+        "comped_subscribers": len(comped_list),
         "free_users": free_users,
-        "premium_user_details": premium_list
+        "premium_user_details": premium_list,
+        "comped_user_details": comped_list
     }
 
 @app.get("/api/admin/funnel_stats")
