@@ -174,7 +174,11 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://web-production-66c05
 
 
 # Analytics tracking
-async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None):
+# Founder/review/test accounts — flagged as "internal" in dashboard panels
+INTERNAL_EMAILS = {"jpsaila1986@gmail.com", "applereview@yawye.app",
+                   "googlereviewer@yawye.app", "test.screenshot@yawye.app"}
+
+async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None, user_id: str = None):
     """Log scan analytics for monitoring"""
     try:
         await scan_analytics_collection.insert_one({
@@ -183,6 +187,7 @@ async def log_scan_analytics(barcode: str, success: bool, source: str, response_
             "source": source,  # "cache", "openfoodfacts", "upcitemdb"
             "response_time_ms": int(response_time * 1000),
             "error": error,
+            "user_id": user_id,
             "timestamp": datetime.utcnow()
         })
         logger.info(f"SCAN: barcode={barcode} success={success} source={source} time={response_time:.2f}s")
@@ -1078,6 +1083,7 @@ async def register(user: UserRegister, request: Request):
         "name": user.name,
         "password": hashed_password,
         "subscription_tier": tier,
+        "comped": bool(pending),
         "total_scans": 0,
         "created_at": datetime.utcnow()
     }
@@ -1397,9 +1403,11 @@ async def admin_failed_scans(key: str = "", days: int = 7):
     async for f in scan_analytics_collection.find(
         {"timestamp": {"$gte": cutoff}, "success": False}, {"_id": 0}
     ).sort("timestamp", -1).limit(50):
+        femail = email_by_id.get(str(f.get("user_id"))) or f.get("user_id")
         lookup_failures.append({
             "barcode": f.get("barcode"),
-            "email": email_by_id.get(str(f.get("user_id"))) or f.get("user_id"),
+            "email": femail,
+            "is_internal": femail in INTERNAL_EMAILS,
             "reason": f.get("error") or f.get("reason") or "product not found",
             "at": f["timestamp"].isoformat() if isinstance(f.get("timestamp"), datetime) else f.get("timestamp"),
         })
@@ -1413,10 +1421,12 @@ async def admin_failed_scans(key: str = "", days: int = 7):
         ]}
     ).sort("scanned_at", -1).limit(50):
         pd = s.get("product_data") or {}
+        semail = email_by_id.get(str(s.get("user_id")))
         score_failures.append({
             "barcode": s.get("barcode"),
             "product": pd.get("product_name") or s.get("product_name"),
-            "email": email_by_id.get(str(s.get("user_id"))),
+            "email": semail,
+            "is_internal": semail in INTERNAL_EMAILS,
             "at": s["scanned_at"].isoformat() if isinstance(s.get("scanned_at"), datetime) else s.get("scanned_at"),
         })
 
@@ -1645,7 +1655,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     # STEP 4: If all sources fail, return 404
     if not product_data:
         response_time = time.time() - start_time
-        await log_scan_analytics(barcode, False, "none", response_time, "Product not found in any database")
+        await log_scan_analytics(barcode, False, "none", response_time, "Product not found in any database", user_id=str(current_user["_id"]))
         raise HTTPException(status_code=404, detail="Product not found. Try scanning again or entering the barcode manually.")
     
     # STEP 5: Check if we have ingredients (required for analysis)
@@ -1670,7 +1680,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             }
         
         response_time = time.time() - start_time
-        await log_scan_analytics(barcode, True, source, response_time, "No ingredients - AI name analysis")
+        await log_scan_analytics(barcode, True, source, response_time, "No ingredients - AI name analysis", user_id=str(current_user["_id"]))
         
         product_data["analysis"] = analysis
         await cache_product(barcode, product_data)
@@ -1840,7 +1850,7 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
     
     # Log analytics
     response_time = time.time() - start_time
-    await log_scan_analytics(barcode, True, source, response_time)
+    await log_scan_analytics(barcode, True, source, response_time, user_id=str(current_user["_id"]))
     
     return {
         "product_name": product_data.get("product_name"),
@@ -1953,11 +1963,11 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
 
     clean_barcode = barcode.replace(" ", "")
     if not clean_barcode.isdigit() or not (6 <= len(clean_barcode) <= 14):
-        await log_scan_analytics(barcode[:60], False, "invalid", 0, "Not a product barcode (QR code or invalid format)")
+        await log_scan_analytics(barcode[:60], False, "invalid", 0, "Not a product barcode (QR code or invalid format)", user_id=str(current_user["_id"]))
         raise HTTPException(status_code=400, detail="That doesn't look like a product barcode. If you scanned a QR code, look for the striped barcode with numbers underneath instead.")
 
     if not _valid_gtin_checksum(clean_barcode):
-        await log_scan_analytics(barcode[:60], False, "invalid", 0, "Checksum failed (camera misread)")
+        await log_scan_analytics(barcode[:60], False, "invalid", 0, "Checksum failed (camera misread)", user_id=str(current_user["_id"]))
         raise HTTPException(status_code=400, detail="That barcode didn't scan cleanly. Hold steady and try scanning it again.")
     
     # Check subscription limits
@@ -2005,7 +2015,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
                     "source": "cache"
                 })
             logger.info(f"Cache hit (complete) for {barcode}")
-            await log_scan_analytics(barcode, True, "cache", 0)
+            await log_scan_analytics(barcode, True, "cache", 0, user_id=str(current_user["_id"]))
             # Freshness check: stale entries get a silent background refresh
             cached_at = cached.get("cached_at")
             if cached_at and (datetime.utcnow() - cached_at) > timedelta(days=CACHE_REFRESH_DAYS):
@@ -2073,9 +2083,9 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
         logger.info(f"Quick scan: no DB match for {barcode}, falling back to AI identification")
         product_data = {"product_name": f"Product (barcode {barcode})", "brands": "", "ingredients_text": "", "image_url": ""}
         source = "ai_identification"
-        await log_scan_analytics(barcode, False, "none", 0, "No DB match - AI identification fallback")
+        await log_scan_analytics(barcode, False, "none", 0, "No DB match - AI identification fallback", user_id=str(current_user["_id"]))
     else:
-        await log_scan_analytics(barcode, True, source, 0)
+        await log_scan_analytics(barcode, True, source, 0, user_id=str(current_user["_id"]))
     
     # Start background AI analysis
     ingredients_text = product_data.get("ingredients_text", "")
@@ -2785,7 +2795,7 @@ async def admin_search_users(key: str = "", q: str = ""):
         {"name": {"$regex": q, "$options": "i"}},
         {"email": {"$regex": q, "$options": "i"}}
     ]}
-    async for u in users_collection.find(query, {"_id": 0, "password_hash": 0}):
+    async for u in users_collection.find(query, {"_id": 0, "password": 0, "password_hash": 0}):
         results.append(u)
     return {"users": results, "count": len(results)}
 
@@ -2846,7 +2856,7 @@ async def admin_grant_pending_premium(key: str = "", email: str = "", note: str 
 
 
 @app.post("/api/admin/set_premium")
-async def admin_set_premium(key: str = "", email: str = "", tier: str = "premium"):
+async def admin_set_premium(key: str = "", email: str = "", tier: str = "premium", comped: bool = False):
     """Set user subscription tier by email"""
     if key != "yawye2024clear":
         raise HTTPException(status_code=403, detail="Invalid key")
@@ -2854,11 +2864,63 @@ async def admin_set_premium(key: str = "", email: str = "", tier: str = "premium
         raise HTTPException(status_code=400, detail="tier must be 'free' or 'premium'")
     result = await users_collection.update_one(
         {"email": email},
-        {"$set": {"subscription_tier": tier}}
+        {"$set": {"subscription_tier": tier, "comped": comped if tier == "premium" else False}}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"message": f"Set {email} to {tier}"}
+    return {"message": f"Set {email} to {tier}" + (" (comped)" if comped and tier == "premium" else "")}
+
+
+@app.post("/api/admin/set_comped")
+async def admin_set_comped(key: str = "", email: str = "", comped: bool = True):
+    """Mark/unmark a premium user as comped (free/influencer) so revenue stats exclude them"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    result = await users_collection.update_one({"email": email}, {"$set": {"comped": comped}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"email": email, "comped": comped}
+
+
+@app.get("/api/admin/usage_stats")
+async def admin_usage_stats(key: str = ""):
+    """Engagement per segment: paying premium vs comped premium vs free"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    now = datetime.utcnow()
+    d7, d30 = now - timedelta(days=7), now - timedelta(days=30)
+    users = {}
+    async for u in users_collection.find({}, {"subscription_tier": 1, "comped": 1, "total_scans": 1}):
+        tier = u.get("subscription_tier")
+        seg = "comped" if (tier == "premium" and u.get("comped")) else ("paying" if tier == "premium" else "free")
+        users[str(u["_id"])] = (seg, u.get("total_scans") or 0)
+    n30, n7 = {}, {}
+    async for d in scans_collection.aggregate([
+        {"$match": {"scanned_at": {"$gte": d30}, "user_id": {"$ne": None}}},
+        {"$group": {"_id": "$user_id", "n30": {"$sum": 1},
+                    "n7": {"$sum": {"$cond": [{"$gte": ["$scanned_at", d7]}, 1, 0]}}}}
+    ]):
+        n30[str(d["_id"])] = d["n30"]
+        n7[str(d["_id"])] = d["n7"]
+    out = {}
+    for seg in ("paying", "comped", "free"):
+        ids = [uid for uid, (s, _) in users.items() if s == seg]
+        n = len(ids)
+        s30 = sum(n30.get(i, 0) for i in ids)
+        s7 = sum(n7.get(i, 0) for i in ids)
+        a30 = sum(1 for i in ids if n30.get(i, 0) > 0)
+        a7 = sum(1 for i in ids if n7.get(i, 0) > 0)
+        out[seg] = {
+            "users": n,
+            "avg_lifetime_scans": round(sum(users[i][1] for i in ids) / n, 1) if n else 0,
+            "scans_last_30d": s30,
+            "avg_scans_per_user_30d": round(s30 / n, 1) if n else 0,
+            "scans_last_7d": s7,
+            "avg_scans_per_user_7d": round(s7 / n, 1) if n else 0,
+            "active_last_7d": a7, "active_7d_pct": round(a7 / n * 100, 1) if n else 0,
+            "active_last_30d": a30, "active_30d_pct": round(a30 / n * 100, 1) if n else 0,
+        }
+    return out
 
 @app.post("/api/admin/delete_user")
 async def admin_delete_user(key: str = "", email: str = ""):

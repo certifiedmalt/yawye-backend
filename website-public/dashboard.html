@@ -69,6 +69,33 @@
       </div>
     </div>
 
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div class="bg-surface border border-white/10 rounded-3xl p-6">
+        <h2 class="font-heading font-bold text-lg">🎁 Comped / Influencers <span class="text-muted text-sm" id="comped-label"></span></h2>
+        <p class="text-muted text-xs mt-1">Free premium accounts — excluded from revenue. Toggle via User Admin.</p>
+        <div class="overflow-x-auto mt-3">
+          <table class="w-full text-sm" data-testid="dashboard-comped-table">
+            <thead><tr class="text-muted text-left border-b border-white/10">
+              <th class="py-2 pr-4">Joined</th><th class="py-2 pr-4">Email</th><th class="py-2 pr-4">Scans</th><th class="py-2">Country</th>
+            </tr></thead>
+            <tbody id="comped-users"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="bg-surface border border-white/10 rounded-3xl p-6">
+        <h2 class="font-heading font-bold text-lg">📊 Member Usage</h2>
+        <p class="text-muted text-xs mt-1">Are subscribers actually using the app?</p>
+        <div class="overflow-x-auto mt-3">
+          <table class="w-full text-sm" data-testid="dashboard-usage-table">
+            <thead><tr class="text-muted text-left border-b border-white/10">
+              <th class="py-2 pr-4"></th><th class="py-2 pr-4">💷 Paying</th><th class="py-2 pr-4">🎁 Comped</th><th class="py-2">Free</th>
+            </tr></thead>
+            <tbody id="usage-stats"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
       <h2 class="font-heading font-bold text-lg">Recent Signups <span class="text-muted text-sm" id="cohort-label"></span></h2>
       <div class="overflow-x-auto mt-4">
@@ -149,7 +176,7 @@
       <p class="text-muted text-xs mt-3">Share youarewhatyoueat.store/go/anycode — clicks are tracked automatically, no setup needed per code.</p>
     </div>
 
-    <p class="text-muted text-xs mt-8">Live data from production. Revenue estimate = premium users × £1.99/mo. Store-level download counts live in App Store Connect / Play Console.</p>
+    <p class="text-muted text-xs mt-8">Live data from production. Revenue estimate = PAYING premium users × £1.99/mo (comped/influencer accounts excluded). Store-level download counts live in App Store Connect / Play Console.</p>
   </div>
 
 <script>
@@ -195,13 +222,15 @@ function bar(label, n, total, color){
 
 async function loadAll(){
   const days = document.getElementById('days').value;
-  const [funnel, diag, stats] = await Promise.all([
+  const [funnel, diag, stats, usage] = await Promise.all([
     api(`/api/admin/funnel_stats?days=${days}`),
     api(`/api/admin/cohort_diagnostics?days=${days}`),
     api('/api/admin/user_stats'),
+    api('/api/admin/usage_stats'),
   ]);
 
   const prem = stats.premium_user_details || [];
+  const comped = stats.comped_user_details || [];
   document.getElementById('premium-label').textContent = `— ${prem.length} paying`;
   document.getElementById('premium-users').innerHTML = prem.map(u => `<tr class="border-b border-white/5">
       <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(0,10)}</td>
@@ -210,13 +239,32 @@ async function loadAll(){
       <td class="py-2 pr-4">${u.total_scans??0}</td>
       <td class="py-2 text-muted">${u.country||'?'}</td></tr>`).join('')
     || '<tr><td colspan="5" class="py-3 text-muted">No premium subscribers yet.</td></tr>';
+  document.getElementById('comped-label').textContent = `— ${comped.length}`;
+  document.getElementById('comped-users').innerHTML = comped.map(u => `<tr class="border-b border-white/5">
+      <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(0,10)}</td>
+      <td class="py-2 pr-4 font-bold">${u.email||''}</td>
+      <td class="py-2 pr-4">${u.total_scans??0}</td>
+      <td class="py-2 text-muted">${u.country||'?'}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="py-3 text-muted">None.</td></tr>';
+
+  const useRow = (label, fmt) => `<tr class="border-b border-white/5"><td class="py-2 pr-4 text-muted">${label}</td>` +
+    ['paying','comped','free'].map(s => `<td class="py-2 pr-4">${fmt(usage[s]||{})}</td>`).join('') + '</tr>';
+  document.getElementById('usage-stats').innerHTML =
+    useRow('Members', u => `<b>${u.users??0}</b>`) +
+    useRow('Avg lifetime scans', u => u.avg_lifetime_scans??0) +
+    useRow('Avg scans (30d)', u => `<b class="text-brand">${u.avg_scans_per_user_30d??0}</b>`) +
+    useRow('Avg scans (7d)', u => u.avg_scans_per_user_7d??0) +
+    useRow('Active last 30d', u => `${u.active_last_30d??0} (${u.active_30d_pct??0}%)`) +
+    useRow('Active last 7d', u => `${u.active_last_7d??0} (${u.active_7d_pct??0}%)`);
+
   const all = funnel.all_time;
   const cohort = funnel[`last_${days}_days_cohort`];
-  const revenue = (all.premium * 1.99).toFixed(0);
+  const paying = stats.paying_subscribers ?? prem.length;
+  const revenue = (paying * 1.99).toFixed(0);
 
   document.getElementById('cards').innerHTML =
     card('Total users', all.registered) +
-    card('Premium', all.premium, 'text-brand') +
+    card('Paying premium', paying, 'text-brand') +
     card('Est. revenue/mo', '£'+revenue, 'text-brand') +
     card(`Signups (${days}d)`, cohort.registered) +
     card(`Premium conv (${days}d)`, cohort.premium_conversion_pct+'%');
@@ -334,13 +382,15 @@ async function uaSearch(){
   el.innerHTML = (res.users||[]).slice(0,8).map(u => {
     const em = u.email || '';
     const prem = u.subscription_tier === 'premium';
+    const comped = !!u.comped;
     return `<div class="bg-black border border-white/10 rounded-xl p-3" data-testid="user-admin-card">
       <div class="flex justify-between flex-wrap gap-1">
         <span class="font-bold ${prem?'text-brand':''}">${em}</span>
-        <span class="text-muted text-xs">${u.name||''} · ${u.total_scans??0} scans · ${prem?'⭐ premium':'free'}</span>
+        <span class="text-muted text-xs">${u.name||''} · ${u.total_scans??0} scans · ${prem?(comped?'🎁 comped':'⭐ premium'):'free'}</span>
       </div>
       <div class="flex flex-wrap gap-2 mt-2 text-xs">
         <button onclick="uaSetTier('${em}','${prem?'free':'premium'}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">${prem?'Revoke premium':'Grant premium'}</button>
+        ${prem?`<button onclick="uaSetComped('${em}',${comped?'false':'true'})" data-testid="user-admin-comped-btn" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">${comped?'Mark as paying':'Mark as comped'}</button>`:''}
         <button onclick="uaResetPw('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">Reset password</button>
         <button onclick="uaFixScans('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">Fix scan count</button>
         <button onclick="uaViewScans('${em}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">View scans</button>
@@ -355,6 +405,10 @@ async function uaSetTier(email, tier){
   if (!confirm(`Set ${email} to ${tier}?`)) return;
   await apiPost(`/api/admin/set_premium?email=${encodeURIComponent(email)}&tier=${tier}`);
   uaNote(`✅ ${email} → ${tier}`); uaSearch();
+}
+async function uaSetComped(email, comped){
+  await apiPost(`/api/admin/set_comped?email=${encodeURIComponent(email)}&comped=${comped}`);
+  uaNote(`✅ ${email} → ${comped==='true'||comped===true?'comped (excluded from revenue)':'paying'}`); uaSearch(); loadAll();
 }
 async function uaResetPw(email){
   const pw = prompt(`New password for ${email}:`);
@@ -389,12 +443,12 @@ async function loadFailedScans(){
     `— ${r.lookup_failures.length + r.score_failures.length} issues / ${r.total_attempts} attempts (${days}d)`;
   document.getElementById('failed-lookups').innerHTML = r.lookup_failures.map(f =>
     `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
-      <span>${f.barcode||'?'} <span class="text-warn">${f.reason||''}</span></span>
+      <span>${f.barcode||'?'} <span class="text-warn">${f.reason||''}</span>${f.is_internal?' <span class="bg-yellow-500/20 text-yellow-400 rounded px-1.5 text-xs font-bold">INTERNAL TEST</span>':''}</span>
       <span class="text-muted text-xs whitespace-nowrap">${(f.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
     || '<span class="text-muted">None 🎉</span>';
   document.getElementById('failed-scores').innerHTML = r.score_failures.map(f =>
     `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
-      <span>${(f.product||f.barcode||'?').toString().slice(0,28)} <span class="text-muted">${f.email||''}</span></span>
+      <span>${(f.product||f.barcode||'?').toString().slice(0,28)} <span class="text-muted">${f.email||''}</span>${f.is_internal?' <span class="bg-yellow-500/20 text-yellow-400 rounded px-1.5 text-xs font-bold">INTERNAL TEST</span>':''}</span>
       <span class="text-muted text-xs whitespace-nowrap">${(f.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
     || '<span class="text-muted">None 🎉</span>';
 }
