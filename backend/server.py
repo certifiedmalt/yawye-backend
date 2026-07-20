@@ -903,7 +903,9 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
 - This overrides the NOVA 3 cap. Example: tinned fruit in juice (fruit + juice + citric acid) = 8-10/10, NOT 5/10.
 - Score within 8-10 based on nutritional value: fresh whole food = 10, tinned/frozen natural food = 9, minimal processing with natural preservative like citric acid = 8-9.
 - This rule does NOT apply if ANY ingredient is an industrial additive, emulsifier, artificial sweetener, or other NOVA 4 marker.
-- Rules 1, 6, and 7 (carcinogens, alcohol, processed meat) ALWAYS take priority over this rule."""
+- Rules 1, 6, and 7 (carcinogens, alcohol, processed meat) ALWAYS take priority over this rule.
+
+SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products scoring 7 or below, and every alternative's score_estimate must be genuinely HIGHER than this product's score. If the product scores 8-10, return an empty healthier_alternatives array — it does not need a swap. Never suggest an alternative with the same or lower score."""
 
         response = await client.chat.completions.create(
             model="gpt-4o",
@@ -1007,6 +1009,22 @@ RULE 8 — CLEAN SHORT INGREDIENT LIST OVERRIDE:
         # plain nuts) are exempt — the compounds form in ALL cooking including at home.
         if has_acrylamide and not added_carcinogens and "whole" not in category and "minimally" not in category:
             result["overall_score"] = min(result["overall_score"], 4)
+
+        # Swap sanity: products scoring 8+ don't need alternatives; and a swap must
+        # genuinely beat the product's final score to be shown
+        final_score = result["overall_score"]
+        if final_score >= 8:
+            result["healthier_alternatives"] = []
+        else:
+            def _swap_score(s):
+                try:
+                    return int(str(s.get("score_estimate", "")).split("/")[0].strip())
+                except (ValueError, AttributeError):
+                    return None
+            result["healthier_alternatives"] = [
+                s for s in (result.get("healthier_alternatives") or [])
+                if _swap_score(s) is None or _swap_score(s) > final_score
+            ]
         
         logger.info(f"Scoring enforced: product={product_name}, ai_score={score}, final_score={result['overall_score']}, upf={upf_pct}%, category={category}")
         
