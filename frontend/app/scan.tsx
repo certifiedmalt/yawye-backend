@@ -33,8 +33,19 @@ export default function Scan() {
   const [confirmData, setConfirmData] = useState<any>(null);
   const [confirmBarcode, setConfirmBarcode] = useState<string>('');
   const [confirmNeedsAnalysis, setConfirmNeedsAnalysis] = useState(false);
+  const [autoFocus, setAutoFocus] = useState<'on' | 'off'>('on');
   const { token } = useAuth();
   const { purchaseSubscription, priceString } = useSubscription();
+
+  // iOS autofocus can lock after the first focus pass, leaving small/glossy
+  // barcodes permanently blurry. Re-trigger focus every 2s while scanning.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setAutoFocus('off');
+      setTimeout(() => setAutoFocus('on'), 80);
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
 
   const isLimitError = (error: any) =>
     error?.response?.status === 403 &&
@@ -467,6 +478,7 @@ export default function Scan() {
       <CameraView
         style={styles.camera}
         facing="back"
+        autofocus={autoFocus}
         onBarcodeScanned={scanned || scannedRef.current ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{
           barcodeTypes: [
