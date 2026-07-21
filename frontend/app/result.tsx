@@ -394,6 +394,7 @@ export default function Result() {
           </View>
         ) : analysis ? (
           <>
+        {!isUnidentified && (
         <View style={[styles.scoreCard, { borderColor: scoreColor }]}>
           <Text style={styles.scoreLabel}>Health Score</Text>
 
@@ -442,15 +443,18 @@ export default function Result() {
           )}
           <Text style={styles.recommendation}>{analysis.recommendation}</Text>
         </View>
+        )}
 
         {isUnidentified && (
           <View style={styles.identifyCard} data-testid="identify-product-card">
             <View style={styles.identifyHeader}>
               <Ionicons name="help-circle" size={22} color="#FFD54F" />
-              <Text style={styles.identifyTitle}>Help us identify this product</Text>
+              <Text style={styles.identifyTitle}>What product is this?</Text>
             </View>
             <Text style={styles.identifyHint}>
-              This barcode isn't in any food database yet. Tell us the product name and our AI will analyze it — you'll also unlock it for every future scanner!
+              {(product_name || '').toLowerCase().includes('store label')
+                ? "That's a store-printed label for a weighed or deli item — it only exists inside that one store. Tell us what the product is and we'll score it in seconds."
+                : "This barcode isn't in any food database yet. Type the product name and our AI will score it in ~10 seconds — you'll also unlock it for every future scanner! 🎉"}
             </Text>
             <TextInput
               style={styles.identifyInput}
@@ -459,6 +463,9 @@ export default function Result() {
               value={identifyName}
               onChangeText={setIdentifyName}
               editable={!identifying}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleIdentify}
               data-testid="identify-product-input"
             />
             <TouchableOpacity
