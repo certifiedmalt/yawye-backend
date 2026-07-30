@@ -209,6 +209,11 @@ async function unlock(){
 }
 function logout(){ sessionStorage.removeItem('yawye_admin_key'); location.reload(); }
 
+const regionName = (code) => {
+  if (!code || code === 'unknown' || code === '?') return code === '?' ? '?' : 'Unknown';
+  try { return new Intl.DisplayNames(['en'], {type:'region'}).of(code) || code; } catch(e) { return code; }
+};
+
 function card(label, value, accent){
   return `<div class="bg-surface border border-white/10 rounded-2xl p-4">
     <div class="text-muted text-xs uppercase tracking-wider">${label}</div>
@@ -237,14 +242,14 @@ async function loadAll(){
       <td class="py-2 pr-4 text-brand font-bold">${u.email||''}</td>
       <td class="py-2 pr-4 text-muted">${u.name||''}</td>
       <td class="py-2 pr-4">${u.total_scans??0}</td>
-      <td class="py-2 text-muted">${u.country||'?'}</td></tr>`).join('')
+      <td class="py-2 text-muted">${regionName(u.country||'?')}</td></tr>`).join('')
     || '<tr><td colspan="5" class="py-3 text-muted">No premium subscribers yet.</td></tr>';
   document.getElementById('comped-label').textContent = `— ${comped.length}`;
   document.getElementById('comped-users').innerHTML = comped.map(u => `<tr class="border-b border-white/5">
       <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(0,10)}</td>
       <td class="py-2 pr-4 font-bold">${u.email||''}</td>
       <td class="py-2 pr-4">${u.total_scans??0}</td>
-      <td class="py-2 text-muted">${u.country||'?'}</td></tr>`).join('')
+      <td class="py-2 text-muted">${regionName(u.country||'?')}</td></tr>`).join('')
     || '<tr><td colspan="4" class="py-3 text-muted">None.</td></tr>';
 
   const useRow = (label, fmt) => `<tr class="border-b border-white/5"><td class="py-2 pr-4 text-muted">${label}</td>` +
@@ -286,7 +291,7 @@ async function loadAll(){
     bar('10+ scans', dist['10_plus_scans'], dtot, 'bg-brand');
 
   document.getElementById('countries').innerHTML = (funnel.by_country||[]).map(c =>
-    `<span class="bg-black border border-white/15 rounded-full px-3 py-1">${c.country}: ${c.users}${c.premium?` (⭐${c.premium})`:''}</span>`).join('');
+    `<span class="bg-black border border-white/15 rounded-full px-3 py-1">${regionName(c.country)}: ${c.users}${c.premium?` (⭐${c.premium})`:''}</span>`).join('');
 
   document.getElementById('cohort-label').textContent = `— ${diag.cohort_users.length} in last ${days} days`;
   document.getElementById('users').innerHTML = diag.cohort_users.map(u => {
