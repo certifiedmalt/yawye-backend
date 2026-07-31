@@ -15,7 +15,7 @@
         "NSCameraUsageDescription": "Scan product barcodes to analyze ingredients",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "52"
+      "buildNumber": "53"
     },
     "android": {
       "adaptiveIcon": {
