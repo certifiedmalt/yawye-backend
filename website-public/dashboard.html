@@ -97,6 +97,12 @@
     </div>
 
     <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
+      <h2 class="font-heading font-bold text-lg">💳 Subscription Activity <span class="text-muted text-sm" id="subevents-label"></span></h2>
+      <p class="text-muted text-xs mt-1">Live feed of new subscriptions, cancellations and billing issues (Apple, Google & Stripe). Recording started Aug 2026.</p>
+      <div id="subevents" class="mt-3 space-y-1.5 text-sm" data-testid="dashboard-subevents"></div>
+    </div>
+
+    <div class="bg-surface border border-white/10 rounded-3xl p-6 mt-6">
       <h2 class="font-heading font-bold text-lg">Recent Signups <span class="text-muted text-sm" id="cohort-label"></span></h2>
       <div class="overflow-x-auto mt-4">
         <table class="w-full text-sm" data-testid="dashboard-users-table">
@@ -306,6 +312,22 @@ async function loadAll(){
   loadPushHistory();
   loadFailedScans();
   loadLinkStats();
+  loadSubEvents();
+}
+
+async function loadSubEvents(){
+  try {
+    const r = await api('/api/admin/subscription_events?days=90');
+    document.getElementById('subevents-label').textContent =
+      `— ${r.summary.new} new · ${r.summary.cancelled} cancelled · ${r.summary.billing_issues} billing issues (90d)`;
+    const ICON = {subscribed:'⭐', resubscribed:'🔁', renewed:'✅', plan_change:'🔀', cancelled:'❌', expired:'⌛', billing_issue:'⚠️'};
+    document.getElementById('subevents').innerHTML = (r.events||[]).map(e =>
+      `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
+        <span>${ICON[e.event]||'•'} <b>${e.email||'?'}</b> <span class="${e.event==='cancelled'||e.event==='expired'?'text-warn':e.event==='subscribed'?'text-brand':'text-muted'}">${e.event.replace('_',' ')}</span>
+        <span class="text-muted">(${e.source||''})</span>${e.days_subscribed!=null?` <span class="text-muted">· subscribed ${e.days_subscribed}d</span>`:''}</span>
+        <span class="text-muted text-xs whitespace-nowrap">${(e.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
+      || '<span class="text-muted">No subscription events recorded yet — the log starts now, so this fills in as people subscribe or cancel.</span>';
+  } catch(e) { console.warn('subevents', e); }
 }
 
 let cohortExpanded = false;

@@ -92,6 +92,7 @@ scan_analytics_collection = db["scan_analytics"]  # New: Analytics tracking
 push_campaigns_collection = db["push_campaigns"]  # Push notification history
 link_clicks_collection = db["link_clicks"]  # Influencer tracked link clicks
 pending_premium_collection = db["pending_premium"]  # Emails auto-granted premium on signup
+subscription_events_collection = db["subscription_events"]  # Subscribe/cancel/billing event log
 
 # Security
 import bcrypt as _bcrypt
@@ -2902,6 +2903,38 @@ async def admin_search_users(key: str = "", q: str = ""):
     return {"users": results, "count": len(results)}
 
 
+@app.get("/api/admin/subscription_events")
+async def admin_subscription_events(key: str = "", days: int = 90):
+    """Recent subscribe/cancel/billing events + churn summary"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    events = []
+    first_sub_by_email = {}
+    async for e in subscription_events_collection.find({"at": {"$gte": cutoff}}, {"_id": 0}).sort("at", -1).limit(100):
+        e["at"] = e["at"].isoformat() if isinstance(e.get("at"), datetime) else e.get("at")
+        events.append(e)
+    # days-subscribed for cancellations: look up that email's earliest 'subscribed' event
+    for e in events:
+        if e["event"] in ("cancelled", "expired"):
+            first = await subscription_events_collection.find_one(
+                {"email": e["email"], "event": {"$in": ["subscribed", "resubscribed"]}}, sort=[("at", 1)])
+            if first and isinstance(first.get("at"), datetime):
+                try:
+                    e["days_subscribed"] = max(0, (datetime.fromisoformat(e["at"]) - first["at"]).days)
+                except Exception:
+                    pass
+    summary = {"new": 0, "cancelled": 0, "billing_issues": 0}
+    for e in events:
+        if e["event"] in ("subscribed", "resubscribed"):
+            summary["new"] += 1
+        elif e["event"] in ("cancelled", "expired"):
+            summary["cancelled"] += 1
+        elif e["event"] == "billing_issue":
+            summary["billing_issues"] += 1
+    return {"events": events, "summary": summary, "days": days}
+
+
 @app.post("/api/admin/grant_scans")
 async def admin_grant_scans(key: str = "", email: str = "", count: int = 3):
     """Give a free user bonus scans by reducing their used-scan count (floor 0)"""
@@ -3282,6 +3315,14 @@ async def revenuecat_webhook(request: Request):
         user_oid = user["_id"]
         
         # Handle subscription events
+        friendly = {"INITIAL_PURCHASE": "subscribed", "RENEWAL": "renewed",
+                    "PRODUCT_CHANGE": "plan_change", "UNCANCELLATION": "resubscribed",
+                    "CANCELLATION": "cancelled", "EXPIRATION": "expired",
+                    "BILLING_ISSUE": "billing_issue"}.get(event_type)
+        if friendly:
+            store = (event.get("store") or "").replace("APP_STORE", "apple").replace("PLAY_STORE", "google").lower() or "mobile"
+            await subscription_events_collection.insert_one({
+                "email": user.get("email"), "event": friendly, "source": store, "at": datetime.utcnow()})
         if event_type in ["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION"]:
             await users_collection.update_one(
                 {"_id": user_oid},
@@ -4362,6 +4403,8 @@ async def stripe_webhook(request: Request):
                     "subscription_source": "web_stripe",
                 }},
             )
+            await subscription_events_collection.insert_one(
+                {"email": email, "event": "subscribed", "source": "stripe_web", "at": datetime.utcnow()})
             logger.info(f"Stripe: upgraded {email} to premium via web checkout")
     
     elif event_type == "invoice.payment_failed":
@@ -4373,6 +4416,8 @@ async def stripe_webhook(request: Request):
                     {"_id": user["_id"]},
                     {"$set": {"subscription_tier": "free"}},
                 )
+                await subscription_events_collection.insert_one(
+                    {"email": user.get("email"), "event": "billing_issue", "source": "stripe_web", "at": datetime.utcnow()})
                 logger.info(f"Stripe: downgraded {user.get('email')} due to payment failure")
     
     elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
@@ -4385,6 +4430,8 @@ async def stripe_webhook(request: Request):
                     {"_id": user["_id"]},
                     {"$set": {"subscription_tier": "free"}},
                 )
+                await subscription_events_collection.insert_one(
+                    {"email": user.get("email"), "event": "cancelled", "source": "stripe_web", "at": datetime.utcnow()})
                 logger.info(f"Stripe: subscription {status} for {user.get('email')}")
     
     return {"status": "success"}
