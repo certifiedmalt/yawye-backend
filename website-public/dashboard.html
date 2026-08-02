@@ -296,7 +296,20 @@ async function loadAll(){
     `<span class="bg-black border border-white/15 rounded-full px-3 py-1">${regionName(c.country)}: ${c.users}${c.premium?` (⭐${c.premium})`:''}</span>`).join('');
 
   document.getElementById('cohort-label').textContent = `— ${diag.cohort_users.length} in last ${days} days`;
-  document.getElementById('users').innerHTML = diag.cohort_users.map(u => {
+  window._cohortUsers = diag.cohort_users;
+  renderCohort(false);
+
+  loadPushHistory();
+  loadFailedScans();
+  loadLinkStats();
+}
+
+let cohortExpanded = false;
+function renderCohort(expanded){
+  cohortExpanded = expanded;
+  const all = window._cohortUsers || [];
+  const shown = expanded ? all : all.slice(0, 20);
+  document.getElementById('users').innerHTML = shown.map(u => {
     const recent = (u.scan_records||[]).slice(0,3).map(r =>
       `<span class="${r.analysis_error||r.score==null?'text-warn':''}">${(r.product||r.barcode||'').toString().slice(0,20)} <b>${r.score??'ERR'}</b></span>`).join(' · ');
     return `<tr class="border-b border-white/5">
@@ -309,11 +322,9 @@ async function loadAll(){
       <td class="py-2 pr-4">${u.has_push_token?'✅':'—'}</td>
       <td class="py-2 pr-4 text-muted">${regionName(u.country||'?')}</td>
       <td class="py-2 text-muted">${recent||'<span class="text-warn">never scanned</span>'}</td></tr>`;
-  }).join('');
-
-  loadPushHistory();
-  loadFailedScans();
-  loadLinkStats();
+  }).join('') + (all.length > 20 ? `<tr><td colspan="9" class="py-3 text-center">
+      <button onclick="renderCohort(${!expanded})" data-testid="cohort-expand-btn" class="bg-white/10 border border-white/20 rounded-full px-5 py-1.5 text-sm hover:bg-white/20">
+        ${expanded ? 'Show latest 20 only' : `Show all ${all.length} signups`}</button></td></tr>` : '');
 }
 
 async function loadLinkStats(){
