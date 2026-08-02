@@ -102,7 +102,7 @@
         <table class="w-full text-sm" data-testid="dashboard-users-table">
           <thead><tr class="text-muted text-left border-b border-white/10">
             <th class="py-2 pr-4">Joined</th><th class="py-2 pr-4">Email</th><th class="py-2 pr-4">Name</th>
-            <th class="py-2 pr-4">Scans</th><th class="py-2 pr-4">Push</th><th class="py-2 pr-4">Country</th><th class="py-2">Recent scans</th>
+            <th class="py-2 pr-4">📱</th><th class="py-2 pr-4">Scans</th><th class="py-2 pr-4">Failed</th><th class="py-2 pr-4">Push</th><th class="py-2 pr-4">Country</th><th class="py-2">Recent scans</th>
           </tr></thead>
           <tbody id="users"></tbody>
         </table>
@@ -214,6 +214,8 @@ const regionName = (code) => {
   try { return new Intl.DisplayNames(['en'], {type:'region'}).of(code) || code; } catch(e) { return code; }
 };
 
+const platIcon = (p) => p==='ios' ? '<span title="iPhone"></span>' : p==='android' ? '<span title="Android">🤖</span>' : '<span class="text-muted">—</span>';
+
 function card(label, value, accent){
   return `<div class="bg-surface border border-white/10 rounded-2xl p-4">
     <div class="text-muted text-xs uppercase tracking-wider">${label}</div>
@@ -240,7 +242,7 @@ async function loadAll(){
   document.getElementById('premium-users').innerHTML = prem.map(u => `<tr class="border-b border-white/5">
       <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(0,10)}</td>
       <td class="py-2 pr-4 text-brand font-bold">${u.email||''}</td>
-      <td class="py-2 pr-4 text-muted">${u.name||''}</td>
+      <td class="py-2 pr-4 text-muted">${u.name||''} ${platIcon(u.platform)}</td>
       <td class="py-2 pr-4">${u.total_scans??0}</td>
       <td class="py-2 text-muted">${regionName(u.country||'?')}</td></tr>`).join('')
     || '<tr><td colspan="5" class="py-3 text-muted">No premium subscribers yet.</td></tr>';
@@ -301,9 +303,11 @@ async function loadAll(){
       <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(5,16).replace('T',' ')}</td>
       <td class="py-2 pr-4">${u.email||''}</td>
       <td class="py-2 pr-4 text-muted">${u.name||''}</td>
+      <td class="py-2 pr-4">${platIcon(u.platform)}</td>
       <td class="py-2 pr-4 font-bold ${u.total_scans===0?'text-warn':u.total_scans>=5?'text-brand':''}">${u.total_scans}</td>
+      <td class="py-2 pr-4 ${u.failed_scans>2?'text-warn font-bold':'text-muted'}">${u.failed_scans||0}</td>
       <td class="py-2 pr-4">${u.has_push_token?'✅':'—'}</td>
-      <td class="py-2 pr-4 text-muted">${u.country||'?'}</td>
+      <td class="py-2 pr-4 text-muted">${regionName(u.country||'?')}</td>
       <td class="py-2 text-muted">${recent||'<span class="text-warn">never scanned</span>'}</td></tr>`;
   }).join('');
 
@@ -390,8 +394,8 @@ async function uaSearch(){
     const comped = !!u.comped;
     return `<div class="bg-black border border-white/10 rounded-xl p-3" data-testid="user-admin-card">
       <div class="flex justify-between flex-wrap gap-1">
-        <span class="font-bold ${prem?'text-brand':''}">${em}</span>
-        <span class="text-muted text-xs">${u.name||''} · ${u.total_scans??0} scans · ${prem?(comped?'🎁 comped':'⭐ premium'):'free'}</span>
+        <span class="font-bold ${prem?'text-brand':''}">${em} ${platIcon(u.platform)}</span>
+        <span class="text-muted text-xs">${u.name||''} · ${u.total_scans??0} scans · ${u.failed_scans?`<span class="text-warn">${u.failed_scans} failed</span> · `:''}${prem?(comped?'🎁 comped':'⭐ premium'):'free'}</span>
       </div>
       <div class="flex flex-wrap gap-2 mt-2 text-xs">
         <button onclick="uaSetTier('${em}','${prem?'free':'premium'}')" class="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 hover:bg-white/20">${prem?'Revoke premium':'Grant premium'}</button>

@@ -178,6 +178,22 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://web-production-66c05
 INTERNAL_EMAILS = {"jpsaila1986@gmail.com", "applereview@yawye.app",
                    "googlereviewer@yawye.app", "test.screenshot@yawye.app"}
 
+def _detect_platform(request) -> Optional[str]:
+    ua = (request.headers.get("user-agent") or "").lower()
+    if "okhttp" in ua or "android" in ua:
+        return "android"
+    if "darwin" in ua or "cfnetwork" in ua or "iphone" in ua or "ios" in ua:
+        return "ios"
+    return None
+
+async def _record_platform(user_id, request, current: Optional[str] = None):
+    try:
+        plat = _detect_platform(request)
+        if plat and plat != current:
+            await users_collection.update_one({"_id": user_id}, {"$set": {"platform": plat}})
+    except Exception:
+        pass
+
 async def log_scan_analytics(barcode: str, success: bool, source: str, response_time: float, error: str = None, user_id: str = None):
     """Log scan analytics for monitoring"""
     try:
@@ -1138,6 +1154,7 @@ async def login(user: UserLogin, request: Request):
     if not db_user or not verify_password(user.password, db_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     asyncio.create_task(capture_user_country(db_user["_id"], _client_ip(request)))
+    asyncio.create_task(_record_platform(db_user["_id"], request, db_user.get("platform")))
     
     # Create token
     token = create_access_token({"sub": str(db_user["_id"])})
@@ -1983,7 +2000,7 @@ async def refresh_stale_cache_entry(barcode: str):
 
 
 @app.post("/api/scan/quick")
-async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_current_user)):
+async def scan_product_quick(scan_req: ScanRequest, request: Request, current_user = Depends(get_current_user)):
     """
     Stage 1: Quick product lookup - returns product name/image fast.
     If cached with full analysis, returns everything immediately.
@@ -1991,6 +2008,7 @@ async def scan_product_quick(scan_req: ScanRequest, current_user = Depends(get_c
     """
     barcode = scan_req.barcode.strip()
     logger.info(f"Quick scan request for barcode: {barcode}")
+    asyncio.create_task(_record_platform(current_user["_id"], request, current_user.get("platform")))
 
     clean_barcode = barcode.replace(" ", "")
     if not clean_barcode.isdigit() or not (6 <= len(clean_barcode) <= 14):
@@ -2708,7 +2726,7 @@ async def admin_user_stats(key: str = ""):
     premium_list, comped_list = [], []
     async for u in users_collection.find(
         {"subscription_tier": "premium"},
-        {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1, "created_at": 1, "country": 1, "comped": 1}
+        {"_id": 0, "email": 1, "name": 1, "subscription_tier": 1, "total_scans": 1, "created_at": 1, "country": 1, "comped": 1, "platform": 1}
     ).sort("created_at", -1):
         if isinstance(u.get("created_at"), datetime):
             u["created_at"] = u["created_at"].isoformat()
@@ -2813,10 +2831,17 @@ async def admin_cohort_diagnostics(key: str = "", days: int = 7):
         raise HTTPException(status_code=403, detail="Invalid key")
     cutoff = datetime.utcnow() - timedelta(days=days)
 
+    fail_by_user = {}
+    async for d in scan_analytics_collection.aggregate([
+        {"$match": {"success": False, "user_id": {"$ne": None}}},
+        {"$group": {"_id": "$user_id", "n": {"$sum": 1}}}
+    ]):
+        fail_by_user[str(d["_id"])] = d["n"]
+
     users = []
     async for u in users_collection.find(
         {"created_at": {"$gte": cutoff}},
-        {"email": 1, "name": 1, "total_scans": 1, "created_at": 1, "push_token": 1, "country": 1}
+        {"email": 1, "name": 1, "total_scans": 1, "created_at": 1, "push_token": 1, "country": 1, "platform": 1}
     ).sort("created_at", -1):
         uid = str(u["_id"])
         scans = []
@@ -2836,6 +2861,8 @@ async def admin_cohort_diagnostics(key: str = "", days: int = 7):
             "total_scans": u.get("total_scans", 0),
             "has_push_token": bool(u.get("push_token")),
             "country": u.get("country"),
+            "platform": u.get("platform"),
+            "failed_scans": fail_by_user.get(uid, 0),
             "scan_records": scans,
         })
 
@@ -2865,7 +2892,9 @@ async def admin_search_users(key: str = "", q: str = ""):
         {"name": {"$regex": q, "$options": "i"}},
         {"email": {"$regex": q, "$options": "i"}}
     ]}
-    async for u in users_collection.find(query, {"_id": 0, "password": 0, "password_hash": 0}):
+    async for u in users_collection.find(query, {"password": 0, "password_hash": 0}):
+        uid = str(u.pop("_id"))
+        u["failed_scans"] = await scan_analytics_collection.count_documents({"user_id": uid, "success": False})
         results.append(u)
     return {"users": results, "count": len(results)}
 
