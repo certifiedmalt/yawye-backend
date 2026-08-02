@@ -197,14 +197,18 @@ async function apiPost(path, body){
 
 async function unlock(){
   KEY = document.getElementById('pw').value.trim();
+  const err = document.getElementById('gate-err');
   try {
-    await api('/api/admin/user_stats');
+    const r = await fetch(`${API}/api/admin/user_stats?key=${encodeURIComponent(KEY)}`);
+    if (r.status === 403) { err.textContent = 'Wrong password.'; err.classList.remove('hidden'); return; }
+    if (!r.ok) throw new Error('server');
     sessionStorage.setItem('yawye_admin_key', KEY);
     document.getElementById('gate').classList.add('hidden');
     document.getElementById('dash').classList.remove('hidden');
     loadAll();
   } catch(e) {
-    document.getElementById('gate-err').classList.remove('hidden');
+    err.textContent = "Can't reach the server (it may be redeploying) — password is probably fine, try again in a minute.";
+    err.classList.remove('hidden');
   }
 }
 function logout(){ sessionStorage.removeItem('yawye_admin_key'); location.reload(); }
