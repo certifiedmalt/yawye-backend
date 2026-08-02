@@ -1300,9 +1300,12 @@ async def admin_send_notification(request: Request, key: str = ""):
     message = body.get("message", "Time to scan!")
     max_scans = body.get("max_scans")
     tier = body.get("tier")
+    email = body.get("email")
     dry_run = body.get("dry_run", False)
 
     query = {"push_token": {"$exists": True, "$ne": ""}}
+    if email:
+        query["email"] = email
     if max_scans is not None:
         query["$or"] = [{"total_scans": {"$lte": int(max_scans)}}, {"total_scans": {"$exists": False}}]
     if tier == "premium":
@@ -2897,6 +2900,19 @@ async def admin_search_users(key: str = "", q: str = ""):
         u["failed_scans"] = await scan_analytics_collection.count_documents({"user_id": uid, "success": False})
         results.append(u)
     return {"users": results, "count": len(results)}
+
+
+@app.post("/api/admin/grant_scans")
+async def admin_grant_scans(key: str = "", email: str = "", count: int = 3):
+    """Give a free user bonus scans by reducing their used-scan count (floor 0)"""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    u = await users_collection.find_one({"email": email})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    new_total = max(0, (u.get("total_scans") or 0) - count)
+    await users_collection.update_one({"_id": u["_id"]}, {"$set": {"total_scans": new_total}})
+    return {"email": email, "total_scans": new_total, "granted": count}
 
 
 @app.post("/api/admin/cache_delete")
