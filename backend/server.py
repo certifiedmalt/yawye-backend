@@ -14,6 +14,7 @@ from passlib.context import CryptContext  # kept for backward compat import
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from openai import AsyncOpenAI
 import asyncio
+import json
 import re
 import time
 import logging
