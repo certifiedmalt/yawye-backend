@@ -3042,7 +3042,7 @@ async def scan_photo(req: PhotoScanRequest, current_user = Depends(get_current_u
         data = json.loads(resp.choices[0].message.content)
     except Exception as e:
         logger.error(f"Photo scan error: {e}")
-        raise HTTPException(status_code=500, detail="Could not analyze the photo. Please try again.")
+        raise HTTPException(status_code=500, detail=f"Photo analysis error: {type(e).__name__}: {str(e)[:200]}")
 
     if data.get("confidence") == "low":
         return {"status": "unclear"}
