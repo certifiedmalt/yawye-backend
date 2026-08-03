@@ -2053,7 +2053,7 @@ async def scan_product_quick(scan_req: ScanRequest, request: Request, current_us
                 "overall_score": 0,
                 "upf_score": "Unknown",
                 "processing_category": "Unknown",
-                "recommendation": "This is a store-printed label (used for weighed, deli or price-reduced items inside one store) — it can't be looked up globally. Type the product name below and we'll analyze it.",
+                "recommendation": "No barcode? Usually a great sign — the healthiest food in the store doesn't need a label. This is a store-printed tag for a weighed, deli or bakery item, so it can't be looked up globally. Tell us what it is and we'll score it in seconds.",
                 "analysis_note": "Store-internal barcode (GS1 restricted range)",
             },
             "source": "store_label",
@@ -2955,6 +2955,126 @@ async def admin_cache_delete(key: str = "", barcode: str = ""):
         raise HTTPException(status_code=403, detail="Invalid key")
     r = await product_cache_collection.delete_one({"barcode": barcode})
     return {"deleted": r.deleted_count, "barcode": barcode}
+
+
+class NameAnalyzeRequest(BaseModel):
+    name: str
+
+class PhotoScanRequest(BaseModel):
+    image_base64: str
+
+def _check_scan_limit(current_user):
+    if current_user.get("subscription_tier") != "premium" and (current_user.get("total_scans") or 0) >= 5:
+        raise HTTPException(status_code=403, detail="Free scan limit reached (5 scans). Upgrade to premium for unlimited scans.")
+
+async def _record_name_scan(current_user, product_name, analysis, source):
+    await scans_collection.insert_one({
+        "user_id": str(current_user["_id"]),
+        "barcode": None,
+        "product_name": product_name,
+        "brands": "",
+        "ingredients_text": "",
+        "image_url": "",
+        "analysis": analysis,
+        "scanned_at": datetime.utcnow(),
+        "source": source,
+    })
+    await users_collection.update_one({"_id": current_user["_id"]}, {"$inc": {"total_scans": 1}})
+
+
+@app.post("/api/analyze/name")
+async def analyze_by_name(req: NameAnalyzeRequest, current_user = Depends(get_current_user)):
+    """Score fresh/unlabelled food by name — used by the fresh-food quick-pick buttons"""
+    _check_scan_limit(current_user)
+    name = req.name.strip()
+    if len(name) < 3:
+        raise HTTPException(status_code=400, detail="Name too short")
+    analysis = await analyze_ingredients_with_ai(name, "")
+    await _record_name_scan(current_user, name, analysis, "name_analysis")
+    return {"status": "complete", "product_name": name, "brands": "", "ingredients_text": "",
+            "image_url": "", "analysis": analysis, "source": "name_analysis"}
+
+
+PHOTO_PROMPT = """You are the AI behind "You Are What You Eat", an honest, no-fear-mongering food scoring app.
+Identify the food in this photo.
+
+Rules:
+- If it is a PACKAGED product with visible branding, name it exactly (brand + product).
+- If it is a cooked dish or fresh food, name the dish (e.g. "Spaghetti bolognese").
+- If you genuinely cannot tell what it is, set "confidence": "low".
+- Score the food AS TYPICALLY MADE. You CANNOT see invisible ingredients (cooking oil type, added sugar, jarred vs homemade sauce, salt) — NEVER pretend you can. List what you assumed in "assumptions" and offer "refinements" the user can tap to adjust the score.
+- Scoring anchors: whole fresh foods (fruit, veg, plain fish/meat) = 9-10; balanced home-cooked dishes = 6-8; fried food/pastries = 4-6; processed meat (bacon, ham, salami — IARC Group 1) = 1-3; deep-fried takeaway/ultra-processed = 2-4.
+- Refinement option scores must stay between 1 and 10 and genuinely reflect the difference.
+
+Respond with JSON only:
+{
+  "food_name": "...",
+  "confidence": "high|medium|low",
+  "overall_score": 7,
+  "processing_category": "Whole Food|Minimally Processed|Processed|Ultra-Processed",
+  "upf_score": "e.g. 10%",
+  "harmful_ingredients": [{"name": "...", "severity": "low|moderate|high", "explanation": "..."}],
+  "beneficial_ingredients": [{"name": "...", "benefit": "..."}],
+  "carcinogens_found": [],
+  "recommendation": "1-2 honest, encouraging sentences",
+  "assumptions": ["Assumes homemade sauce", "Assumes olive or vegetable oil"],
+  "refinements": [{"question": "Jarred or homemade sauce?", "options": [{"label": "Homemade", "score": 7}, {"label": "Jarred", "score": 5}]}]
+}"""
+
+
+@app.post("/api/scan/photo")
+async def scan_photo(req: PhotoScanRequest, current_user = Depends(get_current_user)):
+    """Photo-based food identification and honest typical scoring (fresh food, dishes, no-barcode items)"""
+    _check_scan_limit(current_user)
+    if len(req.image_base64) > 8_000_000:
+        raise HTTPException(status_code=400, detail="Image too large")
+    try:
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        resp = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": PHOTO_PROMPT},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{req.image_base64}", "detail": "low"}},
+            ]}],
+            max_tokens=900, temperature=0,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"Photo scan error: {e}")
+        raise HTTPException(status_code=500, detail="Could not analyze the photo. Please try again.")
+
+    if data.get("confidence") == "low":
+        return {"status": "unclear"}
+
+    def _clamp(s):
+        try:
+            return max(1, min(10, int(s)))
+        except (ValueError, TypeError):
+            return 5
+    refinements = []
+    for r in (data.get("refinements") or [])[:3]:
+        opts = [{"label": str(o.get("label", ""))[:40], "score": _clamp(o.get("score"))}
+                for o in (r.get("options") or [])[:4] if o.get("label")]
+        if opts:
+            refinements.append({"question": str(r.get("question", ""))[:80], "options": opts})
+    analysis = {
+        "overall_score": _clamp(data.get("overall_score")),
+        "processing_category": data.get("processing_category") or "Unknown",
+        "upf_score": data.get("upf_score") or "Unknown",
+        "harmful_ingredients": data.get("harmful_ingredients") or [],
+        "beneficial_ingredients": data.get("beneficial_ingredients") or [],
+        "carcinogens_found": data.get("carcinogens_found") or [],
+        "recommendation": data.get("recommendation") or "",
+        "is_estimate": True,
+        "assumptions": (data.get("assumptions") or [])[:5],
+        "refinements": refinements,
+    }
+    sanitize_carcinogen_claims(analysis)
+    food_name = str(data.get("food_name") or "Unidentified food")[:80]
+    await _record_name_scan(current_user, food_name, analysis, "photo_ai")
+    return {"status": "complete", "product_name": food_name, "brands": "", "ingredients_text": "",
+            "image_url": "", "analysis": analysis, "source": "photo_ai"}
 
 
 @app.post("/api/admin/carcinogen_audit")

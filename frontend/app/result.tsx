@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Haptics from 'expo-haptics';
@@ -48,6 +49,9 @@ interface BeneficialIngredient {
 interface Analysis {
   harmful_ingredients: HarmfulIngredient[];
   beneficial_ingredients: BeneficialIngredient[];
+  is_estimate?: boolean;
+  assumptions?: string[];
+  refinements?: { question: string; selected?: string; options: { label: string; score: number }[] }[];
   carcinogens_found?: CarcinogenEntry[];
   chemical_breakdown?: ChemicalEntry[];
   healthier_alternatives?: AlternativeEntry[];
@@ -104,6 +108,67 @@ export default function Result() {
   const [expandedResearch, setExpandedResearch] = useState<{ [key: string]: boolean }>({});
   const [identifyName, setIdentifyName] = useState('');
   const [identifying, setIdentifying] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  const applyNameResult = (data: any) => {
+    setProductData(data);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleQuickPick = async (name: string) => {
+    if (identifying || photoBusy) return;
+    setIdentifying(true);
+    try {
+      const res = await axios.post(
+        `${BACKEND_URL}/api/analyze/name`,
+        { name },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+      );
+      applyNameResult(res.data);
+    } catch (e: any) {
+      Alert.alert('Analysis Failed', e?.response?.data?.detail || 'Could not analyze. Please try again.');
+    } finally {
+      setIdentifying(false);
+    }
+  };
+
+  const handlePhotoScan = async () => {
+    if (photoBusy || identifying) return;
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Camera needed', 'Allow camera access to snap a photo of the food.');
+      return;
+    }
+    const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, base64: true, allowsEditing: false });
+    if (shot.canceled || !shot.assets?.[0]?.base64) return;
+    setPhotoBusy(true);
+    try {
+      const res = await axios.post(
+        `${BACKEND_URL}/api/scan/photo`,
+        { image_base64: shot.assets[0].base64 },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 90000 }
+      );
+      if (res.data?.status === 'unclear') {
+        Alert.alert("Couldn't tell what that is", 'Try a clearer photo, or use the buttons / type the name instead.');
+        return;
+      }
+      applyNameResult(res.data);
+    } catch (e: any) {
+      Alert.alert('Photo scan failed', e?.response?.data?.detail || 'Could not analyze the photo. Please try again.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const handleRefine = (qIdx: number, opt: { label: string; score: number }) => {
+    setProductData((prev: any) => {
+      if (!prev?.analysis) return prev;
+      const refs = (prev.analysis.refinements || []).map((r: any, i: number) =>
+        i === qIdx ? { ...r, selected: opt.label } : r);
+      return { ...prev, analysis: { ...prev.analysis, overall_score: opt.score, refinements: refs } };
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
   const scoreAnim = useRef(new Animated.Value(0)).current;
   const { token } = useAuth();
 
@@ -453,9 +518,40 @@ export default function Result() {
             </View>
             <Text style={styles.identifyHint}>
               {(product_name || '').toLowerCase().includes('store label')
-                ? "That's a store-printed label for a weighed or deli item — it only exists inside that one store. Tell us what the product is and we'll score it in seconds."
+                ? "No barcode? Usually a great sign 🥦 — the healthiest food in the store doesn't need a label. That was a store's own tag for a weighed, deli or bakery item. Tell us what it is:"
                 : "This barcode isn't in any food database yet. Type the product name and our AI will score it in ~10 seconds — you'll also unlock it for every future scanner! 🎉"}
             </Text>
+            <View style={styles.quickPickRow}>
+              {[
+                { label: '🥖 Bakery', name: 'fresh bakery item (bread, roll or pastry)' },
+                { label: '🥩 Deli meat', name: 'deli counter sliced processed meat (ham, salami)' },
+                { label: '🧀 Cheese', name: 'cheese from the cheese counter' },
+                { label: '🥗 Fruit & veg', name: 'fresh fruit and vegetables' },
+              ].map((p) => (
+                <TouchableOpacity
+                  key={p.label}
+                  style={styles.quickPickChip}
+                  disabled={identifying || photoBusy}
+                  onPress={() => handleQuickPick(p.name)}
+                  data-testid={`quick-pick-${p.label.slice(3).toLowerCase().replace(/[^a-z]+/g, '-')}`}
+                >
+                  <Text style={styles.quickPickText}>{p.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={styles.photoButton}
+              disabled={photoBusy || identifying}
+              onPress={handlePhotoScan}
+              data-testid="photo-scan-button"
+            >
+              {photoBusy
+                ? <ActivityIndicator color="#FFD54F" />
+                : <>
+                    <Ionicons name="camera" size={20} color="#FFD54F" />
+                    <Text style={styles.photoButtonText}>Snap a photo — AI identifies it</Text>
+                  </>}
+            </TouchableOpacity>
             <TextInput
               style={styles.identifyInput}
               placeholder="e.g. Tesco Chocolate Digestives"
@@ -478,6 +574,40 @@ export default function Result() {
                 ? <ActivityIndicator color="#000" />
                 : <Text style={styles.identifyButtonText}>Analyze it</Text>}
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Photo/name estimate: assumptions + refinement chips */}
+        {analysis.is_estimate && (
+          <View style={styles.estimateCard} data-testid="estimate-card">
+            <View style={styles.identifyHeader}>
+              <Ionicons name="analytics" size={20} color="#FFD54F" />
+              <Text style={styles.identifyTitle}>Typical score — help us refine it</Text>
+            </View>
+            {(analysis.assumptions || []).length > 0 && (
+              <Text style={styles.assumptionText}>
+                {(analysis.assumptions || []).map((a: string) => `• ${a}`).join('\n')}
+              </Text>
+            )}
+            {(analysis.refinements || []).map((r: any, qi: number) => (
+              <View key={qi} style={{ marginTop: 10 }}>
+                <Text style={styles.refineQuestion}>{r.question}</Text>
+                <View style={styles.quickPickRow}>
+                  {(r.options || []).map((o: any) => (
+                    <TouchableOpacity
+                      key={o.label}
+                      style={[styles.quickPickChip, r.selected === o.label && styles.quickPickChipActive]}
+                      onPress={() => handleRefine(qi, o)}
+                      data-testid="refine-option"
+                    >
+                      <Text style={[styles.quickPickText, r.selected === o.label && { color: '#000' }]}>
+                        {o.label} · {o.score}/10
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -930,6 +1060,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     textAlign: 'center',
+  },
+  quickPickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  quickPickChip: {
+    backgroundColor: 'rgba(255,213,79,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,213,79,0.4)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  quickPickChipActive: {
+    backgroundColor: '#FFD54F',
+  },
+  quickPickText: {
+    color: '#FFD54F',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,213,79,0.5)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  photoButtonText: {
+    color: '#FFD54F',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  estimateCard: {
+    backgroundColor: 'rgba(255,213,79,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,213,79,0.25)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+  },
+  assumptionText: {
+    color: '#AAA',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  refineQuestion: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
   identifyCard: {
     backgroundColor: '#1a1a1a',
