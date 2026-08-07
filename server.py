@@ -3177,6 +3177,9 @@ async def admin_carcinogen_audit(key: str = "", purge: bool = False):
         claims = (doc.get("analysis") or {}).get("carcinogens_found") or []
         bad = [str(c.get("name") if isinstance(c, dict) else c) for c in claims
                if _is_process_formed(c) or not _is_iarc_verified(c)]
+        if not _is_alcoholic_beverage_name(doc.get("product_name")):
+            bad += [str(c.get("name") if isinstance(c, dict) else c) + " (alcohol claim on non-beverage)"
+                    for c in claims if _is_alcohol_claim(c)]
         if bad:
             suspects.append({
                 "barcode": doc.get("barcode"),
