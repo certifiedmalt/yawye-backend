@@ -660,7 +660,7 @@ Respond with JSON only:
         logger.error(f"AI barcode identification error: {e}")
         return None
 
-async def analyze_product_by_name(client, product_name: str) -> dict:
+async def analyze_product_by_name(client, product_name: str, off_alcoholic: bool = False) -> dict:
     """When no ingredients list is available, use AI knowledge to analyze the product by name"""
     try:
         prompt = f"""You are a food science expert. The product "{product_name}" was scanned but no ingredient list was found in the database.
@@ -715,11 +715,17 @@ Respond with JSON only:
         import json
         result = json.loads(response.choices[0].message.content)
 
-        # Deterministic alcohol handling (name-only path has no ingredient evidence)
-        if _is_alcoholic_beverage_name(product_name):
+        # Strip process-formed / AI-invented carcinogen claims from the panel (no score forcing —
+        # the name-only path has no ingredient evidence to justify an automatic 1)
+        sanitize_carcinogen_claims(result)
+
+        # Deterministic alcohol handling. OFF's alcoholic-beverage category alone can be
+        # crowd-data noise, so it only counts when the AI also flagged alcohol.
+        ai_claimed_alcohol = any(_is_alcohol_claim(c) for c in (result.get("carcinogens_found") or []))
+        if _is_alcoholic_beverage_name(product_name) or (off_alcoholic and ai_claimed_alcohol):
             _enforce_alcoholic_beverage(result)
             logger.info(f"By-name alcohol enforcement: {product_name} -> 1/10")
-        elif any(_is_alcohol_claim(c) for c in (result.get("carcinogens_found") or [])):
+        elif ai_claimed_alcohol:
             _demote_trace_alcohol(result)
             if result.get("overall_score", 5) < 2:
                 result["overall_score"] = 2
@@ -851,11 +857,7 @@ async def analyze_ingredients_with_ai(product_name: str, ingredients: str, off_n
 
         # If no ingredients provided, use product-name-based analysis
         if not ingredients or ingredients.strip() == "":
-            result = await analyze_product_by_name(client, product_name)
-            if off_alcoholic:
-                _enforce_alcoholic_beverage(result)
-                logger.info(f"OFF-category alcohol enforcement (by-name): {product_name} -> 1/10")
-            return result
+            return await analyze_product_by_name(client, product_name, off_alcoholic=off_alcoholic)
         
         prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs), carcinogens, and nutritional health risks.
 
@@ -1065,7 +1067,9 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         ing_lower = (ingredients or "").lower()
         # Brewing ingredients identify beer even when the brand name gives nothing away (e.g. "Corona Extra")
         is_brewed = bool(re.search(r"\bhops?\b|\bhop extract\b", ing_lower)) and "malt" in ing_lower
-        is_beverage = off_alcoholic or is_brewed or _is_alcoholic_beverage_name(product_name)
+        ai_claimed_alcohol = any(_is_alcohol_claim(c) for c in added_carcinogens)
+        # OFF's alcoholic-beverage category alone can be crowd-data noise — require AI corroboration
+        is_beverage = _is_alcoholic_beverage_name(product_name) or is_brewed or (off_alcoholic and ai_claimed_alcohol)
         if any(_is_alcohol_claim(c) for c in added_carcinogens):
             first_two = [p.strip() for p in (ingredients or "").lower().split(",")[:2]]
             alcohol_major = any("alcohol" in p or "ethanol" in p for p in first_two)
