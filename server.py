@@ -714,6 +714,17 @@ Respond with JSON only:
         
         import json
         result = json.loads(response.choices[0].message.content)
+
+        # Deterministic alcohol handling (name-only path has no ingredient evidence)
+        if _is_alcoholic_beverage_name(product_name):
+            _enforce_alcoholic_beverage(result)
+            logger.info(f"By-name alcohol enforcement: {product_name} -> 1/10")
+        elif any(_is_alcohol_claim(c) for c in (result.get("carcinogens_found") or [])):
+            _demote_trace_alcohol(result)
+            if result.get("overall_score", 5) < 2:
+                result["overall_score"] = 2
+            logger.info(f"By-name trace-alcohol guard: demoted alcohol claim for {product_name}")
+
         result["analysis_note"] = "Based on AI knowledge - no ingredient list was available from the database"
         return result
     except Exception as e:
@@ -749,6 +760,58 @@ def _is_process_formed(c):
 def _is_iarc_verified(c):
     name = str(c.get("name", "") if isinstance(c, dict) else c).lower()
     return any(k in name for k in IARC_VERIFIED_KEYWORDS)
+
+BEVERAGE_HINTS = ("beer", "wine", "spirit", "vodka", "gin", "whisky", "whiskey",
+                  "rum", "liqueur", "cider", "ale", "lager", "cocktail", "sake",
+                  "champagne", "prosecco", "brandy", "tequila", "port", "sherry",
+                  "merlot", "chardonnay", "sauvignon", "pinot", "shiraz", "cabernet",
+                  "malbec", "rioja", "chianti", "zinfandel", "moscato", "stout", "ipa",
+                  "bourbon", "mead", "alcopop", "sangria", "vermouth", "absinthe")
+
+# Names that contain a beverage word but are NOT alcoholic drinks
+NON_ALCOHOLIC_PHRASES = ("alcohol-free", "alcohol free", "non-alcoholic", "non alcoholic",
+                         "0.0%", "ginger ale", "ginger beer", "root beer", "wine vinegar",
+                         "wine gum", "beer batter", "rum & raisin", "rum and raisin")
+
+def _is_alcoholic_beverage_name(name: str) -> bool:
+    n = (name or "").lower()
+    if any(fp in n for fp in NON_ALCOHOLIC_PHRASES):
+        return False
+    return any(re.search(r"\b" + re.escape(h) + r"\b", n) for h in BEVERAGE_HINTS)
+
+def _is_alcohol_claim(c):
+    n = str(c.get("name", "") if isinstance(c, dict) else c).lower()
+    return "alcohol" in n or "ethanol" in n
+
+ETHANOL_CARCINOGEN = {
+    "name": "Alcohol (ethanol)",
+    "iarc_group": "Group 1",
+    "cancer_types": "breast, liver, colorectal, oesophageal, mouth and throat cancers",
+    "explanation": "Ethanol in alcoholic drinks is a confirmed human carcinogen — the body converts it to acetaldehyde, which damages DNA. No safe level of drinking has been established.",
+    "source": "WHO/IARC Monographs Volume 100E",
+}
+
+def _enforce_alcoholic_beverage(result: dict) -> None:
+    """Genuine alcoholic beverages always score 1 with ethanol listed as a Group 1 carcinogen."""
+    result["overall_score"] = 1
+    carcs = result.get("carcinogens_found") or []
+    if not any(_is_alcohol_claim(c) for c in carcs):
+        carcs.append(dict(ETHANOL_CARCINOGEN))
+    result["carcinogens_found"] = carcs
+    result["processing_category"] = result.get("processing_category") or "Processed"
+
+def _demote_trace_alcohol(result: dict) -> None:
+    """Trace/carrier alcohol (cooking sprays, extracts) is not a drinking-alcohol exposure."""
+    harmful = [h for h in (result.get("harmful_ingredients") or []) if not _is_alcohol_claim(h)]
+    harmful.append({
+        "name": "Alcohol (trace carrier)",
+        "severity": "low",
+        "explanation": "Trace alcohol used as a carrier/propellant — it largely evaporates in cooking. Not comparable to drinking alcohol.",
+    })
+    result["harmful_ingredients"] = harmful
+    result["carcinogens_found"] = [c for c in (result.get("carcinogens_found") or []) if not _is_alcohol_claim(c)]
+    if "alcohol" in (result.get("recommendation") or "").lower():
+        result["recommendation"] = "The trace alcohol here is a carrier that evaporates during cooking — not a drinking-alcohol risk. The score reflects this product's processing level and additives instead."
 
 def sanitize_carcinogen_claims(result: dict) -> list:
     """Strip process-formed compounds and unverifiable (AI-invented) carcinogen ratings
@@ -990,28 +1053,22 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         # Trace/carrier alcohol guard: IARC Group 1 applies to DRINKING alcohol.
         # Alcohol as a minor ingredient (cooking-spray propellant, flavour carrier —
         # burns off in cooking) must not auto-tank the score to 1.
-        def _is_alcohol_claim(c):
-            n = str(c.get("name", "") if isinstance(c, dict) else c).lower()
-            return "alcohol" in n or "ethanol" in n
+        is_beverage = _is_alcoholic_beverage_name(product_name)
         if any(_is_alcohol_claim(c) for c in added_carcinogens):
-            BEVERAGE_HINTS = ("beer", "wine", "spirit", "vodka", "gin", "whisky", "whiskey",
-                              "rum", "liqueur", "cider", "ale", "lager", "cocktail", "sake",
-                              "champagne", "prosecco", "brandy", "tequila", "port", "sherry")
-            pn = (product_name or "").lower()
             first_two = [p.strip() for p in (ingredients or "").lower().split(",")[:2]]
             alcohol_major = any("alcohol" in p or "ethanol" in p for p in first_two)
-            if not any(h in pn for h in BEVERAGE_HINTS) and not alcohol_major:
-                harmful = result.get("harmful_ingredients", harmful)
-                for c in [c for c in added_carcinogens if _is_alcohol_claim(c)]:
-                    harmful.append({
-                        "name": c.get("name") if isinstance(c, dict) else str(c),
-                        "severity": "low",
-                        "explanation": "Trace alcohol used as a carrier/propellant — it largely evaporates in cooking. Not comparable to drinking alcohol.",
-                    })
-                result["harmful_ingredients"] = harmful
+            if not is_beverage and not alcohol_major:
+                _demote_trace_alcohol(result)
+                harmful = result["harmful_ingredients"]
                 added_carcinogens = [c for c in added_carcinogens if not _is_alcohol_claim(c)]
-                result["carcinogens_found"] = [c for c in (result.get("carcinogens_found") or []) if not _is_alcohol_claim(c)]
                 logger.info(f"Trace-alcohol guard: demoted alcohol claim for {product_name}")
+        elif is_beverage:
+            # Genuine alcoholic beverage but AI failed to flag ethanol — enforce it
+            _enforce_alcoholic_beverage(result)
+            added_carcinogens = added_carcinogens + [dict(ETHANOL_CARCINOGEN)]
+            logger.info(f"Alcohol enforcement: added ethanol carcinogen for {product_name}")
+
+        carcinogens = result.get("carcinogens_found", [])
 
         harmful = result.get("harmful_ingredients", harmful)
         has_acrylamide = any(_is_process_formed(h.get("name", "")) for h in harmful)
