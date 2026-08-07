@@ -843,14 +843,19 @@ def sanitize_carcinogen_claims(result: dict) -> list:
         logger.info(f"Carcinogen gate: demoted {[str(c.get('name') if isinstance(c, dict) else c) for c, _ in demoted]}")
     return verified
 
-async def analyze_ingredients_with_ai(product_name: str, ingredients: str, off_nova_group: int = None) -> dict:
+async def analyze_ingredients_with_ai(product_name: str, ingredients: str, off_nova_group: int = None, off_categories: list = None) -> dict:
     """Analyze ingredients using OpenAI GPT-4o with focus on ultra-processed foods (UPFs)"""
     try:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        
+        off_alcoholic = "en:alcoholic-beverages" in (off_categories or [])
+
         # If no ingredients provided, use product-name-based analysis
         if not ingredients or ingredients.strip() == "":
-            return await analyze_product_by_name(client, product_name)
+            result = await analyze_product_by_name(client, product_name)
+            if off_alcoholic:
+                _enforce_alcoholic_beverage(result)
+                logger.info(f"OFF-category alcohol enforcement (by-name): {product_name} -> 1/10")
+            return result
         
         prompt = f"""You are a food science expert specializing in ultra-processed foods (UPFs), carcinogens, and nutritional health risks.
 
@@ -1059,7 +1064,8 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         # burns off in cooking) must not auto-tank the score to 1.
         ing_lower = (ingredients or "").lower()
         # Brewing ingredients identify beer even when the brand name gives nothing away (e.g. "Corona Extra")
-        is_beverage = _is_alcoholic_beverage_name(product_name) or ("hops" in ing_lower and "malt" in ing_lower)
+        is_brewed = bool(re.search(r"\bhops?\b|\bhop extract\b", ing_lower)) and "malt" in ing_lower
+        is_beverage = off_alcoholic or is_brewed or _is_alcoholic_beverage_name(product_name)
         if any(_is_alcohol_claim(c) for c in added_carcinogens):
             first_two = [p.strip() for p in (ingredients or "").lower().split(",")[:2]]
             alcohol_major = any("alcohol" in p or "ethanol" in p for p in first_two)
@@ -1811,7 +1817,8 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
             analysis = await analyze_ingredients_with_ai(
                 product_data.get("product_name", "Unknown"),
                 "",  # Empty ingredients triggers product-by-name analysis
-                off_nova_group=product_data.get("nova_group")
+                off_nova_group=product_data.get("nova_group"),
+                off_categories=product_data.get("categories_tags")
             )
         except Exception as e:
             logger.error(f"AI name-based analysis failed: {e}")
@@ -1861,7 +1868,8 @@ async def scan_product(scan_req: ScanRequest, current_user = Depends(get_current
         analysis = await analyze_ingredients_with_ai(
             product_data.get("product_name", "Unknown"),
             ingredients_text,
-            off_nova_group=product_data.get("nova_group")
+            off_nova_group=product_data.get("nova_group"),
+            off_categories=product_data.get("categories_tags")
         )
     except Exception as e:
         logger.error(f"AI analysis failed: {e}")
@@ -2547,10 +2555,9 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
     
     # Run fresh AI analysis
     if ingredients:
-        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=off_nova)
+        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=off_nova, off_categories=cached.get("categories_tags"))
     else:
-        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        analysis = await analyze_product_by_name(client, product_name)
+        analysis = await analyze_ingredients_with_ai(product_name, "", off_categories=cached.get("categories_tags"))
     
     # Update cache with new analysis
     await product_cache_collection.update_one(
