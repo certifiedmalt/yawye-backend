@@ -911,7 +911,8 @@ RULE 5 — ONLY NOVA 1 CAN SCORE 8+:
 - 8-10/10: Whole/unprocessed, no harmful additives, no carcinogens
 
 RULE 6 — ALCOHOL ALWAYS 1/10:
-- All alcohol products = 1/10. Group 1 carcinogen.
+- All alcoholic BEVERAGES (beer, wine, spirits, cider, alcopops) = 1/10. Group 1 carcinogen.
+- EXCEPTION: trace alcohol used as a carrier/propellant/solvent (cooking sprays, vanilla extract, flavourings — it evaporates in cooking) is NOT a Group 1 exposure. Do not list it in carcinogens_found; mention in harmful_ingredients at most with low severity.
 
 RULE 7 — PROCESSED MEAT ALWAYS 1/10:
 - All processed meat = 1/10. Group 1 carcinogen (nitrosamines).
@@ -985,6 +986,33 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         # Process-formed compounds and AI-invented IARC ratings are demoted by
         # sanitize_carcinogen_claims and can never trigger a 1 on their own.
         added_carcinogens = sanitize_carcinogen_claims(result)
+
+        # Trace/carrier alcohol guard: IARC Group 1 applies to DRINKING alcohol.
+        # Alcohol as a minor ingredient (cooking-spray propellant, flavour carrier —
+        # burns off in cooking) must not auto-tank the score to 1.
+        def _is_alcohol_claim(c):
+            n = str(c.get("name", "") if isinstance(c, dict) else c).lower()
+            return "alcohol" in n or "ethanol" in n
+        if any(_is_alcohol_claim(c) for c in added_carcinogens):
+            BEVERAGE_HINTS = ("beer", "wine", "spirit", "vodka", "gin", "whisky", "whiskey",
+                              "rum", "liqueur", "cider", "ale", "lager", "cocktail", "sake",
+                              "champagne", "prosecco", "brandy", "tequila", "port", "sherry")
+            pn = (product_name or "").lower()
+            first_two = [p.strip() for p in (ingredients or "").lower().split(",")[:2]]
+            alcohol_major = any("alcohol" in p or "ethanol" in p for p in first_two)
+            if not any(h in pn for h in BEVERAGE_HINTS) and not alcohol_major:
+                harmful = result.get("harmful_ingredients", harmful)
+                for c in [c for c in added_carcinogens if _is_alcohol_claim(c)]:
+                    harmful.append({
+                        "name": c.get("name") if isinstance(c, dict) else str(c),
+                        "severity": "low",
+                        "explanation": "Trace alcohol used as a carrier/propellant — it largely evaporates in cooking. Not comparable to drinking alcohol.",
+                    })
+                result["harmful_ingredients"] = harmful
+                added_carcinogens = [c for c in added_carcinogens if not _is_alcohol_claim(c)]
+                result["carcinogens_found"] = [c for c in (result.get("carcinogens_found") or []) if not _is_alcohol_claim(c)]
+                logger.info(f"Trace-alcohol guard: demoted alcohol claim for {product_name}")
+
         harmful = result.get("harmful_ingredients", harmful)
         has_acrylamide = any(_is_process_formed(h.get("name", "")) for h in harmful)
         if added_carcinogens:
