@@ -2533,13 +2533,15 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
 
     # Refresh authoritative NOVA classification from OpenFoodFacts (older cache entries lack it)
     off_nova = cached.get("nova_group")
-    if off_nova is None:
+    off_cats = cached.get("categories_tags")
+    if off_nova is None or off_cats is None:
         try:
             loop = asyncio.get_event_loop()
             fresh = await loop.run_in_executor(None, fetch_from_openfoodfacts, barcode)
             if fresh:
                 off_nova = fresh.get("nova_group")
-                refresh_update = {"nova_group": off_nova}
+                off_cats = fresh.get("categories_tags")
+                refresh_update = {"nova_group": off_nova, "categories_tags": off_cats}
                 if not ingredients and fresh.get("ingredients_text"):
                     ingredients = fresh["ingredients_text"]
                     refresh_update["ingredients_text"] = ingredients
@@ -2555,9 +2557,9 @@ async def rescan_product(scan_req: ScanRequest, current_user = Depends(get_curre
     
     # Run fresh AI analysis
     if ingredients:
-        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=off_nova, off_categories=cached.get("categories_tags"))
+        analysis = await analyze_ingredients_with_ai(product_name, ingredients, off_nova_group=off_nova, off_categories=off_cats)
     else:
-        analysis = await analyze_ingredients_with_ai(product_name, "", off_categories=cached.get("categories_tags"))
+        analysis = await analyze_ingredients_with_ai(product_name, "", off_categories=off_cats)
     
     # Update cache with new analysis
     await product_cache_collection.update_one(
