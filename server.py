@@ -3191,12 +3191,16 @@ async def admin_carcinogen_audit(key: str = "", purge: bool = False):
     suspects = []
     cursor = product_cache_collection.find(
         {"analysis.carcinogens_found.0": {"$exists": True}},
-        {"barcode": 1, "product_name": 1, "analysis.carcinogens_found": 1, "analysis.overall_score": 1})
+        {"barcode": 1, "product_name": 1, "ingredients_text": 1, "categories_tags": 1,
+         "analysis.carcinogens_found": 1, "analysis.overall_score": 1})
     async for doc in cursor:
         claims = (doc.get("analysis") or {}).get("carcinogens_found") or []
         bad = [str(c.get("name") if isinstance(c, dict) else c) for c in claims
                if _is_process_formed(c) or not _is_iarc_verified(c)]
-        if not _is_alcoholic_beverage_name(doc.get("product_name")):
+        ing_l = (doc.get("ingredients_text") or "").lower()
+        brewed = bool(re.search(r"\bhops?\b|\bhop extract\b", ing_l)) and "malt" in ing_l
+        off_alc = "en:alcoholic-beverages" in (doc.get("categories_tags") or [])
+        if not (_is_alcoholic_beverage_name(doc.get("product_name")) or brewed or off_alc):
             bad += [str(c.get("name") if isinstance(c, dict) else c) + " (alcohol claim on non-beverage)"
                     for c in claims if _is_alcohol_claim(c)]
         if bad:
