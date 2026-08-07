@@ -766,15 +766,19 @@ BEVERAGE_HINTS = ("beer", "wine", "spirit", "vodka", "gin", "whisky", "whiskey",
                   "champagne", "prosecco", "brandy", "tequila", "port", "sherry",
                   "merlot", "chardonnay", "sauvignon", "pinot", "shiraz", "cabernet",
                   "malbec", "rioja", "chianti", "zinfandel", "moscato", "stout", "ipa",
-                  "bourbon", "mead", "alcopop", "sangria", "vermouth", "absinthe")
+                  "bourbon", "mead", "alcopop", "sangria", "vermouth", "absinthe",
+                  "amaretto", "weissbier", "pilsner", "aperol", "campari", "margarita", "mojito")
 
 # Names that contain a beverage word but are NOT alcoholic drinks
-NON_ALCOHOLIC_PHRASES = ("alcohol-free", "alcohol free", "non-alcoholic", "non alcoholic",
-                         "0.0%", "ginger ale", "ginger beer", "root beer", "wine vinegar",
+NON_ALCOHOLIC_PHRASES = ("ginger ale", "ginger beer", "root beer", "wine vinegar",
                          "wine gum", "beer batter", "rum & raisin", "rum and raisin")
 
 def _is_alcoholic_beverage_name(name: str) -> bool:
     n = (name or "").lower()
+    if any(fp in n for fp in ("alcohol-free", "alcohol free", "non-alcoholic", "non alcoholic", "0.0%")):
+        return False
+    if "alcoholic" in n:
+        return True
     if any(fp in n for fp in NON_ALCOHOLIC_PHRASES):
         return False
     return any(re.search(r"\b" + re.escape(h) + r"\b", n) for h in BEVERAGE_HINTS)
@@ -1053,7 +1057,9 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         # Trace/carrier alcohol guard: IARC Group 1 applies to DRINKING alcohol.
         # Alcohol as a minor ingredient (cooking-spray propellant, flavour carrier —
         # burns off in cooking) must not auto-tank the score to 1.
-        is_beverage = _is_alcoholic_beverage_name(product_name)
+        ing_lower = (ingredients or "").lower()
+        # Brewing ingredients identify beer even when the brand name gives nothing away (e.g. "Corona Extra")
+        is_beverage = _is_alcoholic_beverage_name(product_name) or ("hops" in ing_lower and "malt" in ing_lower)
         if any(_is_alcohol_claim(c) for c in added_carcinogens):
             first_two = [p.strip() for p in (ingredients or "").lower().split(",")[:2]]
             alcohol_major = any("alcohol" in p or "ethanol" in p for p in first_two)
