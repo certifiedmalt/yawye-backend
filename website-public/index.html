@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>You Are What You Eat – Know What's Really In Your Food</title>
-  <meta name="description" content="Poor diet has overtaken smoking as the leading cause of death. Scan any barcode and see the truth about ultra-processed food. Download YAWYE free.">
+  <meta name="description" content="Poor diet has overtaken smoking as the leading cause of death. Scan any barcode — US, UK and European brands — and see the truth about ultra-processed food, additives like Red 40 and high fructose corn syrup. Download YAWYE free.">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -30,7 +30,7 @@
         "name": "You Are What You Eat – Food Scanner",
         "operatingSystem": "iOS, Android",
         "applicationCategory": "HealthApplication",
-        "description": "Scan any food barcode and instantly see an honest 1-10 health score. Detects ultra-processed ingredients, additives and IARC-classified carcinogens, and suggests genuinely healthier swaps — without fear-mongering. Also analyses fresh food from a photo when there's no barcode.",
+        "description": "Scan any food barcode — American, British and European brands — and instantly see an honest 1-10 health score. Detects ultra-processed ingredients and additives including Red 40, Red 3, Yellow 5, high fructose corn syrup, titanium dioxide and IARC-classified carcinogens, and suggests genuinely healthier swaps — without fear-mongering. Powered by USDA FoodData Central and OpenFoodFacts. Also analyses fresh food from a photo when there's no barcode.",
         "url": "https://youarewhatyoueat.store/",
         "installUrl": "https://apps.apple.com/app/id6760589990",
         "sameAs": [
@@ -40,7 +40,7 @@
         "author": {"@id": "https://youarewhatyoueat.store/#org"},
         "offers": [
           {"@type": "Offer", "price": "0", "priceCurrency": "GBP", "description": "Free download with 5 free scans"},
-          {"@type": "Offer", "price": "1.99", "priceCurrency": "GBP", "description": "Premium subscription — unlimited scans, £1.99/month"}
+          {"@type": "Offer", "price": "1.99", "priceCurrency": "GBP", "description": "Premium subscription — unlimited scans, £1.99/month (about $2.50 USD, billed in your local currency by the App Store or Google Play)"}
         ]
       },
       {
@@ -68,7 +68,7 @@
             "name": "Is the You Are What You Eat app free?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes — the app is free to download on iOS and Android and includes 5 free scans. Unlimited scanning is available with a Premium subscription for £1.99 per month."
+              "text": "Yes — the app is free to download on iOS and Android and includes 5 free scans. Unlimited scanning is available with a Premium subscription for £1.99 per month (about $2.50 USD — billed in your local currency by the App Store or Google Play)."
             }
           },
           {
@@ -81,10 +81,26 @@
           },
           {
             "@type": "Question",
+            "name": "Does it work with American products?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. The app has strong US coverage through USDA FoodData Central and UPC barcode databases, so it recognises American grocery brands and flags US-specific concerns like Red 40, Red 3 (banned by the FDA in 2025), high fructose corn syrup, brominated vegetable oil and titanium dioxide. It also works across the UK and Europe, and if a product isn't in any database you can teach the app the product name and it will analyse it for you."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can it detect Red 40, Red 3 and other food dyes?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. The app flags artificial food dyes including Red 40 (Allura Red), Red 3 (Erythrosine — banned in US foods by the FDA in 2025), Yellow 5 (Tartrazine), Yellow 6 (Sunset Yellow) and titanium dioxide, explaining the evidence for each — such as hyperactivity links in children and EU warning-label requirements — without inventing cancer claims that aren't backed by IARC."
+            }
+          },
+          {
+            "@type": "Question",
             "name": "Which countries and products does the app work with?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "The app works worldwide, with strongest coverage for UK, European and US products. It combines several barcode databases including OpenFoodFacts and USDA FoodData Central, and when a product isn't in any database you can teach the app the product name and it will analyse it for you."
+              "text": "The app works worldwide, with strongest coverage for US, UK and European products. It combines several barcode databases including USDA FoodData Central and OpenFoodFacts, and when a product isn't in any database you can teach the app the product name and it will analyse it for you."
             }
           }
         ]
@@ -213,7 +229,7 @@
         </div>
         <div class="bg-surface border border-white/10 rounded-3xl p-6 reveal" data-testid="stat-card-calories">
           <div class="font-heading text-4xl font-black text-brand">57%</div>
-          <p class="text-sm text-muted mt-2">of the average UK adult's calories now come from ultra-processed food.</p>
+          <p class="text-sm text-muted mt-2">of the average US and UK adult's calories now come from ultra-processed food.</p>
         </div>
       </div>
     </div>
@@ -348,7 +364,7 @@
             <div class="w-12 h-12 rounded-2xl bg-brand text-black font-heading font-black text-xl flex items-center justify-center shrink-0">1</div>
             <div>
               <h3 class="font-heading font-bold text-xl">Scan any barcode</h3>
-              <p class="text-muted text-base mt-1">Point your phone at anything in the supermarket or your cupboard.</p>
+              <p class="text-muted text-base mt-1">Point your phone at anything in the grocery store, supermarket or your cupboard.</p>
             </div>
           </div>
           <div class="flex gap-5 reveal" data-testid="app-step-2">
@@ -384,7 +400,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-12 max-w-4xl">
       <div class="bg-surface border border-white/10 rounded-3xl p-8 reveal" data-testid="pricing-free-card">
         <div class="font-heading font-bold text-lg text-muted">Free</div>
-        <div class="font-heading text-5xl font-black mt-2">£0 <span class="text-lg text-muted font-normal">/forever</span></div>
+        <div class="font-heading text-5xl font-black mt-2">£0 <span class="text-lg text-muted font-normal">/ $0 forever</span></div>
         <ul class="mt-6 flex flex-col gap-3 text-base text-muted">
           <li class="flex gap-3"><span class="text-brand">✓</span>5 product scans</li>
           <li class="flex gap-3"><span class="text-brand">✓</span>Full AI ingredient analysis</li>
@@ -396,6 +412,7 @@
         <div class="absolute -top-3 left-8 bg-brand text-black text-xs font-bold tracking-widest uppercase rounded-full px-3 py-1">Most popular</div>
         <div class="font-heading font-bold text-lg text-brand">Premium</div>
         <div class="font-heading text-5xl font-black mt-2">£1.99 <span class="text-lg text-muted font-normal">/month</span></div>
+        <p class="text-xs text-muted mt-1">about $2.50 USD — billed in your local currency by the App Store or Google Play</p>
         <ul class="mt-6 flex flex-col gap-3 text-base text-muted">
           <li class="flex gap-3"><span class="text-brand">✓</span>Unlimited scans</li>
           <li class="flex gap-3"><span class="text-brand">✓</span>Safe Swaps — healthier alternatives</li>
