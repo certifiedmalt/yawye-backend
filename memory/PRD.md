@@ -108,3 +108,4 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - Cache cleanup: rescanned 25 stale products flagged by extended carcinogen audit; final audit = 0 suspects.
 - ADDED (verified live): Schema.org JSON-LD on youarewhatyoueat.store index.html (Organization, WebSite, MobileApplication, FAQPage w/ 5 Q&As) for Google AI search visibility. Deployed via yawye-website repo.
 - NOTE: user is cost-sensitive — always state plan + size estimate before work; prefer minimal scope.
+- US market visibility (verified live): US search terms in meta/schema (Red 40, Red 3 FDA ban, HFCS, USDA), 2 new US FAQ schema entries (7 total), ~$2.50 USD pricing context on pricing card + schema, US-inclusive copy (US/UK stat, grocery store). Kept £ as real billed price.
