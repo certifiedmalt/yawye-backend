@@ -102,3 +102,9 @@ A food product analysis app that scans barcodes, provides AI-powered health scor
 - Admin: jpsaila1986@gmail.com / hello123
 - Apple Review: applereview@yawye.app / Review2024!
 - Test: test.screenshot@yawye.app / test1234
+
+## June 2026 session
+- FIXED (verified live): Frylight "olive oil" false alcohol-carcinogen scoring. Deterministic alcohol logic: genuine alcoholic drinks (name hints w/ word boundaries, hops+malt ingredients, or OFF alcoholic category + AI corroboration) = 1/10 with ethanol Group 1; trace/carrier alcohol demoted to low-severity, no false carcinogen claims. Applied to both ingredient and by-name paths; by-name path now also runs sanitize_carcinogen_claims.
+- Cache cleanup: rescanned 25 stale products flagged by extended carcinogen audit; final audit = 0 suspects.
+- ADDED (verified live): Schema.org JSON-LD on youarewhatyoueat.store index.html (Organization, WebSite, MobileApplication, FAQPage w/ 5 Q&As) for Google AI search visibility. Deployed via yawye-website repo.
+- NOTE: user is cost-sensitive — always state plan + size estimate before work; prefer minimal scope.
