@@ -179,7 +179,7 @@
           <tbody id="link-stats"></tbody>
         </table>
       </div>
-      <p class="text-muted text-xs mt-3">Share youarewhatyoueat.store/go/anycode — clicks are tracked automatically, no setup needed per code.</p>
+      <p class="text-muted text-xs mt-3">Your TikTok USA ad link: <span class="text-brand font-bold">https://youarewhatyoueat.store/go/tiktokusa</span> — any other /go/code works automatically, no setup needed.</p>
     </div>
 
     <p class="text-muted text-xs mt-8">Live data from production. Revenue estimate = PAYING premium users × £1.99/mo (comped/influencer accounts excluded). Store-level download counts live in App Store Connect / Play Console.</p>
@@ -356,13 +356,22 @@ function renderCohort(expanded){
 async function loadLinkStats(){
   const r = await api('/api/admin/link_stats');
   document.getElementById('link-stats').innerHTML = (r.links||[]).map(l => `<tr class="border-b border-white/5">
-      <td class="py-2 pr-4 font-bold text-brand">/go/${l.code}</td>
+      <td class="py-2 pr-4 font-bold text-brand">/go/${l.code}
+        <button onclick="copyLink('${l.code}', this)" data-testid="copy-link-${l.code}" title="Copy full link"
+          class="ml-2 bg-white/10 border border-white/20 rounded-full px-2.5 py-0.5 text-xs text-white font-normal hover:bg-white/20">copy</button></td>
       <td class="py-2 pr-4 font-bold">${l.clicks}</td>
       <td class="py-2 pr-4">${l.ios}</td>
       <td class="py-2 pr-4">${l.android}</td>
       <td class="py-2 pr-4 text-muted">${(l.countries||[]).join(', ')||'—'}</td>
       <td class="py-2 text-muted">${(l.last_click||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
     || '<tr><td colspan="6" class="py-3 text-muted">No link clicks yet. Share youarewhatyoueat.store/go/yourcode to start tracking.</td></tr>';
+}
+
+function copyLink(code, btn){
+  navigator.clipboard.writeText('https://youarewhatyoueat.store/go/' + code).then(() => {
+    btn.textContent = 'copied ✓';
+    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+  });
 }
 
 document.getElementById('pw').addEventListener('keydown', e => { if(e.key==='Enter') unlock(); });
