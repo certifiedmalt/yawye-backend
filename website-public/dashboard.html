@@ -248,10 +248,11 @@ async function loadAll(){
 
   const prem = stats.premium_user_details || [];
   const comped = stats.comped_user_details || [];
-  document.getElementById('premium-label').textContent = `— ${prem.length} paying`;
+  const payingCount = stats.paying_subscribers ?? prem.length;
+  document.getElementById('premium-label').textContent = `— ${payingCount} paying` + (stats.internal_subscribers ? ` (+${stats.internal_subscribers} internal, excluded)` : '');
   document.getElementById('premium-users').innerHTML = prem.map(u => `<tr class="border-b border-white/5">
       <td class="py-2 pr-4 text-muted whitespace-nowrap">${(u.created_at||'').slice(0,10)}</td>
-      <td class="py-2 pr-4 text-brand font-bold">${u.email||''}</td>
+      <td class="py-2 pr-4 text-brand font-bold">${u.email||''}${u.internal?' <span class="bg-white/10 border border-white/20 rounded-full px-2 py-0.5 text-xs text-muted font-normal">internal</span>':''}</td>
       <td class="py-2 pr-4 text-muted">${u.name||''} ${platIcon(u.platform)}</td>
       <td class="py-2 pr-4">${u.total_scans??0}</td>
       <td class="py-2 text-muted">${regionName(u.country||'?')}</td></tr>`).join('')
@@ -322,8 +323,8 @@ async function loadSubEvents(){
       `— ${r.summary.new} new · ${r.summary.cancelled} cancelled · ${r.summary.billing_issues} billing issues (90d)`;
     const ICON = {subscribed:'⭐', resubscribed:'🔁', renewed:'✅', plan_change:'🔀', cancelled:'❌', expired:'⌛', billing_issue:'⚠️'};
     document.getElementById('subevents').innerHTML = (r.events||[]).map(e =>
-      `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2">
-        <span>${ICON[e.event]||'•'} <b>${e.email||'?'}</b> <span class="${e.event==='cancelled'||e.event==='expired'?'text-warn':e.event==='subscribed'?'text-brand':'text-muted'}">${e.event.replace('_',' ')}</span>
+      `<div class="bg-black border border-white/10 rounded-lg px-3 py-1.5 flex justify-between gap-2${e.internal?' opacity-50':''}">
+        <span>${ICON[e.event]||'•'} <b>${e.email||'?'}</b>${e.internal?' <span class="bg-white/10 border border-white/20 rounded-full px-2 py-0.5 text-xs text-muted">internal test — not counted</span>':''} <span class="${e.event==='cancelled'||e.event==='expired'?'text-warn':e.event==='subscribed'?'text-brand':'text-muted'}">${e.event.replace('_',' ')}</span>
         <span class="text-muted">(${e.source||''})</span>${e.days_subscribed!=null?` <span class="text-muted">· subscribed ${e.days_subscribed}d</span>`:''}</span>
         <span class="text-muted text-xs whitespace-nowrap">${(e.at||'').slice(5,16).replace('T',' ')}</span></div>`).join('')
       || '<span class="text-muted">No subscription events recorded yet — the log starts now, so this fills in as people subscribe or cancel.</span>';

@@ -2839,12 +2839,16 @@ async def admin_user_stats(key: str = ""):
     ).sort("created_at", -1):
         if isinstance(u.get("created_at"), datetime):
             u["created_at"] = u["created_at"].isoformat()
+        if (u.get("email") or "") in INTERNAL_EMAILS:
+            u["internal"] = True
         (comped_list if u.get("comped") else premium_list).append(u)
+    paying = [u for u in premium_list if not u.get("internal")]
     return {
         "total_users": total_users,
         "premium_subscribers": premium_users,
-        "paying_subscribers": len(premium_list),
+        "paying_subscribers": len(paying),
         "comped_subscribers": len(comped_list),
+        "internal_subscribers": len(premium_list) - len(paying),
         "free_users": free_users,
         "premium_user_details": premium_list,
         "comped_user_details": comped_list
@@ -3015,9 +3019,10 @@ async def admin_subscription_events(key: str = "", days: int = 90):
         raise HTTPException(status_code=403, detail="Invalid key")
     cutoff = datetime.utcnow() - timedelta(days=days)
     events = []
-    first_sub_by_email = {}
     async for e in subscription_events_collection.find({"at": {"$gte": cutoff}}, {"_id": 0}).sort("at", -1).limit(100):
         e["at"] = e["at"].isoformat() if isinstance(e.get("at"), datetime) else e.get("at")
+        if (e.get("email") or "") in INTERNAL_EMAILS:
+            e["internal"] = True
         events.append(e)
     # days-subscribed for cancellations: look up that email's earliest 'subscribed' event
     for e in events:
@@ -3031,6 +3036,8 @@ async def admin_subscription_events(key: str = "", days: int = 90):
                     pass
     summary = {"new": 0, "cancelled": 0, "billing_issues": 0}
     for e in events:
+        if e.get("internal"):
+            continue
         if e["event"] in ("subscribed", "resubscribed"):
             summary["new"] += 1
         elif e["event"] in ("cancelled", "expired"):
