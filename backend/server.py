@@ -1516,14 +1516,19 @@ async def admin_link_stats(key: str = ""):
             "_id": "$code", "clicks": {"$sum": 1},
             "ios": {"$sum": {"$cond": [{"$eq": ["$device", "ios"]}, 1, 0]}},
             "android": {"$sum": {"$cond": [{"$eq": ["$device", "android"]}, 1, 0]}},
-            "countries": {"$addToSet": "$country"},
+            "countries": {"$push": "$country"},
             "last_click": {"$max": "$clicked_at"},
         }},
         {"$sort": {"clicks": -1}},
     ]):
+        counts = {}
+        for c in d["countries"]:
+            c = c or "?"
+            counts[c] = counts.get(c, 0) + 1
         stats.append({
             "code": d["_id"], "clicks": d["clicks"], "ios": d["ios"], "android": d["android"],
-            "countries": sorted(c for c in d["countries"] if c),
+            "countries": sorted(c for c in set(d["countries"]) if c),
+            "country_counts": dict(sorted(counts.items(), key=lambda kv: -kv[1])),
             "last_click": d["last_click"].isoformat() if d.get("last_click") else None,
         })
     return {"links": stats}

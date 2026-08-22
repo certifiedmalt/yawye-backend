@@ -363,7 +363,7 @@ async function loadLinkStats(){
       <td class="py-2 pr-4 font-bold">${l.clicks}</td>
       <td class="py-2 pr-4">${l.ios}</td>
       <td class="py-2 pr-4">${l.android}</td>
-      <td class="py-2 pr-4 text-muted">${(l.countries||[]).join(', ')||'—'}</td>
+      <td class="py-2 pr-4 text-muted">${l.country_counts ? Object.entries(l.country_counts).map(([c,n])=>`${c}×${n}`).join(', ') : (l.countries||[]).join(', ')||'—'}</td>
       <td class="py-2 text-muted">${(l.last_click||'').slice(0,16).replace('T',' ')}</td></tr>`).join('')
     || '<tr><td colspan="6" class="py-3 text-muted">No link clicks yet. Share youarewhatyoueat.store/go/yourcode to start tracking.</td></tr>';
 }
