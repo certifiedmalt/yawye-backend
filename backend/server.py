@@ -849,6 +849,71 @@ def sanitize_carcinogen_claims(result: dict) -> list:
         logger.info(f"Carcinogen gate: demoted {[str(c.get('name') if isinstance(c, dict) else c) for c, _ in demoted]}")
     return verified
 
+# NOVA 4 marker ingredients (Monteiro et al. / OpenFoodFacts marker list): substances of no
+# or rare culinary use and cosmetic additives. If any appear in the ingredient text the product
+# IS ultra-processed, whatever the AI says — the AI misses these inconsistently (e.g. Mars bars
+# with glucose syrup + whey + milk protein were coming back "0% UPF").
+NOVA4_MARKER_PATTERNS = (
+    r"glucose[\s-]*(?:fructose\s+)?syrup", r"fructose[\s-]*(?:glucose\s+)?syrup", r"corn\s+syrup",
+    r"invert(?:ed)?\s+sugar", r"\bdextrose\b", r"maltodextrin", r"\blactose\b", r"\bfructose\b",
+    r"\bwhey\s+(?:powder|protein|permeate|solids)", r"protein\s+from\s+whey", r"\bwhey\b(?=\s*\(|\s*,|\s*$)",
+    r"milk\s+proteins?", r"\bcaseinates?\b", r"\bprotein\s+isolate", r"soya?\s+protein", r"pea\s+protein",
+    r"hydroly[sz]ed", r"modified\s+(?:\w+\s+)?starch", r"hydrogenated", r"interesterified",
+    r"emulsifiers?", r"lecithins?", r"mono-?\s*and\s+di-?glycerides", r"polysorbate", r"carrageenan",
+    r"xanthan", r"thickeners?", r"stabili[sz]ers?", r"humectants?", r"anti-?caking", r"glazing\s+agent",
+    r"flavour\s+enhancer", r"flavor\s+enhancer", r"(?<!natural vanilla )flavou?rings?\b",
+    r"artificial\s+flavou?r", r"sweeteners?", r"aspartame", r"sucralose", r"acesulfame", r"saccharin",
+    r"\bcolou?rs?\b\s*[:(]", r"monosodium\s+glutamate",
+    # E-numbers: colours (E100-E199), emulsifiers/stabilisers/thickeners (E400-E499),
+    # flavour enhancers (E620-E640), sweeteners (E950-E969)
+    r"\be\s?-?1\d\d[a-z]?\b", r"\be\s?-?4\d\d[a-z]?\b", r"\be\s?-?6[2-4]\d\b", r"\be\s?-?9[56]\d\b",
+)
+_NOVA4_RE = re.compile("|".join(NOVA4_MARKER_PATTERNS), re.IGNORECASE)
+
+# Refined seed/vegetable oils. Not NOVA 4 on their own, but a product containing one is never
+# "0% UPF" whole food — it must be flagged consistently and never boosted by the low-UPF rules.
+_REFINED_OIL_RE = re.compile(
+    r"\b(?:sunflower|rapeseed|canola|soy|soya|soybean|corn|maize|cottonseed|vegetable|palm(?:\s+kernel)?)"
+    r"\s+(?:seed\s+)?(?:oil|oils|fat|fats)\b", re.IGNORECASE)
+_UNREFINED_RE = re.compile(r"cold[\s-]*pressed|extra[\s-]*virgin|unrefined|virgin", re.IGNORECASE)
+
+
+def detect_nova4_markers(ingredients: str) -> list:
+    """Return the NOVA 4 marker ingredients found in the raw ingredient text (deduplicated)."""
+    found = []
+    for m in _NOVA4_RE.finditer(ingredients or ""):
+        name = m.group(0).strip(" :(").lower()
+        if name not in found:
+            found.append(name)
+    return found
+
+
+def detect_refined_oils(ingredients: str) -> list:
+    """Return refined seed/vegetable oils named in the ingredient text (skips cold-pressed/virgin)."""
+    found = []
+    for part in re.split(r"[,;()\[\]]", ingredients or ""):
+        if _UNREFINED_RE.search(part):
+            continue
+        for m in _REFINED_OIL_RE.finditer(part):
+            name = m.group(0).lower()
+            if name not in found:
+                found.append(name)
+    return found
+
+
+def _ensure_flagged(result: dict, names: list, note: str, level: str) -> None:
+    """Add any detected ingredient the AI left out of harmful_ingredients, so the user sees it."""
+    harmful = result.get("harmful_ingredients") or []
+    listed = " ".join(str(h.get("name", "")).lower() for h in harmful if isinstance(h, dict))
+    for n in names:
+        key = n.split()[0]
+        if key not in listed:
+            harmful.append({"name": n.title(), "severity": "medium", "health_impact": note,
+                            "processing_level": level})
+            listed += " " + n
+    result["harmful_ingredients"] = harmful
+
+
 async def analyze_ingredients_with_ai(product_name: str, ingredients: str, off_nova_group: int = None, off_categories: list = None) -> dict:
     """Analyze ingredients using OpenAI GPT-4o with focus on ultra-processed foods (UPFs)"""
     try:
@@ -1042,9 +1107,20 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         # Rule 0: NOVA 4 consistency — if OpenFoodFacts (authoritative DB) classifies the
         # product as NOVA 4, or the AI itself flagged a NOVA 4 marker ingredient, the whole
         # product IS Ultra-Processed by NOVA methodology. Never allow "Processed" + NOVA 4 additive.
+        # The ingredient text is also checked in code, because the AI misses markers
+        # inconsistently (it caught them in crisps but not in a Mars bar).
         ai_flagged_nova4 = any(h.get("processing_level") == "NOVA 4" for h in harmful)
-        if (off_nova_group == 4 or ai_flagged_nova4) and "ultra" not in category:
-            logger.info(f"Rule 0: coercing '{category}' -> Ultra-Processed for {product_name} (off_nova={off_nova_group}, ai_nova4_ingredient={ai_flagged_nova4})")
+        code_nova4 = detect_nova4_markers(ingredients)
+        refined_oils = detect_refined_oils(ingredients)
+        if code_nova4:
+            _ensure_flagged(result, code_nova4, "Industrial ingredient not used in home cooking — a marker of ultra-processed food (NOVA 4).", "NOVA 4")
+        if refined_oils:
+            _ensure_flagged(result, refined_oils, "Industrially refined oil (solvent-extracted, bleached and deodorised at high heat) — a signature ingredient of ultra-processed foods.", "NOVA 2")
+        harmful = result.get("harmful_ingredients", harmful)
+        if code_nova4 or refined_oils:
+            has_industrial_additives = True
+        if (off_nova_group == 4 or ai_flagged_nova4 or code_nova4) and "ultra" not in category:
+            logger.info(f"Rule 0: coercing '{category}' -> Ultra-Processed for {product_name} (off_nova={off_nova_group}, ai_nova4_ingredient={ai_flagged_nova4}, code_markers={code_nova4})")
             result["processing_category"] = "Ultra-Processed"
             category = "ultra-processed"
             if 0 <= upf_pct <= 10:
@@ -1055,6 +1131,10 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         # Fried snacks (chips/crisps/fries) can have short "clean" ingredient lists but are
         # never whole/minimally-processed — exclude from clean-list and whole-food boosts
         fried_snack = any(k in (product_name or "").lower() for k in ["chips", "crisps", "fries", "tortilla"])
+
+        # Sugar as the main ingredient (confectionery, sweets) never earns a low-UPF boost
+        first_ingredient = (ingredients or "").split(",")[0].strip().lower()
+        sugar_led = bool(re.search(r"\bsugars?\b|syrup", first_ingredient))
 
         # Rule 1: Any VERIFIED ADDED carcinogen = score 1.
         # Process-formed compounds and AI-invented IARC ratings are demoted by
@@ -1098,7 +1178,7 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
             result["overall_score"] = max(score, 8)
         # Rule 3: Processed (NOVA 3) = clamp to 3-5 — BUT not if UPF is genuinely 0-10%
         elif "processed" in category and "minimally" not in category and "whole" not in category:
-            if upf_pct >= 0 and upf_pct <= 10:
+            if upf_pct >= 0 and upf_pct <= 10 and not has_industrial_additives and not sugar_led:
                 # UPF 0-10% contradicts "Processed" — trust the UPF score, boost it
                 result["overall_score"] = max(score, 7)
             else:
@@ -1106,12 +1186,12 @@ SWAPS RULE — healthier_alternatives: ONLY suggest alternatives for products sc
         
         # Rule 9: Zero/Low UPF safety net — 0% UPF must score at least 7
         # Fires AFTER all other rules as a final sanity check
-        if upf_pct >= 0 and upf_pct <= 10 and not has_industrial_additives and not fried_snack:
+        if upf_pct >= 0 and upf_pct <= 10 and not has_industrial_additives and not fried_snack and not sugar_led:
             if not (carcinogens and len(carcinogens) > 0) and "ultra" not in category:
                 result["overall_score"] = max(result["overall_score"], 7)
         
         # Rule 10: Whole Food / Minimally Processed floor = 7
-        if ("whole" in category or "minimally" in category) and not (carcinogens and len(carcinogens) > 0) and not fried_snack:
+        if ("whole" in category or "minimally" in category) and not (carcinogens and len(carcinogens) > 0) and not fried_snack and not (code_nova4 or refined_oils):
             result["overall_score"] = max(result["overall_score"], 7)
 
         # Rule 12: Fried snacks always clamp to max 5 regardless of category the AI chose
@@ -3222,6 +3302,34 @@ async def admin_carcinogen_audit(key: str = "", purge: bool = False):
                 "score": (doc.get("analysis") or {}).get("overall_score"),
                 "unverified_claims": bad,
             })
+    if purge and suspects:
+        await product_cache_collection.delete_many({"barcode": {"$in": [s["barcode"] for s in suspects]}})
+    return {"count": len(suspects), "purged": bool(purge), "suspects": suspects}
+
+
+@app.post("/api/admin/nova_audit")
+async def admin_nova_audit(key: str = "", purge: bool = False):
+    """Find cached analyses scored before code-level ingredient detection: products whose
+    ingredient text has NOVA 4 markers but aren't Ultra-Processed, or that contain refined
+    oils / are sugar-led yet score 6+. Optionally purge them so the next scan re-analyses."""
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    suspects = []
+    cursor = product_cache_collection.find(
+        {"analysis.overall_score": {"$exists": True}, "ingredients_text": {"$nin": [None, ""]}},
+        {"barcode": 1, "product_name": 1, "ingredients_text": 1,
+         "analysis.overall_score": 1, "analysis.processing_category": 1})
+    async for doc in cursor:
+        ing = doc.get("ingredients_text") or ""
+        analysis = doc.get("analysis") or {}
+        score = analysis.get("overall_score") or 0
+        markers = detect_nova4_markers(ing)
+        oils = detect_refined_oils(ing)
+        sugar_led = bool(re.search(r"\bsugars?\b|syrup", ing.split(",")[0].strip().lower()))
+        not_ultra = "ultra" not in str(analysis.get("processing_category", "")).lower()
+        if (markers and not_ultra and score > 3) or ((oils or sugar_led) and score >= 6):
+            suspects.append({"barcode": doc.get("barcode"), "product_name": doc.get("product_name"),
+                             "score": score, "markers": markers, "refined_oils": oils, "sugar_led": sugar_led})
     if purge and suspects:
         await product_cache_collection.delete_many({"barcode": {"$in": [s["barcode"] for s in suspects]}})
     return {"count": len(suspects), "purged": bool(purge), "suspects": suspects}
