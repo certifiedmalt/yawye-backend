@@ -3307,13 +3307,10 @@ async def admin_carcinogen_audit(key: str = "", purge: bool = False):
     return {"count": len(suspects), "purged": bool(purge), "suspects": suspects}
 
 
-@app.post("/api/admin/nova_audit")
-async def admin_nova_audit(key: str = "", purge: bool = False):
+async def _run_nova_audit(purge: bool = False) -> dict:
     """Find cached analyses scored before code-level ingredient detection: products whose
     ingredient text has NOVA 4 markers but aren't Ultra-Processed, or that contain refined
     oils / are sugar-led yet score 6+. Optionally purge them so the next scan re-analyses."""
-    if key != "yawye2024clear":
-        raise HTTPException(status_code=403, detail="Invalid key")
     suspects = []
     cursor = product_cache_collection.find(
         {"analysis.overall_score": {"$exists": True}, "ingredients_text": {"$nin": [None, ""]}},
@@ -3333,6 +3330,33 @@ async def admin_nova_audit(key: str = "", purge: bool = False):
     if purge and suspects:
         await product_cache_collection.delete_many({"barcode": {"$in": [s["barcode"] for s in suspects]}})
     return {"count": len(suspects), "purged": bool(purge), "suspects": suspects}
+
+
+@app.post("/api/admin/nova_audit")
+async def admin_nova_audit(key: str = "", purge: bool = False):
+    if key != "yawye2024clear":
+        raise HTTPException(status_code=403, detail="Invalid key")
+    return await _run_nova_audit(purge)
+
+
+@app.on_event("startup")
+async def _nova_audit_on_startup():
+    """NOVA_AUDIT_ON_STARTUP=dry logs the stale-score list; =purge also clears it.
+    Lets the audit run from Railway variables alone, results read from the deploy logs."""
+    mode = (os.getenv("NOVA_AUDIT_ON_STARTUP") or "").strip().lower()
+    if mode not in ("dry", "purge"):
+        return
+
+    async def _run():
+        try:
+            res = await _run_nova_audit(purge=(mode == "purge"))
+            logger.info(f"NOVA_AUDIT mode={mode} count={res['count']} purged={res['purged']}")
+            for s in res["suspects"]:
+                logger.info(f"NOVA_AUDIT_ITEM {s['barcode']} score={s['score']} name={s['product_name']!r} "
+                            f"markers={s['markers'][:4]} oils={s['refined_oils']} sugar_led={s['sugar_led']}")
+        except Exception as e:
+            logger.error(f"NOVA_AUDIT failed: {e}")
+    asyncio.create_task(_run())
 
 
 @app.post("/api/admin/grant_pending_premium")
